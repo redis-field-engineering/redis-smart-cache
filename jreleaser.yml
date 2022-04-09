@@ -1,8 +1,8 @@
 project:
-  name: sql-redis
-  description: SQL interface for RediSearch
-  longDescription: SQL interface and JDBC driver for RediSearch
-  website: https://github.com/redis-field-engineering/sql-redis
+  name: sidecar-redis
+  description: JDBC Cache
+  longDescription: JDBC driver that transparently caches SQL queries 
+  website: https://github.com/redis-field-engineering/sidecar-redis
   authors:
     - Julien Ruaux
   license: Apache-2.0
@@ -97,10 +97,10 @@ announce:
   slack:
     active: release
     channel: '#field-engineering-announcements'
-    message: '🚀 SQL Redis {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '🚀 Sidecar Redis {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
-  trino-redisearch:
+  sidecar-redis-driver:
     artifacts:
       - path: subprojects/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'
