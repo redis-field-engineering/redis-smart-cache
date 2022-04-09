@@ -10,5 +10,4 @@ image:https://img.shields.io/maven-central/v/{project-group}/{project-name}[Down
 image:https://img.shields.io/nexus/s/{project-group}/{project-name}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{project-name}"]
 image:https://codecov.io/gh/{project-owner}/sidecar-redis/branch/master/graph/badge.svg?token=9I4H9NOBRQ["Coverage", link="https://codecov.io/gh/{project-owner}/sidecar-redis"]
 
-Sidecar Redis is a transparent SQL caching proxy
-
+Sidecar Redis is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
