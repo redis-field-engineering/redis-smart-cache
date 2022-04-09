@@ -1,7 +1,7 @@
 = Sidecar Redis
 :linkattrs:
 :project-owner:   redis-field-engineering
-:project-name:    sidecar-redis
+:project-name:    sidecar-redis-driver
 :project-group:   com.redis
 :project-version: 0.0.1
 
