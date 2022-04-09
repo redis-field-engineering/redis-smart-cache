@@ -66,9 +66,19 @@ subprojects {
 			description = project.project_description
 		}
 	}
+	
+	dependencies {
+        testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    }
+    
+    test {
+        useJUnitPlatform()
+    }
+    
 	bootJar {
 		enabled = false
 	}
+	
 	jar {
 		enabled = true
 		archiveClassifier = ''
