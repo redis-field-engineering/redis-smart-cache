@@ -1,18 +1,12 @@
 package com.redis.sidecar;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-
-import javax.sql.DataSource;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -35,16 +29,14 @@ public class PostgreSQLTests extends AbstractSidecarTests {
 
 	@BeforeAll
 	public static void setupAll() throws SQLException, IOException {
-		backendConnection = getDataSource(POSTGRESQL).getConnection();
+		backendConnection = getDatabaseConnection(POSTGRESQL);
 		ScriptRunner scriptRunner = new ScriptRunner(backendConnection);
 		scriptRunner.setAutoCommit(false);
 		scriptRunner.setStopOnError(true);
 		String file = "northwind.sql";
-		InputStream inputStream = PostgreSQLTests.class.getClassLoader().getResourceAsStream(file);
-		if (inputStream == null) {
-			throw new FileNotFoundException(file);
+		try (InputStream inputStream = PostgreSQLTests.class.getClassLoader().getResourceAsStream(file)) {
+			scriptRunner.runScript(new InputStreamReader(inputStream));
 		}
-		scriptRunner.runScript(new InputStreamReader(inputStream));
 	}
 
 	@AfterAll
@@ -52,25 +44,40 @@ public class PostgreSQLTests extends AbstractSidecarTests {
 		backendConnection.close();
 	}
 
-	@AfterEach
-	void clearTables() throws SQLException {
-		try (Statement statement = backendConnection.createStatement()) {
-			statement.execute("DROP TABLE IF EXISTS mytable");
-		}
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testSimpleStatement(RedisTestContext redis) throws Exception {
+		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testCachePut(RedisTestContext redis) throws Exception {
-		DataSource sidecarDataSource = getSidecarDataSource(POSTGRESQL, redis);
-		String query = "SELECT COUNT(*) AS count FROM orders";
-		try (Connection connection = sidecarDataSource.getConnection()) {
-			try (Statement statement = connection.createStatement()) {
-				statement.execute(query);
-				statement.getResultSet();
-				Assertions.assertEquals(1, redis.getConnection().sync().keys("SELECT*").size());
-			}
-		}
+	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
+		testUpdateAndGetResultSet(POSTGRESQL, redis, "SELECT * FROM orders");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testPreparedStatement(RedisTestContext redis) throws Exception {
+		testPreparedStatement(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatement(RedisTestContext redis) throws Exception {
+		testCallableStatement(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
+		testCallableStatementGetResultSet(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = 8");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testResultSetMetadata(RedisTestContext redis) throws Exception {
+		testResultSetMetaData(POSTGRESQL, redis.getServer(), "SELECT * FROM orders");
 	}
 
 }

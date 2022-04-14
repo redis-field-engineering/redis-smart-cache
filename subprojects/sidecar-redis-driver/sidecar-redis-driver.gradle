@@ -1,8 +1,7 @@
 dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
-    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
-    testImplementation 'com.zaxxer:HikariCP'
     testImplementation 'org.postgresql:postgresql'
+    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
     testImplementation group: 'com.redis.testcontainers', name: 'postgresql', version: testcontainersVersion
     testImplementation group: 'com.redis.testcontainers', name: 'oracle-xe', version: testcontainersVersion
 }

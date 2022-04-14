@@ -24,53 +24,45 @@ import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.redis.sidecar.SidecarStatement;
-
 public class CachedResultSet implements ResultSet {
 
-	private final SidecarStatement statement;
+	private static final ResultSetCodec codec = new ResultSetCodec();
 	private final DataInputStream input;
 	private final CachedResultSetMetaData metaData;
 	private final Object[] currentRow;
 	private final Object[] nextRow;
 	private final HashMap<String, Integer> columnNames;
-	private volatile boolean wasNull;
-	private volatile int currentPos;
-	private volatile int nextPos;
-	private volatile boolean closed;
+	private boolean wasNull;
+	private int currentPos;
+	private int nextPos;
+	private boolean closed;
+	private int fetchSize = 0;
+	private int maxRows = 0;
+	private int concurrency = ResultSet.CONCUR_UPDATABLE;
+	private int rowSetType = ResultSet.TYPE_SCROLL_INSENSITIVE;
+	private int fetchDirection = ResultSet.FETCH_FORWARD; // default fetch direction
 
-	public CachedResultSet(SidecarStatement statement, DataInputStream input) throws SQLException {
-		this.statement = statement;
+	public CachedResultSet(DataInputStream input) throws SQLException, IOException {
 		this.wasNull = false;
 		this.currentPos = 0;
 		this.nextPos = 0;
 		this.closed = false;
 		this.input = input;
-		try {
-			this.metaData = new CachedResultSetMetaData(readColumns(input));
-			this.currentRow = new Object[metaData.getColumns().length];
-			this.nextRow = new Object[metaData.getColumns().length];
-			this.columnNames = new HashMap<>();
-			for (int index = 0; index < metaData.getColumns().length; index++) {
-				Column column = metaData.getColumns()[index];
-				this.columnNames.put(column.getLabel(), index + 1);
-			}
-			readNext();
-		} catch (IOException e) {
-			try {
-				close();
-			} catch (Exception ex) {
-				// Close quietly
-			}
-			throw new SQLException("Cannot read the cache for statement " + statement, e);
+		this.metaData = new CachedResultSetMetaData(readColumns(input));
+		this.currentRow = new Object[metaData.getColumns().length];
+		this.nextRow = new Object[metaData.getColumns().length];
+		this.columnNames = new HashMap<>();
+		for (int index = 0; index < metaData.getColumns().length; index++) {
+			Column column = metaData.getColumns()[index];
+			this.columnNames.put(column.getLabel(), index + 1);
 		}
+		readNext();
 	}
 
 	private Column[] readColumns(DataInputStream input) throws IOException {
@@ -97,72 +89,10 @@ public class CachedResultSet implements ResultSet {
 		for (int index = 0; index < metaData.getColumns().length; index++) {
 			Column column = metaData.getColumns()[index];
 			try {
-				nextRow[index] = readRow(column.getType(), input);
+				nextRow[index] = codec.readRow(column.getType(), input);
 			} catch (IOException e) {
 				throw new SQLException("Cannot extract column " + index + " - pos " + nextPos, e);
 			}
-		}
-	}
-
-	private static Object readRow(int type, DataInputStream input) throws IOException {
-		boolean wasNull = !input.readBoolean();
-		if (wasNull)
-			return null;
-		switch (type) {
-		case Types.BIT:
-		case Types.BOOLEAN:
-			return input.readBoolean();
-		case Types.TINYINT:
-			return input.readByte();
-		case Types.SMALLINT:
-			return input.readShort();
-		case Types.INTEGER:
-			return input.readInt();
-		case Types.BIGINT:
-			return input.readLong();
-		case Types.FLOAT:
-		case Types.REAL:
-			return input.readFloat();
-		case Types.DOUBLE:
-		case Types.NUMERIC:
-		case Types.DECIMAL:
-			return input.readDouble();
-		case Types.CHAR:
-		case Types.VARCHAR:
-		case Types.LONGVARCHAR:
-		case Types.NCHAR:
-		case Types.NVARCHAR:
-		case Types.LONGNVARCHAR:
-			return input.readUTF();
-		case Types.DATE:
-			return new java.sql.Date(input.readLong());
-		case Types.TIME:
-		case Types.TIME_WITH_TIMEZONE:
-			return new java.sql.Time(input.readLong());
-		case Types.TIMESTAMP:
-		case Types.TIMESTAMP_WITH_TIMEZONE:
-			return new java.sql.Timestamp(input.readLong());
-		case Types.ROWID:
-			return input.readUTF();
-		case Types.CLOB:
-			return input.readUTF();
-		case Types.BINARY:
-		case Types.VARBINARY:
-		case Types.LONGVARBINARY:
-		case Types.NULL:
-		case Types.OTHER:
-		case Types.JAVA_OBJECT:
-		case Types.DISTINCT:
-		case Types.STRUCT:
-		case Types.ARRAY:
-		case Types.BLOB:
-		case Types.REF:
-		case Types.DATALINK:
-		case Types.NCLOB:
-		case Types.SQLXML:
-		case Types.REF_CURSOR:
-		default:
-			throw new IOException("Column type no supported: " + type);
 		}
 	}
 
@@ -592,31 +522,61 @@ public class CachedResultSet implements ResultSet {
 
 	@Override
 	public void setFetchDirection(int direction) throws SQLException {
+		if (((getType() == ResultSet.TYPE_FORWARD_ONLY) && (direction != ResultSet.FETCH_FORWARD))
+				|| ((direction != ResultSet.FETCH_FORWARD) && (direction != ResultSet.FETCH_REVERSE)
+						&& (direction != ResultSet.FETCH_UNKNOWN))) {
+			throw new SQLException("Invalid Fetch Direction");
+		}
+		fetchDirection = direction;
 	}
 
 	@Override
 	public int getFetchDirection() throws SQLException {
-		return statement.getFetchDirection();
+		return fetchDirection;
+	}
+
+	public int getMaxRows() throws SQLException {
+		return maxRows;
 	}
 
 	@Override
 	public void setFetchSize(int rows) throws SQLException {
-
+		// Added this checking as maxRows can be 0 when this function is called
+		// maxRows = 0 means rowset can hold any number of rows, os this checking
+		// is needed to take care of this condition.
+		if (getMaxRows() == 0 && rows >= 0) {
+			fetchSize = rows;
+			return;
+		}
+		if ((rows < 0) || (rows > getMaxRows())) {
+			throw new SQLException("Invalid fetch size set. Cannot be of " + "value: " + rows);
+		}
+		fetchSize = rows;
 	}
 
 	@Override
 	public int getFetchSize() throws SQLException {
-		return statement.getFetchSize();
+		return fetchSize;
 	}
 
 	@Override
 	public int getType() throws SQLException {
-		return statement.getResultSetType();
+		return rowSetType;
+	}
+
+	public void setType(int type) throws SQLException {
+		if ((type != ResultSet.TYPE_FORWARD_ONLY) && (type != ResultSet.TYPE_SCROLL_INSENSITIVE)
+				&& (type != ResultSet.TYPE_SCROLL_SENSITIVE)) {
+			throw new SQLException("Invalid type of RowSet set. Must be either "
+					+ "ResultSet.TYPE_FORWARD_ONLY or ResultSet.TYPE_SCROLL_INSENSITIVE "
+					+ "or ResultSet.TYPE_SCROLL_SENSITIVE.");
+		}
+		this.rowSetType = type;
 	}
 
 	@Override
 	public int getConcurrency() throws SQLException {
-		return statement.getResultSetConcurrency();
+		return concurrency;
 	}
 
 	@Override
@@ -861,7 +821,7 @@ public class CachedResultSet implements ResultSet {
 
 	@Override
 	public Statement getStatement() throws SQLException {
-		return statement;
+		return null;
 	}
 
 	@Override
@@ -1036,7 +996,7 @@ public class CachedResultSet implements ResultSet {
 
 	@Override
 	public int getHoldability() throws SQLException {
-		return statement.getResultSetHoldability();
+		throw new SQLFeatureNotSupportedException();
 	}
 
 	@Override

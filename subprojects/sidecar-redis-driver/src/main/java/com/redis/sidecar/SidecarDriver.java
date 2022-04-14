@@ -13,6 +13,8 @@ import com.redis.sidecar.impl.RedisResultSetCache;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.codec.StringCodec;
 
 public class SidecarDriver implements Driver {
 
@@ -39,24 +41,29 @@ public class SidecarDriver implements Driver {
 		if (isEmpty(driverClass)) {
 			throw new SQLException("No backend driver class specified");
 		}
+		Driver driver;
 		try {
-			Class.forName(driverClass);
-		} catch (ClassNotFoundException e) {
+			driver = (Driver) Class.forName(driverClass).getConstructor().newInstance();
+		} catch (Exception e) {
 			throw new SQLException("Cannot initialize backend driver '" + driverClass + "'", e);
 		}
 		String driverUrl = info.getProperty(DRIVER_URL);
 		if (isEmpty(driverUrl)) {
 			throw new SQLException("No backend URL specified");
 		}
-		Connection backendConnection = DriverManager.getConnection(driverUrl, info);
+		Connection connection = driver.connect(driverUrl, info);
 		String redisURI = url.substring(JDBC_URL_PREFIX.length());
 		RedisResultSetCache resultSetCache = cache(redisURI);
-		return new SidecarConnection(backendConnection, resultSetCache);
+		return new SidecarConnection(connection, resultSetCache);
 	}
 
 	private RedisResultSetCache cache(String redisURI) {
 		RedisClient client = isEmpty(redisURI) ? RedisClient.create() : RedisClient.create(redisURI);
-		return new RedisResultSetCache(client.connect(ByteArrayCodec.INSTANCE));
+		return new RedisResultSetCache(client.connect(codec()));
+	}
+
+	public static RedisCodec<String, byte[]> codec() {
+		return RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
 	}
 
 	private boolean isEmpty(String string) {
