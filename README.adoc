@@ -4,10 +4,13 @@
 :project-name:    redis-sidecar
 :project-group:   com.redis
 :project-version: 0.0.1
+:artifact-id:     redis-sidecar-driver
+:codecov-token:   y0NMn7uIJ0
+
 
 image:https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
-image:https://img.shields.io/maven-central/v/{project-group}/redis-sidecar-driver[Download, link="https://search.maven.org/#search|ga|1|redis-sidecar-driver"]
-image:https://img.shields.io/nexus/s/{project-group}/redis-sidecar-driver?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~redis-sidecar-driver"]
-image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token=y0NMn7uIJ0["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
+image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Download, link="https://search.maven.org/#search|ga|1|{artifact-id}"]
+image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
+image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
 Redis-Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
