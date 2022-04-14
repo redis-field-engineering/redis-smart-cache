@@ -14,7 +14,7 @@ buildscript {
 
 apply plugin: 'org.kordamp.gradle.kordamp-parentbuild'
 
-rootProject.name = 'sidecar-redis'
+rootProject.name = 'redis-sidecar'
 
 projects {
     directories = ['subprojects']

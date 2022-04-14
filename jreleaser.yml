@@ -1,8 +1,8 @@
 project:
-  name: sidecar-redis
+  name: redis-sidecar
   description: JDBC Cache
   longDescription: JDBC driver that transparently caches SQL queries 
-  website: https://github.com/redis-field-engineering/sidecar-redis
+  website: https://github.com/redis-field-engineering/redis-sidecar
   authors:
     - Julien Ruaux
   license: Apache-2.0
@@ -97,10 +97,10 @@ announce:
   slack:
     active: release
     channel: '#field-engineering-announcements'
-    message: '🚀 Sidecar Redis {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '🚀 Redis-Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
-  sidecar-redis-driver:
+  redis-sidecar-driver:
     artifacts:
       - path: subprojects/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'

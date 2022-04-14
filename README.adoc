@@ -1,13 +1,13 @@
-= Sidecar Redis
+= Redis-Sidecar
 :linkattrs:
 :project-owner:   redis-field-engineering
-:project-name:    sidecar-redis-driver
+:project-name:    redis-sidecar-driver
 :project-group:   com.redis
 :project-version: 0.0.1
 
-image:https://github.com/{project-owner}/sidecar-redis/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
+image:https://github.com/{project-owner}/redis-sidecar/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
 image:https://img.shields.io/maven-central/v/{project-group}/{project-name}[Download, link="https://search.maven.org/#search|ga|1|{project-name}"]
 image:https://img.shields.io/nexus/s/{project-group}/{project-name}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{project-name}"]
-image:https://codecov.io/gh/{project-owner}/sidecar-redis/branch/master/graph/badge.svg?token=9I4H9NOBRQ["Coverage", link="https://codecov.io/gh/{project-owner}/sidecar-redis"]
+image:https://codecov.io/gh/{project-owner}/redis-sidecar/branch/master/graph/badge.svg?token=9I4H9NOBRQ["Coverage", link="https://codecov.io/gh/{project-owner}/redis-sidecar"]
 
-Sidecar Redis is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
+Redis-Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
