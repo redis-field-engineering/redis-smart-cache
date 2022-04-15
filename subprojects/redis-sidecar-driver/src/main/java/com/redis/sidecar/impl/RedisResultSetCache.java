@@ -7,22 +7,30 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.redis.sidecar.ResultSetCache;
 
+import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.codec.StringCodec;
 
 public class RedisResultSetCache implements ResultSetCache {
 
 	private final AtomicLong misses = new AtomicLong();
 	private final AtomicLong hits = new AtomicLong();
 	private final ResultSetCodec codec = new ResultSetCodec();
+	private final RedisClient client;
 	private final StatefulRedisConnection<String, byte[]> connection;
 
-	public RedisResultSetCache(StatefulRedisConnection<String, byte[]> connection) {
-		this.connection = connection;
+	public RedisResultSetCache(String redisURI) {
+		this.client = RedisClient.create(redisURI);
+		this.connection = client.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
 	}
 
 	@Override
 	public void close() throws Exception {
 		connection.close();
+		client.shutdown();
+		client.getResources().shutdown();
 	}
 
 	@Override

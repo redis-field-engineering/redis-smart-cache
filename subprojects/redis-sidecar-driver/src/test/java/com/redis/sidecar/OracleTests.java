@@ -5,12 +5,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Properties;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -22,8 +20,8 @@ import com.redis.testcontainers.junit.RedisTestContextsSource;
 @Testcontainers
 class OracleTests extends AbstractSidecarTests {
 
-	private static final DockerImageName ORACLE_DOCKER_IMAGE_NAME = DockerImageName
-			.parse("diemobiliar/minimized-oraclexe-image").withTag("18.4.0-xe");
+	private static final DockerImageName ORACLE_DOCKER_IMAGE_NAME = DockerImageName.parse("gvenzl/oracle-xe")
+			.withTag("18.4.0-slim");
 
 	@Container
 	private static final OracleContainer ORACLE = new OracleContainer(ORACLE_DOCKER_IMAGE_NAME);
@@ -40,17 +38,9 @@ class OracleTests extends AbstractSidecarTests {
 			scriptRunner.runScript(new InputStreamReader(inputStream));
 		}
 	}
-	
-	@Override
-	protected Properties properties(JdbcDatabaseContainer<?> container) {
-		Properties info = new Properties();
-		info.setProperty("username", container.getUsername());
-		info.setProperty("password", container.getPassword());
-		return info;
-	}
 
 	@AfterAll
-	public  void teardownAll() throws SQLException {
+	public void teardownAll() throws SQLException {
 		backendConnection.close();
 	}
 

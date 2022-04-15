@@ -5,12 +5,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Properties;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -39,14 +37,6 @@ class PostgreSQLTests extends AbstractSidecarTests {
 		try (InputStream inputStream = PostgreSQLTests.class.getClassLoader().getResourceAsStream(file)) {
 			scriptRunner.runScript(new InputStreamReader(inputStream));
 		}
-	}
-
-	@Override
-	protected Properties properties(JdbcDatabaseContainer<?> container) {
-		Properties info = new Properties();
-		info.setProperty("user", container.getUsername());
-		info.setProperty("password", container.getPassword());
-		return info;
 	}
 
 	@AfterAll

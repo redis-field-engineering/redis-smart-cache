@@ -11,11 +11,6 @@ import java.util.logging.Logger;
 
 import com.redis.sidecar.impl.RedisResultSetCache;
 
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.codec.ByteArrayCodec;
-import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
-
 public class SidecarDriver implements Driver {
 
 	private static final Logger log = Logger.getLogger(SidecarDriver.class.getName());
@@ -53,17 +48,8 @@ public class SidecarDriver implements Driver {
 		}
 		Connection connection = driver.connect(driverUrl, info);
 		String redisURI = url.substring(JDBC_URL_PREFIX.length());
-		RedisResultSetCache resultSetCache = cache(redisURI);
+		RedisResultSetCache resultSetCache = new RedisResultSetCache(redisURI);
 		return new SidecarConnection(connection, resultSetCache);
-	}
-
-	private RedisResultSetCache cache(String redisURI) {
-		RedisClient client = isEmpty(redisURI) ? RedisClient.create() : RedisClient.create(redisURI);
-		return new RedisResultSetCache(client.connect(codec()));
-	}
-
-	public static RedisCodec<String, byte[]> codec() {
-		return RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
 	}
 
 	private boolean isEmpty(String string) {

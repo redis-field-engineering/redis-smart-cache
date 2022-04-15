@@ -13,7 +13,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Properties;
+
+import javax.sql.DataSource;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
@@ -21,11 +22,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.sidecar.impl.RedisResultSetCache;
 import com.redis.testcontainers.RedisContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
@@ -34,6 +38,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 //	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
 //			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
 //					.withKeyspaceNotifications();
+	private DataSource dataSource;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
@@ -61,27 +66,21 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
 	}
 
-	protected abstract Properties properties(JdbcDatabaseContainer<?> container);
-
-	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> container) throws SQLException {
-		Driver driver;
-		try {
-			driver = (Driver) Class.forName(container.getDriverClassName()).getConstructor().newInstance();
-		} catch (Exception e) {
-			throw new SQLException("Could not initialize JDBC driver: " + container.getDriverClassName(), e);
+	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
+		if (dataSource == null) {
+			HikariConfig config = new HikariConfig();
+			config.setJdbcUrl(database.getJdbcUrl());
+			config.setUsername(database.getUsername());
+			config.setPassword(database.getPassword());
+			dataSource = new HikariDataSource(config);
 		}
-		return driver.connect(container.getJdbcUrl(), properties(container));
+		return dataSource.getConnection();
 	}
 
 	protected SidecarConnection getSidecarConnection(JdbcDatabaseContainer<?> database, RedisServer redis)
 			throws SQLException {
-		Properties info = new Properties();
-		info.setProperty(SidecarDriver.DRIVER_URL, database.getJdbcUrl());
-		info.setProperty(SidecarDriver.DRIVER_CLASS, database.getDriverClassName());
-		info.putAll(properties(database));
-		return (SidecarConnection) DriverManager.getConnection(SidecarDriver.JDBC_URL_PREFIX + redis.getRedisURI(),
-				info);
-
+		Connection connection = getDatabaseConnection(database);
+		return new SidecarConnection(connection, new RedisResultSetCache(redis.getRedisURI()));
 	}
 
 	protected void assertEquals(ResultSet expected, ResultSet actual) throws SQLException {

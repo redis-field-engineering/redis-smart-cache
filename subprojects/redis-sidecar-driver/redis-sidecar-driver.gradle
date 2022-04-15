@@ -3,6 +3,8 @@ dependencies {
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
-    testImplementation group: 'com.redis.testcontainers', name: 'postgresql', version: testcontainersVersion
-    testImplementation group: 'com.redis.testcontainers', name: 'oracle-xe', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'testcontainers', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
+    testImplementation 'com.zaxxer:HikariCP'
 }
