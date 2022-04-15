@@ -27,7 +27,7 @@ import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
+abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
 	private final RedisContainer redis = new RedisContainer(
 			RedisContainer.DEFAULT_IMAGE_NAME.withTag(RedisContainer.DEFAULT_TAG)).withKeyspaceNotifications();
@@ -41,7 +41,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	@BeforeAll
-	public static void initDriver() throws ClassNotFoundException, IOException {
+	public void initDriver() throws ClassNotFoundException, IOException {
 		Class.forName(SidecarDriver.class.getName());
 	}
 
@@ -61,7 +61,9 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
 	}
 
-	protected static Connection getDatabaseConnection(JdbcDatabaseContainer<?> container) throws SQLException {
+	protected abstract Properties properties(JdbcDatabaseContainer<?> container);
+
+	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> container) throws SQLException {
 		Driver driver;
 		try {
 			driver = (Driver) Class.forName(container.getDriverClassName()).getConstructor().newInstance();
@@ -69,13 +71,6 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 			throw new SQLException("Could not initialize JDBC driver: " + container.getDriverClassName(), e);
 		}
 		return driver.connect(container.getJdbcUrl(), properties(container));
-	}
-
-	private static Properties properties(JdbcDatabaseContainer<?> container) {
-		Properties info = new Properties();
-		info.setProperty("user", container.getUsername());
-		info.setProperty("password", container.getPassword());
-		return info;
 	}
 
 	protected SidecarConnection getSidecarConnection(JdbcDatabaseContainer<?> database, RedisServer redis)
