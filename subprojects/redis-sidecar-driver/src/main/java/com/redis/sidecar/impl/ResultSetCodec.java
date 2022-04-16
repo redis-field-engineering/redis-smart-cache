@@ -128,11 +128,11 @@ public class ResultSetCodec {
 		for (int index = 0; index < types.length; index++) {
 			types[index] = metadata.getColumnType(index + 1);
 		}
-		int pos = 0;
+		int pos = 1;
 		while (resultSet.next()) {
-			out.writeInt(++pos);
-			int index = 1;
-			for (int type : types) {
+			out.writeInt(pos);
+			for (int index = 1; index <= types.length; index++) {
+				int type = types[index - 1];
 				switch (type) {
 				case Types.BIT:
 				case Types.BOOLEAN:
@@ -206,8 +206,8 @@ public class ResultSetCodec {
 				default:
 					break;
 				}
-				index++;
 			}
+			pos++;
 		}
 	}
 

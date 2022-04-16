@@ -99,7 +99,13 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		while (expected.next()) {
 			Assertions.assertTrue(actual.next());
 			for (int index = 1; index <= meta1.getColumnCount(); index++) {
-				Assertions.assertEquals(expected.getObject(index), actual.getObject(index),
+				Object expectedValue = expected.getObject(index);
+				Object actualValue = actual.getObject(index);
+				if (expectedValue instanceof Number) {
+					expectedValue = ((Number) expectedValue).doubleValue();
+					actualValue = ((Number) actualValue).doubleValue();
+				}
+				Assertions.assertEquals(expectedValue, actualValue,
 						String.format("Column %s type %s", meta1.getColumnName(index), meta1.getColumnType(index)));
 			}
 			Assertions.assertEquals(expected.isLast(), actual.isLast());
