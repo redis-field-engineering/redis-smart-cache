@@ -12,13 +12,6 @@ ADD ( CONSTRAINT reg_id_pk
        		 PRIMARY KEY (region_id)
     ) ;
 
-REM ********************************************************************
-REM Create the COUNTRIES table to hold country information for customers
-REM and company locations. 
-REM OE.CUSTOMERS table and HR.LOCATIONS have a foreign key to this table.
-
-Prompt ******  Creating COUNTRIES table ....
-
 CREATE TABLE countries 
     ( country_id      CHAR(2) 
        CONSTRAINT  country_id_nn NOT NULL 
@@ -34,12 +27,6 @@ ADD ( CONSTRAINT countr_reg_fk
         	 FOREIGN KEY (region_id)
           	  REFERENCES regions(region_id) 
     ) ;
-
-REM ********************************************************************
-REM Create the LOCATIONS table to hold address information for company departments.
-REM HR.DEPARTMENTS has a foreign key to this table.
-
-Prompt ******  Creating LOCATIONS table ....
 
 CREATE TABLE locations
     ( location_id    NUMBER(4)
@@ -62,21 +49,12 @@ ADD ( CONSTRAINT loc_id_pk
         	  REFERENCES countries(country_id) 
     ) ;
 
-Rem 	Useful for any subsequent addition of rows to locations table
-Rem 	Starts with 3300
-
 CREATE SEQUENCE locations_seq
  START WITH     3300
  INCREMENT BY   100
  MAXVALUE       9900
  NOCACHE
  NOCYCLE;
-
-REM ********************************************************************
-REM Create the DEPARTMENTS table to hold company department information.
-REM HR.EMPLOYEES and HR.JOB_HISTORY have a foreign key to this table.
-
-Prompt ******  Creating DEPARTMENTS table ....
 
 CREATE TABLE departments
     ( department_id    NUMBER(4)
@@ -97,21 +75,12 @@ ADD ( CONSTRAINT dept_id_pk
         	  REFERENCES locations (location_id)
      ) ;
 
-Rem 	Useful for any subsequent addition of rows to departments table
-Rem 	Starts with 280 
-
 CREATE SEQUENCE departments_seq
  START WITH     280
  INCREMENT BY   10
  MAXVALUE       9990
  NOCACHE
  NOCYCLE;
-
-REM ********************************************************************
-REM Create the JOBS table to hold the different names of job roles within the company.
-REM HR.EMPLOYEES has a foreign key to this table.
-
-Prompt ******  Creating JOBS table ....
 
 CREATE TABLE jobs
     ( job_id         VARCHAR2(10)
@@ -128,13 +97,6 @@ ALTER TABLE jobs
 ADD ( CONSTRAINT job_id_pk
       		 PRIMARY KEY(job_id)
     ) ;
-
-REM ********************************************************************
-REM Create the EMPLOYEES table to hold the employee personnel 
-REM information for the company.
-REM HR.EMPLOYEES has a self referencing foreign key to this table.
-
-Prompt ******  Creating EMPLOYEES table ....
 
 CREATE TABLE employees
     ( employee_id    NUMBER(6)
@@ -182,23 +144,11 @@ ADD ( CONSTRAINT dept_mgr_fk
       		  REFERENCES employees (employee_id)
     ) ;
 
-
-Rem 	Useful for any subsequent addition of rows to employees table
-Rem 	Starts with 207 
-
-
 CREATE SEQUENCE employees_seq
  START WITH     207
  INCREMENT BY   1
  NOCACHE
  NOCYCLE;
-
-REM ********************************************************************
-REM Create the JOB_HISTORY table to hold the history of jobs that 
-REM employees have held in the past.
-REM HR.JOBS, HR_DEPARTMENTS, and HR.EMPLOYEES have a foreign key to this table.
-
-Prompt ******  Creating JOB_HISTORY table ....
 
 CREATE TABLE job_history
     ( employee_id   NUMBER(6)
@@ -230,13 +180,6 @@ ADD ( CONSTRAINT jhist_emp_id_st_date_pk
                      FOREIGN KEY (department_id)
                      REFERENCES departments
     ) ;
-
-REM ********************************************************************
-REM Create the EMP_DETAILS_VIEW that joins the employees, jobs, 
-REM departments, jobs, countries, and locations table to provide details
-REM about employees.
-
-Prompt ******  Creating EMP_DETAILS_VIEW view ...
 
 CREATE OR REPLACE VIEW emp_details_view
   (employee_id,
@@ -291,9 +234,6 @@ COMMIT;
 SET VERIFY OFF
 ALTER SESSION SET NLS_LANGUAGE=American; 
 
-REM ***************************insert data into the REGIONS table
-
-Prompt ******  Populating REGIONS table ....
 
 INSERT INTO regions VALUES 
         ( 1
@@ -314,10 +254,6 @@ INSERT INTO regions VALUES
         ( 4
         , 'Middle East and Africa' 
         );
-
-REM ***************************insert data into the COUNTRIES table
-
-Prompt ******  Populating COUNTIRES table ....
 
 INSERT INTO countries VALUES 
         ( 'IT'
@@ -469,10 +405,6 @@ INSERT INTO countries VALUES
         , 1 
         );
 
-
-REM ***************************insert data into the LOCATIONS table
-
-Prompt ******  Populating LOCATIONS table ....
 
 INSERT INTO locations VALUES 
         ( 1000 
@@ -682,12 +614,6 @@ INSERT INTO locations VALUES
         );
 
 
-REM ****************************insert data into the DEPARTMENTS table
-
-Prompt ******  Populating DEPARTMENTS table ....
-
-REM disable integrity constraint to EMPLOYEES to load data
-
 ALTER TABLE departments 
   DISABLE CONSTRAINT dept_mgr_fk;
 
@@ -880,11 +806,6 @@ INSERT INTO departments VALUES
         , 1700
         );
 
-
-REM ***************************insert data into the JOBS table
-
-Prompt ******  Populating JOBS table ....
-
 INSERT INTO jobs VALUES 
         ( 'AD_PRES'
         , 'President'
@@ -1014,11 +935,6 @@ INSERT INTO jobs VALUES
         , 4500
         , 10500
         );
-
-
-REM ***************************insert data into the EMPLOYEES table
-
-Prompt ******  Populating EMPLOYEES table ....
 
 INSERT INTO employees VALUES 
         ( 100
@@ -2518,10 +2434,6 @@ INSERT INTO employees VALUES
         , 110
         );
 
-REM ********* insert data into the JOB_HISTORY table
-
-Prompt ******  Populating JOB_HISTORY table ....
-
 
 INSERT INTO job_history
 VALUES (102
@@ -2598,8 +2510,6 @@ VALUES  (200
         , 'AC_ACCOUNT'
         , 90
         );
-
-REM enable integrity constraint to DEPARTMENTS
 
 ALTER TABLE departments 
   ENABLE CONSTRAINT dept_mgr_fk;
