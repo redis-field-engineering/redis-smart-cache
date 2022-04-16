@@ -231,10 +231,6 @@ WITH READ ONLY;
 
 COMMIT;
 
-SET VERIFY OFF
-ALTER SESSION SET NLS_LANGUAGE=American; 
-
-
 INSERT INTO regions VALUES 
         ( 1
         , 'Europe' 
