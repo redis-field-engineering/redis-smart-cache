@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -38,19 +37,11 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 //	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
 //			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
 //					.withKeyspaceNotifications();
-	private static HikariDataSource dataSource;
+	private HikariDataSource dataSource;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
-	}
-
-	@AfterAll
-	void closeDataSource() {
-		if (dataSource == null) {
-			return;
-		}
-		dataSource.close();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -79,7 +70,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
 	}
 
-	protected static Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
+	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
 		if (dataSource == null) {
 			HikariConfig config = new HikariConfig();
 			config.setJdbcUrl(database.getJdbcUrl());
