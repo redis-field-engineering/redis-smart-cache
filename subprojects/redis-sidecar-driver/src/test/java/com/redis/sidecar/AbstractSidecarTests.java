@@ -27,8 +27,6 @@ import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 
 abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
@@ -37,7 +35,6 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 //	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
 //			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
 //					.withKeyspaceNotifications();
-	private HikariDataSource dataSource;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
@@ -70,15 +67,13 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
 	}
 
-	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
-		if (dataSource == null) {
-			HikariConfig config = new HikariConfig();
-			config.setJdbcUrl(database.getJdbcUrl());
-			config.setUsername(database.getUsername());
-			config.setPassword(database.getPassword());
-			dataSource = new HikariDataSource(config);
+	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> container) throws SQLException {
+		try {
+			Class.forName(container.getDriverClassName());
+		} catch (ClassNotFoundException e) {
+			throw new SQLException("Could not initialize driver", e);
 		}
-		return dataSource.getConnection();
+		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
 	protected SidecarConnection getSidecarConnection(JdbcDatabaseContainer<?> database, RedisServer redis)
