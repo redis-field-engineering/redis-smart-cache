@@ -1,8 +1,6 @@
 package com.redis.sidecar;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -30,13 +28,7 @@ class OracleTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		backendConnection = getDatabaseConnection(ORACLE);
-		ScriptRunner scriptRunner = new ScriptRunner(backendConnection);
-		scriptRunner.setAutoCommit(false);
-		scriptRunner.setStopOnError(true);
-		String file = "northwind.sql";
-		try (InputStream inputStream = OracleTests.class.getClassLoader().getResourceAsStream(file)) {
-			scriptRunner.runScript(new InputStreamReader(inputStream));
-		}
+		runScript(backendConnection, "hr.sql");
 	}
 
 	@AfterAll
@@ -47,37 +39,37 @@ class OracleTests extends AbstractSidecarTests {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(ORACLE, redis, "SELECT * FROM orders");
+		testSimpleStatement(ORACLE, redis, "SELECT * FROM employees");
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
-		testUpdateAndGetResultSet(ORACLE, redis, "SELECT * FROM orders");
+		testUpdateAndGetResultSet(ORACLE, redis, "SELECT * FROM employees");
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testPreparedStatement(RedisTestContext redis) throws Exception {
-		testPreparedStatement(ORACLE, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+		testPreparedStatement(ORACLE, redis, "SELECT * FROM employees WHERE department_id = ?", 30);
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testCallableStatement(RedisTestContext redis) throws Exception {
-		testCallableStatement(ORACLE, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+		testCallableStatement(ORACLE, redis, "SELECT * FROM employees WHERE department_id = ?", 30);
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
-		testCallableStatementGetResultSet(ORACLE, redis, "SELECT * FROM orders WHERE employee_id = 8");
+		testCallableStatementGetResultSet(ORACLE, redis, "SELECT * FROM employees WHERE department_id = 30");
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(ORACLE, redis.getServer(), "SELECT * FROM orders");
+		testResultSetMetaData(ORACLE, redis.getServer(), "SELECT * FROM employees");
 	}
 
 }

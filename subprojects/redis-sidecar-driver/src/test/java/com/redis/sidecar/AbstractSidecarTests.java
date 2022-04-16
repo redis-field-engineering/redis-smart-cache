@@ -1,6 +1,8 @@
 package com.redis.sidecar;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.Driver;
@@ -38,11 +40,20 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 //	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
 //			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
 //					.withKeyspaceNotifications();
-	private DataSource dataSource;
+	private static DataSource dataSource;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
+	}
+
+	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
+		ScriptRunner scriptRunner = new ScriptRunner(backendConnection);
+		scriptRunner.setAutoCommit(false);
+		scriptRunner.setStopOnError(true);
+		try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(script)) {
+			scriptRunner.runScript(new InputStreamReader(inputStream));
+		}
 	}
 
 	@BeforeAll
@@ -66,7 +77,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
 	}
 
-	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
+	protected static Connection getDatabaseConnection(JdbcDatabaseContainer<?> database) throws SQLException {
 		if (dataSource == null) {
 			HikariConfig config = new HikariConfig();
 			config.setJdbcUrl(database.getJdbcUrl());

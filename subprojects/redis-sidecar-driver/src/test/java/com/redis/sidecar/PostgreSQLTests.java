@@ -1,8 +1,6 @@
 package com.redis.sidecar;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -30,13 +28,7 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		backendConnection = getDatabaseConnection(POSTGRESQL);
-		ScriptRunner scriptRunner = new ScriptRunner(backendConnection);
-		scriptRunner.setAutoCommit(false);
-		scriptRunner.setStopOnError(true);
-		String file = "northwind.sql";
-		try (InputStream inputStream = PostgreSQLTests.class.getClassLoader().getResourceAsStream(file)) {
-			scriptRunner.runScript(new InputStreamReader(inputStream));
-		}
+		runScript(backendConnection, "northwind.sql");
 	}
 
 	@AfterAll
