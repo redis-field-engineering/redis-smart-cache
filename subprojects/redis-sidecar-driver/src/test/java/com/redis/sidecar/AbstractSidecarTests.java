@@ -209,7 +209,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 					Assert.assertEquals(ResultSetMetaData.columnNoNulls, metaData.isNullable(i));
 					Assert.assertFalse(metaData.isCaseSensitive(i));
 					Assert.assertFalse(metaData.isAutoIncrement(i));
-					Assert.assertFalse(metaData.isCurrency(i));
+//					Assert.assertFalse(metaData.isCurrency(i));
 //					Assert.assertFalse(metaData.isWritable(i));
 				} else {
 					Assert.assertEquals(ResultSetMetaData.columnNullable, metaData.isNullable(i));
