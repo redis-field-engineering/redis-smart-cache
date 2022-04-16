@@ -103,7 +103,9 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 				Assertions.assertEquals(expectedValue, actualValue,
 						String.format("Column %s type %s", meta1.getColumnName(index), meta1.getColumnType(index)));
 			}
-			Assertions.assertEquals(expected.isLast(), actual.isLast());
+			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
+				Assertions.assertEquals(expected.isLast(), actual.isLast());
+			}
 			count++;
 		}
 		Assertions.assertTrue(count > 0);
