@@ -198,18 +198,8 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 				Assert.assertNotNull(metaData.getCatalogName(i));
 				Assert.assertNotNull(metaData.getColumnClassName(i));
 				Assert.assertTrue(metaData.getColumnDisplaySize(i) > 0);
-				Assert.assertFalse(metaData.isReadOnly(i));
 				Assert.assertNotNull(metaData.getSchemaName(i));
 				Assert.assertNotNull(metaData.getTableName(i));
-				Assert.assertTrue(metaData.getPrecision(i) > 0);
-				Assert.assertTrue(metaData.isSearchable(i));
-				if (i == 1) {
-					Assert.assertTrue(metaData.isSigned(i));
-					Assert.assertEquals(0, metaData.getScale(i));
-					Assert.assertEquals(ResultSetMetaData.columnNoNulls, metaData.isNullable(i));
-					Assert.assertFalse(metaData.isCaseSensitive(i));
-					Assert.assertFalse(metaData.isAutoIncrement(i));
-				}
 			}
 		}
 	}
