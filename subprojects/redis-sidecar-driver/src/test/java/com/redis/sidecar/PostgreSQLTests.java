@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -23,17 +22,11 @@ class PostgreSQLTests extends AbstractSidecarTests {
 
 	@Container
 	private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>(POSTGRE_DOCKER_IMAGE_NAME);
-	private static Connection backendConnection;
 
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
-		backendConnection = getDatabaseConnection(POSTGRESQL);
+		Connection backendConnection = getDatabaseConnection(POSTGRESQL);
 		runScript(backendConnection, "northwind.sql");
-	}
-
-	@AfterAll
-	public void teardownAll() throws SQLException {
-		backendConnection.close();
 	}
 
 	@ParameterizedTest

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.OracleContainer;
@@ -23,17 +22,11 @@ class OracleTests extends AbstractSidecarTests {
 
 	@Container
 	private static final OracleContainer ORACLE = new OracleContainer(ORACLE_DOCKER_IMAGE_NAME);
-	private static Connection backendConnection;
 
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
-		backendConnection = getDatabaseConnection(ORACLE);
+		Connection backendConnection = getDatabaseConnection(ORACLE);
 		runScript(backendConnection, "hr.sql");
-	}
-
-	@AfterAll
-	public void teardownAll() throws SQLException {
-		backendConnection.close();
 	}
 
 	@ParameterizedTest

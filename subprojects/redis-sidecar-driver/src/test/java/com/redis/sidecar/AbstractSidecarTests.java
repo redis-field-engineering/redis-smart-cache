@@ -16,11 +16,9 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 
-import javax.sql.DataSource;
-
 import org.junit.Assert;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
@@ -40,11 +38,19 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 //	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
 //			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
 //					.withKeyspaceNotifications();
-	private static DataSource dataSource;
+	private static HikariDataSource dataSource;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
+	}
+
+	@AfterAll
+	void closeDataSource() {
+		if (dataSource == null) {
+			return;
+		}
+		dataSource.close();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -56,14 +62,10 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		}
 	}
 
-	@BeforeAll
-	public void initDriver() throws ClassNotFoundException, IOException {
-		Class.forName(SidecarDriver.class.getName());
-	}
-
 	@ParameterizedTest
 	@RedisTestContextsSource
-	public void testDriver(RedisTestContext redis) throws SQLException {
+	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException {
+		Class.forName(SidecarDriver.class.getName());
 		Driver driver = DriverManager.getDriver(SidecarDriver.JDBC_URL_PREFIX + redis.getRedisURI());
 		Assert.assertNotNull(driver);
 		Assert.assertTrue(driver.getMajorVersion() >= 0);
