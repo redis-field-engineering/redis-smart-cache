@@ -5,9 +5,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.CallableStatement;
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
-import java.sql.DriverPropertyInfo;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -18,27 +16,26 @@ import java.util.Collection;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.sidecar.impl.RedisResultSetCache;
+import com.redis.testcontainers.RedisClusterContainer;
 import com.redis.testcontainers.RedisContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
-import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
 	private final RedisContainer redis = new RedisContainer(
 			RedisContainer.DEFAULT_IMAGE_NAME.withTag(RedisContainer.DEFAULT_TAG)).withKeyspaceNotifications();
-//	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
-//			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
-//					.withKeyspaceNotifications();
+	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
+			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
+					.withKeyspaceNotifications();
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
-		return Arrays.asList(redis);
+		return Arrays.asList(redis, redisCluster);
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -50,24 +47,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		}
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException {
-		Class.forName(SidecarDriver.class.getName());
-		Driver driver = DriverManager.getDriver(SidecarDriver.JDBC_URL_PREFIX + redis.getRedisURI());
-		Assert.assertNotNull(driver);
-		Assert.assertTrue(driver.getMajorVersion() >= 0);
-		Assert.assertTrue(driver.getMinorVersion() >= 0);
-		Assert.assertNotNull(driver.getParentLogger());
-		Assert.assertFalse(driver.jdbcCompliant());
-		DriverPropertyInfo[] infos = driver.getPropertyInfo(null, null);
-		Assert.assertNotNull(infos);
-		Assert.assertEquals(2, infos.length);
-		Assert.assertEquals(SidecarDriver.DRIVER_URL, infos[0].name);
-		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
-	}
-
-	protected Connection getDatabaseConnection(JdbcDatabaseContainer<?> container) throws SQLException {
+	protected Connection connection(JdbcDatabaseContainer<?> container) throws SQLException {
 		try {
 			Class.forName(container.getDriverClassName());
 		} catch (ClassNotFoundException e) {
@@ -76,9 +56,9 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
-	protected SidecarConnection getSidecarConnection(JdbcDatabaseContainer<?> database, RedisServer redis)
+	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
-		Connection connection = getDatabaseConnection(database);
+		Connection connection = connection(database);
 		return new SidecarConnection(connection, new RedisResultSetCache(redis.getRedisURI()));
 	}
 
@@ -119,12 +99,12 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 
 	protected void testSimpleStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
 			throws SQLException {
-		test(databaseContainer, redis.getServer(), c -> c.createStatement().executeQuery(sql));
+		test(databaseContainer, redis, c -> c.createStatement().executeQuery(sql));
 	}
 
 	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			String sql) throws SQLException {
-		test(databaseContainer, redis.getServer(), c -> {
+		test(databaseContainer, redis, c -> {
 			Statement statement = c.createStatement();
 			statement.execute(sql);
 			return statement.getResultSet();
@@ -133,7 +113,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 
 	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
 			Object... parameters) throws SQLException {
-		test(databaseContainer, redis.getServer(), c -> {
+		test(databaseContainer, redis, c -> {
 			PreparedStatement statement = c.prepareStatement(sql);
 			for (int index = 0; index < parameters.length; index++) {
 				statement.setObject(index + 1, parameters[index]);
@@ -144,7 +124,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 
 	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
 			Object... parameters) throws SQLException {
-		test(databaseContainer, redis.getServer(), c -> {
+		test(databaseContainer, redis, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			for (int index = 0; index < parameters.length; index++) {
 				statement.setObject(index + 1, parameters[index]);
@@ -155,17 +135,17 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 
 	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			String sql, Object... parameters) throws SQLException {
-		test(databaseContainer, redis.getServer(), c -> {
+		test(databaseContainer, redis, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			statement.execute();
 			return statement.getResultSet();
 		});
 	}
 
-	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisServer redis,
+	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			StatementExecutor executor) throws SQLException {
-		try (Connection databaseConnection = getDatabaseConnection(databaseContainer);
-				SidecarConnection connection = getSidecarConnection(databaseContainer, redis)) {
+		try (Connection databaseConnection = connection(databaseContainer);
+				SidecarConnection connection = connection(databaseContainer, redis)) {
 			assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			Assertions.assertEquals(0, connection.getCache().getHits());
 			Assertions.assertEquals(1, connection.getCache().getMisses());
@@ -180,9 +160,9 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 		}
 	}
 
-	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, RedisServer redis, String sql)
+	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
 			throws SQLException {
-		try (SidecarConnection connection = getSidecarConnection(databaseContainer, redis)) {
+		try (SidecarConnection connection = connection(databaseContainer, redis)) {
 			Statement statement = connection.createStatement();
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();

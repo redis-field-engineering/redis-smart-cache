@@ -1,20 +1,25 @@
 package com.redis.sidecar;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.time.LocalDateTime;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-@Testcontainers
 class PostgreSQLTests extends AbstractSidecarTests {
 
 	private static final DockerImageName POSTGRE_DOCKER_IMAGE_NAME = DockerImageName.parse(PostgreSQLContainer.IMAGE)
@@ -25,7 +30,7 @@ class PostgreSQLTests extends AbstractSidecarTests {
 
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
-		Connection backendConnection = getDatabaseConnection(POSTGRESQL);
+		Connection backendConnection = connection(POSTGRESQL);
 		runScript(backendConnection, "northwind.sql");
 	}
 
@@ -55,6 +60,77 @@ class PostgreSQLTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
+	void testCallableStatementParams(RedisTestContext redis) throws Exception {
+		String createTable = "CREATE TABLE EMPLOYEE" + "(" + " ID serial," + " NAME varchar(100) NOT NULL,"
+				+ " SALARY numeric(15, 2) NOT NULL,"
+				+ " CREATED_DATE timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP," + " PRIMARY KEY (ID)"
+				+ ")";
+		try (Connection connection = connection(POSTGRESQL, redis)) {
+			connection.createStatement().execute(createTable);
+			connection.createStatement().execute(generateInsert("mkyong", new BigDecimal(999.80)));
+		}
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatement2(RedisTestContext redis) throws SQLException {
+		String createFunction = "CREATE OR REPLACE FUNCTION hello(p1 TEXT) RETURNS TEXT AS $$ BEGIN RETURN 'hello ' || p1; END; $$ LANGUAGE plpgsql";
+
+		String runFunction = "{ ? = call hello( ? ) }";
+
+		try (Connection conn = connection(POSTGRESQL, redis);
+				Statement statement = conn.createStatement();
+				CallableStatement callableStatement = conn.prepareCall(runFunction)) {
+			statement.execute(createFunction);
+			callableStatement.registerOutParameter(1, Types.VARCHAR);
+			callableStatement.setString(2, "mkyong");
+			callableStatement.executeUpdate();
+			Assertions.assertEquals("hello mkyong", callableStatement.getString(1));
+		}
+	}
+
+	private static String generateInsert(String name, BigDecimal salary) {
+		return "INSERT INTO EMPLOYEE (NAME, SALARY, CREATED_DATE) " + "VALUES ('" + name + "','" + salary + "','"
+				+ LocalDateTime.now() + "')";
+
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatementRefCursor(RedisTestContext redis) throws SQLException {
+
+		String createFunction = "CREATE OR REPLACE FUNCTION getUsers(mycurs OUT refcursor) RETURNS refcursor  AS $$ BEGIN OPEN mycurs FOR select * from pg_user; END; $$ LANGUAGE plpgsql";
+
+		String runFunction = "{? = call getUsers()}";
+
+		try (Connection conn = connection(POSTGRESQL, redis);
+				Statement statement = conn.createStatement();
+				CallableStatement cs = conn.prepareCall(runFunction)) {
+
+			// We must be inside a transaction for cursors to work.
+			conn.setAutoCommit(false);
+
+			// create function
+			statement.execute(createFunction);
+
+			// register output
+			cs.registerOutParameter(1, Types.REF_CURSOR);
+
+			// run function
+			cs.execute();
+
+			// get refcursor and convert it to ResultSet
+			ResultSet resultSet = (ResultSet) cs.getObject(1);
+			while (resultSet.next()) {
+				Assertions.assertEquals("test", resultSet.getString("usename"));
+				Assertions.assertEquals("********", resultSet.getString("passwd"));
+			}
+
+		}
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
 	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
 		testCallableStatementGetResultSet(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = 8");
 	}
@@ -62,7 +138,7 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(POSTGRESQL, redis.getServer(), "SELECT * FROM orders");
+		testResultSetMetaData(POSTGRESQL, redis, "SELECT * FROM orders");
 	}
 
 }
