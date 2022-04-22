@@ -6,5 +6,4 @@ dependencies {
     testImplementation group: 'org.testcontainers', name: 'testcontainers', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
-    testImplementation 'com.h2database:h2'
 }
