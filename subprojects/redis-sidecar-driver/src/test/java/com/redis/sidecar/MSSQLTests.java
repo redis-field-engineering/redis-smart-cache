@@ -20,8 +20,8 @@ class MSSQLTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(MSSQL);
-		runScript(backendConnection, "mssql/demo_hr_02_create_tables.sql");
-		runScript(backendConnection, "mssql/demo_hr_03_populate_tables.sql");
+		runScript(backendConnection, "mssql/create_tables.sql");
+		runScript(backendConnection, "mssql/populate_tables.sql");
 	}
 
 	@ParameterizedTest
