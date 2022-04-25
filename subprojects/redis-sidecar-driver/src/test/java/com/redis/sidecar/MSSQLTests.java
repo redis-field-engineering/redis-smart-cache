@@ -15,7 +15,8 @@ import com.redis.testcontainers.junit.RedisTestContextsSource;
 class MSSQLTests extends AbstractSidecarTests {
 
 	@Container
-	private static final MSSQLServerContainer<?> MSSQL = new MSSQLServerContainer<>(MSSQLServerContainer.IMAGE).acceptLicense();
+	private static final MSSQLServerContainer<?> MSSQL = new MSSQLServerContainer<>(MSSQLServerContainer.IMAGE)
+			.acceptLicense();
 
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
@@ -30,4 +31,27 @@ class MSSQLTests extends AbstractSidecarTests {
 		testSimpleStatement(MSSQL, redis, "SELECT * FROM LOCATIONS");
 	}
 
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
+		testUpdateAndGetResultSet(MSSQL, redis, "SELECT * FROM LOCATIONS");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testPreparedStatement(RedisTestContext redis) throws Exception {
+		testPreparedStatement(MSSQL, redis, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = ?", "US");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
+		testCallableStatementGetResultSet(MSSQL, redis, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = 'US'");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testResultSetMetadata(RedisTestContext redis) throws Exception {
+		testResultSetMetaData(MSSQL, redis, "SELECT * FROM LOCATIONS");
+	}
 }
