@@ -1,0 +1,17 @@
+CREATE TABLE EMPLOYEE
+    (
+        ID number GENERATED ALWAYS as IDENTITY(START with 1 INCREMENT by 1),
+        NAME varchar2(100) NOT NULL, SALARY number(15, 2) NOT NULL,
+        CREATED_DATE DATE DEFAULT SYSDATE NOT NULL, CONSTRAINT employee_pk PRIMARY KEY (ID)
+    );
+
+CREATE OR REPLACE PROCEDURE insert_employee
+    (
+        p_name IN EMPLOYEE.NAME%TYPE,
+        p_salary IN EMPLOYEE.SALARY%TYPE, 
+        p_date IN EMPLOYEE.CREATED_DATE%TYPE
+    )
+    AS BEGIN
+    INSERT INTO EMPLOYEE ("NAME", "SALARY", "CREATED_DATE") VALUES (p_name, p_salary, p_date);
+    COMMIT;
+    END;

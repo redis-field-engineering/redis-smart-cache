@@ -28,7 +28,8 @@ class OracleTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(ORACLE);
-		runScript(backendConnection, "hr.sql");
+		runScript(backendConnection, "oracle-hr.sql");
+		runScript(backendConnection, "oracle-employee.sql");
 	}
 
 	@ParameterizedTest
@@ -52,20 +53,9 @@ class OracleTests extends AbstractSidecarTests {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testCallableStatement(RedisTestContext redis) throws Exception {
-		String createTable = "CREATE TABLE EMPLOYEE" + "("
-				+ " ID number GENERATED ALWAYS as IDENTITY(START with 1 INCREMENT by 1),"
-				+ " NAME varchar2(100) NOT NULL," + " SALARY number(15, 2) NOT NULL,"
-				+ " CREATED_DATE DATE DEFAULT SYSDATE NOT NULL," + " CONSTRAINT employee_pk PRIMARY KEY (ID)" + ")";
-		String createSP = "CREATE OR REPLACE PROCEDURE insert_employee( p_name IN EMPLOYEE.NAME%TYPE, "
-				+ " p_salary IN EMPLOYEE.SALARY%TYPE, " + " p_date IN EMPLOYEE.CREATED_DATE%TYPE) " + " AS " + " BEGIN "
-				+ "     INSERT INTO EMPLOYEE (\"NAME\", \"SALARY\", \"CREATED_DATE\") VALUES (p_name, p_salary, p_date); "
-				+ "     COMMIT; " + " END; ";
-		String runSP = "{ call insert_employee(?,?,?) }";
 		try (Connection connection = connection(ORACLE, redis)) {
-			connection.createStatement().execute(createTable);
-			connection.createStatement().execute(createSP);
-			CallableStatement callableStatement = connection.prepareCall(runSP);
-			callableStatement.setString(1, "mkyong");
+			CallableStatement callableStatement = connection.prepareCall("{ call insert_employee(?,?,?) }");
+			callableStatement.setString(1, "julien");
 			callableStatement.setBigDecimal(2, new BigDecimal("99.99"));
 			callableStatement.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
 			callableStatement.executeUpdate();

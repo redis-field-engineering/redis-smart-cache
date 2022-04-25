@@ -31,7 +31,8 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
-		runScript(backendConnection, "northwind.sql");
+		runScript(backendConnection, "postgres-northwind.sql");
+		runScript(backendConnection, "postgres-employee.sql");
 	}
 
 	@ParameterizedTest
@@ -61,31 +62,23 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testCallableStatementParams(RedisTestContext redis) throws Exception {
-		String createTable = "CREATE TABLE EMPLOYEE" + "(" + " ID serial," + " NAME varchar(100) NOT NULL,"
-				+ " SALARY numeric(15, 2) NOT NULL,"
-				+ " CREATED_DATE timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP," + " PRIMARY KEY (ID)"
-				+ ")";
 		try (Connection connection = connection(POSTGRESQL, redis)) {
-			connection.createStatement().execute(createTable);
-			connection.createStatement().execute(generateInsert("mkyong", new BigDecimal(999.80)));
+			connection.createStatement().execute(generateInsert("julien", new BigDecimal(999.80)));
 		}
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testCallableStatement2(RedisTestContext redis) throws SQLException {
-		String createFunction = "CREATE OR REPLACE FUNCTION hello(p1 TEXT) RETURNS TEXT AS $$ BEGIN RETURN 'hello ' || p1; END; $$ LANGUAGE plpgsql";
-
 		String runFunction = "{ ? = call hello( ? ) }";
 
 		try (Connection conn = connection(POSTGRESQL, redis);
 				Statement statement = conn.createStatement();
 				CallableStatement callableStatement = conn.prepareCall(runFunction)) {
-			statement.execute(createFunction);
 			callableStatement.registerOutParameter(1, Types.VARCHAR);
-			callableStatement.setString(2, "mkyong");
+			callableStatement.setString(2, "julien");
 			callableStatement.executeUpdate();
-			Assertions.assertEquals("hello mkyong", callableStatement.getString(1));
+			Assertions.assertEquals("hello julien", callableStatement.getString(1));
 		}
 	}
 
@@ -99,8 +92,6 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testCallableStatementRefCursor(RedisTestContext redis) throws SQLException {
 
-		String createFunction = "CREATE OR REPLACE FUNCTION getUsers(mycurs OUT refcursor) RETURNS refcursor  AS $$ BEGIN OPEN mycurs FOR select * from pg_user; END; $$ LANGUAGE plpgsql";
-
 		String runFunction = "{? = call getUsers()}";
 
 		try (Connection conn = connection(POSTGRESQL, redis);
@@ -109,9 +100,6 @@ class PostgreSQLTests extends AbstractSidecarTests {
 
 			// We must be inside a transaction for cursors to work.
 			conn.setAutoCommit(false);
-
-			// create function
-			statement.execute(createFunction);
 
 			// register output
 			cs.registerOutParameter(1, Types.REF_CURSOR);
