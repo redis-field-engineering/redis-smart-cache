@@ -14,16 +14,20 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.sidecar.impl.RedisClusterResultSetCache;
 import com.redis.sidecar.impl.RedisResultSetCache;
 import com.redis.testcontainers.RedisClusterContainer;
 import com.redis.testcontainers.RedisContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
+
+import io.lettuce.core.api.StatefulConnection;
 
 abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
@@ -59,7 +63,15 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
 		Connection connection = connection(database);
-		return new SidecarConnection(connection, new RedisResultSetCache(redis.getRedisURI()));
+		return new SidecarConnection(connection, cache(redis));
+	}
+
+	private ResultSetCache cache(RedisTestContext redis) {
+		GenericObjectPoolConfig<StatefulConnection<String, byte[]>> poolConfig = new GenericObjectPoolConfig<>();
+		if (redis.isCluster()) {
+			return new RedisClusterResultSetCache(redis.getRedisClusterClient(), poolConfig);
+		}
+		return new RedisResultSetCache(redis.getRedisClient(), poolConfig);
 	}
 
 	protected void assertEquals(ResultSet expected, ResultSet actual) throws SQLException {

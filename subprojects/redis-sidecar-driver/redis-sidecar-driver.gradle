@@ -1,5 +1,6 @@
 dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
+    implementation 'org.apache.commons:commons-pool2'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion

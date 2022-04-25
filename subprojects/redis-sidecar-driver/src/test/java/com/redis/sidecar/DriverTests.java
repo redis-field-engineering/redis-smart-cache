@@ -26,8 +26,8 @@ class DriverTests extends AbstractSidecarTests {
 		DriverPropertyInfo[] infos = driver.getPropertyInfo(null, null);
 		Assert.assertNotNull(infos);
 		Assert.assertEquals(2, infos.length);
-		Assert.assertEquals(SidecarDriver.DRIVER_URL, infos[0].name);
-		Assert.assertEquals(SidecarDriver.DRIVER_CLASS, infos[1].name);
+		Assert.assertEquals(SidecarDriver.PROPERTY_DRIVER_URL, infos[0].name);
+		Assert.assertEquals(SidecarDriver.PROPERTY_DRIVER_CLASS, infos[1].name);
 	}
 
 }
