@@ -48,7 +48,8 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 		this.sql = executedSql();
 		resultSet = connection.getCache().get(sql);
 		if (resultSet == null) {
-			resultSet = connection.getCache().set(sql, statement.executeQuery());
+			ResultSet backendResultSet = statement.executeQuery();
+			resultSet = connection.getCache().set(sql, backendResultSet);
 		}
 		return resultSet;
 	}

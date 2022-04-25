@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.OracleContainer;
@@ -58,7 +59,7 @@ class OracleTests extends AbstractSidecarTests {
 			callableStatement.setString(1, "julien");
 			callableStatement.setBigDecimal(2, new BigDecimal("99.99"));
 			callableStatement.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
-			callableStatement.executeUpdate();
+			Assertions.assertEquals(1, callableStatement.executeUpdate());
 		}
 	}
 

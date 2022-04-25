@@ -1,14 +1,12 @@
 package com.redis.sidecar;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,21 +53,13 @@ class PostgreSQLTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testCallableStatement(RedisTestContext redis) throws Exception {
+	void testSimpleCallableStatement(RedisTestContext redis) throws Exception {
 		testCallableStatement(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
 	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testCallableStatementParams(RedisTestContext redis) throws Exception {
-		try (Connection connection = connection(POSTGRESQL, redis)) {
-			connection.createStatement().execute(generateInsert("julien", new BigDecimal(999.80)));
-		}
-	}
-
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatement2(RedisTestContext redis) throws SQLException {
+	void testCallableStatementParams(RedisTestContext redis) throws SQLException {
 		String runFunction = "{ ? = call hello( ? ) }";
 
 		try (Connection conn = connection(POSTGRESQL, redis);
@@ -80,12 +70,6 @@ class PostgreSQLTests extends AbstractSidecarTests {
 			callableStatement.executeUpdate();
 			Assertions.assertEquals("hello julien", callableStatement.getString(1));
 		}
-	}
-
-	private static String generateInsert(String name, BigDecimal salary) {
-		return "INSERT INTO EMPLOYEE (NAME, SALARY, CREATED_DATE) " + "VALUES ('" + name + "','" + salary + "','"
-				+ LocalDateTime.now() + "')";
-
 	}
 
 	@ParameterizedTest

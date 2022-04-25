@@ -39,7 +39,8 @@ public class SidecarStatement implements Statement {
 		this.sql = sql;
 		this.resultSet = connection.getCache().get(sql);
 		if (resultSet == null) {
-			resultSet = connection.getCache().set(sql, statement.executeQuery(sql));
+			ResultSet backendResultSet = statement.executeQuery(sql);
+			resultSet = connection.getCache().set(sql, backendResultSet);
 		}
 		return resultSet;
 	}
@@ -122,7 +123,8 @@ public class SidecarStatement implements Statement {
 	@Override
 	public ResultSet getResultSet() throws SQLException {
 		if (resultSet == null) {
-			resultSet = connection.getCache().set(sql, statement.getResultSet());
+			ResultSet backendResultSet = statement.getResultSet();
+			resultSet = connection.getCache().set(sql, backendResultSet);
 		}
 		return resultSet;
 	}
