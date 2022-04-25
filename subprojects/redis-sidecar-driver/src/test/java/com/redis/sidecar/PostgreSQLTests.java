@@ -29,8 +29,8 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
-		runScript(backendConnection, "postgres-northwind.sql");
-		runScript(backendConnection, "postgres-employee.sql");
+		runScript(backendConnection, "postgres/northwind.sql");
+		runScript(backendConnection, "postgres/employee.sql");
 	}
 
 	@ParameterizedTest

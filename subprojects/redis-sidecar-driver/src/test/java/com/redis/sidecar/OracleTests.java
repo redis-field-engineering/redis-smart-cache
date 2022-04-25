@@ -29,8 +29,8 @@ class OracleTests extends AbstractSidecarTests {
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(ORACLE);
-		runScript(backendConnection, "oracle-hr.sql");
-		runScript(backendConnection, "oracle-employee.sql");
+		runScript(backendConnection, "oracle/hr.sql");
+		runScript(backendConnection, "oracle/employee.sql");
 	}
 
 	@ParameterizedTest
