@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -75,25 +76,21 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	}
 
 	protected void assertEquals(ResultSet expected, ResultSet actual) throws SQLException {
-		ResultSetMetaData meta1 = expected.getMetaData();
-		ResultSetMetaData meta2 = actual.getMetaData();
-		Assertions.assertEquals(meta1.getColumnCount(), meta2.getColumnCount());
-		for (int index = 0; index < meta1.getColumnCount(); index++) {
-			Assertions.assertEquals(meta1.getColumnName(index + 1), meta2.getColumnName(index + 1));
-			Assertions.assertEquals(meta1.getColumnType(index + 1), meta2.getColumnType(index + 1));
+		ResultSetMetaData expectedMeta = expected.getMetaData();
+		ResultSetMetaData actualMeta = actual.getMetaData();
+		Assertions.assertEquals(expectedMeta.getColumnCount(), actualMeta.getColumnCount());
+		for (int index = 0; index < expectedMeta.getColumnCount(); index++) {
+			Assertions.assertEquals(expectedMeta.getColumnName(index + 1), actualMeta.getColumnName(index + 1));
+			Assertions.assertEquals(expectedMeta.getColumnType(index + 1), actualMeta.getColumnType(index + 1));
 		}
 		int count = 0;
 		while (expected.next()) {
 			Assertions.assertTrue(actual.next());
-			for (int index = 1; index <= meta1.getColumnCount(); index++) {
-				Object expectedValue = expected.getObject(index);
-				Object actualValue = actual.getObject(index);
-				if (expectedValue instanceof Number) {
-					expectedValue = ((Number) expectedValue).doubleValue();
-					actualValue = ((Number) actualValue).doubleValue();
-				}
-				Assertions.assertEquals(expectedValue, actualValue,
-						String.format("Column %s type %s", meta1.getColumnName(index), meta1.getColumnType(index)));
+			for (int index = 1; index <= expectedMeta.getColumnCount(); index++) {
+				Object expectedValue = normalize(expected.getObject(index));
+				Object actualValue = normalize(actual.getObject(index));
+				Assertions.assertEquals(expectedValue, actualValue, String.format("Column %s type %s",
+						expectedMeta.getColumnName(index), expectedMeta.getColumnType(index)));
 			}
 			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
 				Assertions.assertEquals(expected.isLast(), actual.isLast());
@@ -101,6 +98,16 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 			count++;
 		}
 		Assertions.assertTrue(count > 0);
+	}
+
+	private Object normalize(Object value) {
+		if (value instanceof Number) {
+			return ((Number) value).doubleValue();
+		}
+		if (value instanceof Timestamp) {
+			return ((Timestamp) value).toLocalDateTime();
+		}
+		return value;
 	}
 
 	private static interface StatementExecutor {
