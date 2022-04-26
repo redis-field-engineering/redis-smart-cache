@@ -31,4 +31,27 @@ class DB2Tests extends AbstractSidecarTests {
 		testSimpleStatement(DB2, redis, "SELECT * FROM books");
 	}
 
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
+		testUpdateAndGetResultSet(DB2, redis, "SELECT * FROM books");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testPreparedStatement(RedisTestContext redis) throws Exception {
+		testPreparedStatement(DB2, redis, "SELECT * FROM books WHERE publisher_id = ?", 5);
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
+		testCallableStatementGetResultSet(DB2, redis, "SELECT * FROM books WHERE publisher_id = 5");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testResultSetMetadata(RedisTestContext redis) throws Exception {
+		testResultSetMetaData(DB2, redis, "SELECT * FROM books");
+	}
 }
