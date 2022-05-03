@@ -11,24 +11,20 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import javax.sql.rowset.RowSetProvider;
+
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
-import com.redis.sidecar.impl.RedisClusterResultSetCache;
-import com.redis.sidecar.impl.RedisResultSetCache;
 import com.redis.testcontainers.RedisClusterContainer;
 import com.redis.testcontainers.RedisContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
-
-import io.lettuce.core.api.StatefulConnection;
 
 abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
@@ -64,50 +60,12 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
 		Connection connection = connection(database);
-		return new SidecarConnection(connection, cache(redis));
+		return new SidecarConnection(connection, cache(redis), RowSetProvider.newFactory());
 	}
 
 	private ResultSetCache cache(RedisTestContext redis) {
-		GenericObjectPoolConfig<StatefulConnection<String, byte[]>> poolConfig = new GenericObjectPoolConfig<>();
-		if (redis.isCluster()) {
-			return new RedisClusterResultSetCache(redis.getRedisClusterClient(), poolConfig);
-		}
-		return new RedisResultSetCache(redis.getRedisClient(), poolConfig);
-	}
-
-	protected void assertEquals(ResultSet expected, ResultSet actual) throws SQLException {
-		ResultSetMetaData expectedMeta = expected.getMetaData();
-		ResultSetMetaData actualMeta = actual.getMetaData();
-		Assertions.assertEquals(expectedMeta.getColumnCount(), actualMeta.getColumnCount());
-		for (int index = 0; index < expectedMeta.getColumnCount(); index++) {
-			Assertions.assertEquals(expectedMeta.getColumnName(index + 1), actualMeta.getColumnName(index + 1));
-			Assertions.assertEquals(expectedMeta.getColumnType(index + 1), actualMeta.getColumnType(index + 1));
-		}
-		int count = 0;
-		while (expected.next()) {
-			Assertions.assertTrue(actual.next());
-			for (int index = 1; index <= expectedMeta.getColumnCount(); index++) {
-				Object expectedValue = normalize(expected.getObject(index));
-				Object actualValue = normalize(actual.getObject(index));
-				Assertions.assertEquals(expectedValue, actualValue, String.format("Column %s type %s",
-						expectedMeta.getColumnName(index), expectedMeta.getColumnType(index)));
-			}
-			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
-				Assertions.assertEquals(expected.isLast(), actual.isLast());
-			}
-			count++;
-		}
-		Assertions.assertTrue(count > 0);
-	}
-
-	private Object normalize(Object value) {
-		if (value instanceof Number) {
-			return ((Number) value).doubleValue();
-		}
-		if (value instanceof Timestamp) {
-			return ((Timestamp) value).toLocalDateTime();
-		}
-		return value;
+		return SidecarDriver
+				.cache(SidecarConfig.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster()).build());
 	}
 
 	private static interface StatementExecutor {
@@ -165,7 +123,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 			StatementExecutor executor) throws SQLException {
 		try (Connection databaseConnection = connection(databaseContainer);
 				SidecarConnection connection = connection(databaseContainer, redis)) {
-			assertEquals(executor.execute(databaseConnection), executor.execute(connection));
+			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			Assertions.assertEquals(0, connection.getCache().getHits());
 			Assertions.assertEquals(1, connection.getCache().getMisses());
 			ResultSet resultSet = null;
@@ -175,7 +133,7 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 			}
 			Assertions.assertEquals(count, connection.getCache().getHits());
 			Assertions.assertEquals(1, connection.getCache().getMisses());
-			assertEquals(executor.execute(databaseConnection), resultSet);
+			TestUtils.assertEquals(executor.execute(databaseConnection), resultSet);
 		}
 	}
 

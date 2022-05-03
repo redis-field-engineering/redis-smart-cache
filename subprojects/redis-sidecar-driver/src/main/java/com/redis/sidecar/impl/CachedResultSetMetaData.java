@@ -3,28 +3,37 @@ package com.redis.sidecar.impl;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class CachedResultSetMetaData implements ResultSetMetaData {
 
-	private final Column[] columns;
+	private final List<ColumnMetaData> columns;
+	private final Map<String, Integer> columnNames = new HashMap<>();
 
-	public CachedResultSetMetaData(Column[] columns) {
+	public CachedResultSetMetaData(List<ColumnMetaData> columns) {
 		this.columns = columns;
+		for (int index = 0; index < columns.size(); index++) {
+			ColumnMetaData column = columns.get(index);
+			columnNames.put(column.getColumnName(), index + 1);
+		}
 	}
 
-	public Column[] getColumns() {
+	public List<ColumnMetaData> getColumns() {
 		return columns;
 	}
 
 	@Override
-	public int getColumnCount() throws SQLException {
-		return columns.length;
+	public int getColumnCount() {
+		return columns.size();
 	}
 
-	private Column getColumn(int column) throws SQLException {
-		if (column == 0 || column > columns.length)
+	private ColumnMetaData getColumn(int column) throws SQLException {
+		if (column == 0 || column > columns.size())
 			throw new SQLException("Wrong column number: " + column);
-		return columns[column - 1];
+		return columns.get(column - 1);
 	}
 
 	@Override
@@ -59,17 +68,17 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 
 	@Override
 	public int getColumnDisplaySize(int column) throws SQLException {
-		return getColumn(column).getDisplaySize();
+		return getColumn(column).getColumnDisplaySize();
 	}
 
 	@Override
 	public String getColumnLabel(int column) throws SQLException {
-		return getColumn(column).getLabel();
+		return getColumn(column).getColumnLabel();
 	}
 
 	@Override
 	public String getColumnName(int column) throws SQLException {
-		return getColumn(column).getName();
+		return getColumn(column).getColumnName();
 	}
 
 	@Override
@@ -94,17 +103,17 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 
 	@Override
 	public String getCatalogName(int column) throws SQLException {
-		return getColumn(column).getCatalog();
+		return getColumn(column).getCatalogName();
 	}
 
 	@Override
 	public int getColumnType(int column) throws SQLException {
-		return getColumn(column).getType();
+		return getColumn(column).getColumnType();
 	}
 
 	@Override
 	public String getColumnTypeName(int column) throws SQLException {
-		return getColumn(column).getTypeName();
+		return getColumn(column).getColumnTypeName();
 	}
 
 	@Override
@@ -124,7 +133,7 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 
 	@Override
 	public String getColumnClassName(int column) throws SQLException {
-		return getColumn(column).getClassName();
+		return getColumn(column).getColumnClassName();
 	}
 
 	@Override
@@ -136,4 +145,26 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 	public boolean isWrapperFor(Class<?> iface) throws SQLException {
 		throw new SQLFeatureNotSupportedException();
 	}
+
+	public Integer getColumnIndex(String name) {
+		return columnNames.get(name);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(columns);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		CachedResultSetMetaData other = (CachedResultSetMetaData) obj;
+		return Objects.equals(columns, other.columns);
+	}
+
 }

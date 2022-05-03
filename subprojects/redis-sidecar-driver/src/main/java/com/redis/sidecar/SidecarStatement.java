@@ -6,6 +6,9 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
+import javax.sql.RowSet;
+import javax.sql.rowset.CachedRowSet;
+
 public class SidecarStatement implements Statement {
 
 	protected final SidecarConnection connection;
@@ -39,10 +42,22 @@ public class SidecarStatement implements Statement {
 		this.sql = sql;
 		this.resultSet = connection.getCache().get(sql);
 		if (resultSet == null) {
-			ResultSet backendResultSet = statement.executeQuery(sql);
-			resultSet = connection.getCache().set(sql, backendResultSet);
+			resultSet = cache(sql, () -> statement.executeQuery(sql));
 		}
 		return resultSet;
+	}
+
+	protected interface ResultSetProvider {
+
+		ResultSet get() throws SQLException;
+	}
+
+	protected RowSet cache(String sql, ResultSetProvider provider) throws SQLException {
+		CachedRowSet rowSet = connection.createCachedRowSet();
+		rowSet.populate(provider.get());
+		connection.getCache().set(sql, rowSet);
+		rowSet.beforeFirst();
+		return rowSet;
 	}
 
 	@Override
@@ -123,8 +138,7 @@ public class SidecarStatement implements Statement {
 	@Override
 	public ResultSet getResultSet() throws SQLException {
 		if (resultSet == null) {
-			ResultSet backendResultSet = statement.getResultSet();
-			resultSet = connection.getCache().set(sql, backendResultSet);
+			resultSet = cache(sql, statement::getResultSet);
 		}
 		return resultSet;
 	}

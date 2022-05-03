@@ -4,29 +4,30 @@ import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.sql.rowset.RowSetProvider;
+
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.redis.sidecar.impl.RedisClusterResultSetCache;
-import com.redis.sidecar.impl.RedisResultSetCache;
+import com.redis.sidecar.impl.ByteArrayResultSetCodec;
+import com.redis.sidecar.impl.RedisStringCache;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulConnection;
+import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 
 public class SidecarDriver implements Driver {
 
 	private static final Logger log = Logger.getLogger(SidecarDriver.class.getName());
 
 	static final String JDBC_URL_PREFIX = "jdbc:sidecar:";
-	public static final String PROPERTY_DRIVER_URL = "sidecar.driver.url";
-	public static final String PROPERTY_DRIVER_CLASS = "sidecar.driver.class";
-	public static final String PROPERTY_REDIS_CLUSTER = "sidecar.redis.cluster";
-	public static final String PROPERTY_REDIS_POOL_SIZE = "sidecar.redis.pool";
 
 	static {
 		try {
@@ -41,35 +42,36 @@ public class SidecarDriver implements Driver {
 		if (!acceptsURL(url)) {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
-		String driverClass = info.getProperty(PROPERTY_DRIVER_CLASS);
-		if (isEmpty(driverClass)) {
+		SidecarConfig config = SidecarConfig.load(info);
+		if (isEmpty(config.getDriverClass())) {
 			throw new SQLException("No backend driver class specified");
 		}
 		Driver driver;
 		try {
-			driver = (Driver) Class.forName(driverClass).getConstructor().newInstance();
+			driver = (Driver) Class.forName(config.getDriverClass()).getConstructor().newInstance();
 		} catch (Exception e) {
-			throw new SQLException("Cannot initialize backend driver '" + driverClass + "'", e);
+			throw new SQLException("Cannot initialize backend driver '" + config.getDriverClass() + "'", e);
 		}
-		String driverUrl = info.getProperty(PROPERTY_DRIVER_URL);
-		if (isEmpty(driverUrl)) {
+		if (isEmpty(config.getDriverURL())) {
 			throw new SQLException("No backend URL specified");
 		}
-		Connection connection = driver.connect(driverUrl, info);
-		String redisURI = url.substring(JDBC_URL_PREFIX.length());
-		boolean cluster = info.getProperty(PROPERTY_REDIS_CLUSTER, "false").equalsIgnoreCase("true");
-		int poolSize = Integer.parseInt(
-				info.getProperty(PROPERTY_REDIS_POOL_SIZE, String.valueOf(GenericObjectPoolConfig.DEFAULT_MAX_TOTAL)));
-		return new SidecarConnection(connection, resultSetCache(redisURI, cluster, poolSize));
+		Connection connection = driver.connect(config.getDriverURL(), info);
+		config.setRedisURI(url.substring(JDBC_URL_PREFIX.length()));
+		return new SidecarConnection(connection, cache(config), RowSetProvider.newFactory());
 	}
 
-	private ResultSetCache resultSetCache(String redisURI, boolean cluster, int poolMax) {
-		GenericObjectPoolConfig<StatefulConnection<String, byte[]>> poolConfig = new GenericObjectPoolConfig<>();
-		poolConfig.setMaxTotal(poolMax);
-		if (cluster) {
-			return new RedisClusterResultSetCache(RedisClusterClient.create(redisURI), poolConfig);
+	public static ResultSetCache cache(SidecarConfig config) {
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(config.getByteBufferSize());
+		GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig = new GenericObjectPoolConfig<>();
+		poolConfig.setMaxTotal(config.getPoolSize());
+		if (config.isRedisCluster()) {
+			RedisClusterClient client = RedisClusterClient.create(config.getRedisURI());
+			return new RedisStringCache(() -> client.connect(codec), poolConfig,
+					c -> ((StatefulRedisClusterConnection<String, ResultSet>) c).sync());
 		}
-		return new RedisResultSetCache(RedisClient.create(redisURI), poolConfig);
+		RedisClient client = RedisClient.create(config.getRedisURI());
+		return new RedisStringCache(() -> client.connect(codec), poolConfig,
+				c -> ((StatefulRedisConnection<String, ResultSet>) c).sync());
 
 	}
 
@@ -84,8 +86,11 @@ public class SidecarDriver implements Driver {
 
 	@Override
 	public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
-		return new DriverPropertyInfo[] { new DriverPropertyInfo(PROPERTY_DRIVER_URL, null),
-				new DriverPropertyInfo(PROPERTY_DRIVER_CLASS, null) };
+		return new DriverPropertyInfo[] {
+				new DriverPropertyInfo(SidecarConfig.PROPERTY_DRIVER_URL,
+						info.getProperty(SidecarConfig.PROPERTY_DRIVER_URL)),
+				new DriverPropertyInfo(SidecarConfig.PROPERTY_DRIVER_CLASS,
+						info.getProperty(SidecarConfig.PROPERTY_DRIVER_CLASS)) };
 	}
 
 	@Override

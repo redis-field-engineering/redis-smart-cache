@@ -15,25 +15,18 @@ import com.redis.sidecar.ResultSetCache;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.sync.BaseRedisCommands;
 import io.lettuce.core.api.sync.RedisStringCommands;
-import io.lettuce.core.codec.ByteArrayCodec;
-import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.support.ConnectionPoolSupport;
 
-public abstract class AbstractRedisResultSetCache implements ResultSetCache {
-
-	protected static final RedisCodec<String, byte[]> REDIS_CODEC = RedisCodec.of(StringCodec.UTF8,
-			ByteArrayCodec.INSTANCE);
+public class RedisStringCache implements ResultSetCache {
 
 	private final AtomicLong misses = new AtomicLong();
 	private final AtomicLong hits = new AtomicLong();
-	private final ResultSetCodec codec = new ResultSetCodec();
-	private final GenericObjectPool<StatefulConnection<String, byte[]>> pool;
-	private final Function<StatefulConnection<String, byte[]>, BaseRedisCommands<String, byte[]>> sync;
+	private final GenericObjectPool<StatefulConnection<String, ResultSet>> pool;
+	private final Function<StatefulConnection<String, ResultSet>, BaseRedisCommands<String, ResultSet>> sync;
 
-	protected AbstractRedisResultSetCache(Supplier<StatefulConnection<String, byte[]>> connectionSupplier,
-			GenericObjectPoolConfig<StatefulConnection<String, byte[]>> poolConfig,
-			Function<StatefulConnection<String, byte[]>, BaseRedisCommands<String, byte[]>> sync) {
+	public RedisStringCache(Supplier<StatefulConnection<String, ResultSet>> connectionSupplier,
+			GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig,
+			Function<StatefulConnection<String, ResultSet>, BaseRedisCommands<String, ResultSet>> sync) {
 		this.pool = ConnectionPoolSupport.createGenericObjectPool(connectionSupplier, poolConfig);
 		this.sync = sync;
 	}
@@ -41,10 +34,7 @@ public abstract class AbstractRedisResultSetCache implements ResultSetCache {
 	@Override
 	public void close() throws Exception {
 		pool.close();
-		doClose();
 	}
-
-	protected abstract void doClose();
 
 	@Override
 	public long getMisses() {
@@ -60,14 +50,14 @@ public abstract class AbstractRedisResultSetCache implements ResultSetCache {
 	@Override
 	public ResultSet get(String sql) throws SQLException {
 		String key = key(sql);
-		try (StatefulConnection<String, byte[]> connection = pool.borrowObject()) {
-			byte[] value = ((RedisStringCommands<String, byte[]>) sync.apply(connection)).get(key);
+		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
+			ResultSet value = ((RedisStringCommands<String, ResultSet>) sync.apply(connection)).get(key);
 			if (value == null) {
 				misses.incrementAndGet();
 				return null;
 			}
 			hits.incrementAndGet();
-			return codec.decode(value);
+			return value;
 		} catch (IOException e) {
 			throw new SQLException("Could not decode ResultSet", e);
 		} catch (Exception e) {
@@ -81,12 +71,10 @@ public abstract class AbstractRedisResultSetCache implements ResultSetCache {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ResultSet set(String sql, ResultSet resultSet) throws SQLException {
+	public void set(String sql, ResultSet resultSet) throws SQLException {
 		String key = key(sql);
-		try (StatefulConnection<String, byte[]> connection = pool.borrowObject()) {
-			byte[] value = codec.encode(resultSet);
-			((RedisStringCommands<String, byte[]>) sync.apply(connection)).set(key, value);
-			return codec.decode(value);
+		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
+			((RedisStringCommands<String, ResultSet>) sync.apply(connection)).set(key, resultSet);
 		} catch (IOException e) {
 			throw new SQLException("Could not encode ResultSet", e);
 		} catch (Exception e) {

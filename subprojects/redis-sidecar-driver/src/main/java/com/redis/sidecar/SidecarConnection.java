@@ -19,14 +19,19 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetFactory;
+
 public class SidecarConnection implements Connection {
 
 	private final Connection connection;
 	private final ResultSetCache cache;
+	private final RowSetFactory rowSetFactory;
 
-	public SidecarConnection(Connection connection, ResultSetCache cache) {
+	public SidecarConnection(Connection connection, ResultSetCache cache, RowSetFactory rowSetFactory) {
 		this.connection = connection;
 		this.cache = cache;
+		this.rowSetFactory = rowSetFactory;
 	}
 
 	@Override
@@ -324,6 +329,10 @@ public class SidecarConnection implements Connection {
 
 	public ResultSetCache getCache() {
 		return cache;
+	}
+
+	public CachedRowSet createCachedRowSet() throws SQLException {
+		return rowSetFactory.createCachedRowSet();
 	}
 
 }

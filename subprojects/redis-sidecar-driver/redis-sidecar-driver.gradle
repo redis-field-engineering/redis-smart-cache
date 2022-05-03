@@ -1,6 +1,7 @@
 dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
     implementation 'org.apache.commons:commons-pool2'
+    testImplementation 'org.slf4j:slf4j-jdk14'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
     testImplementation 'mysql:mysql-connector-java'
