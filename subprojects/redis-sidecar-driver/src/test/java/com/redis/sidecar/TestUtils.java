@@ -38,7 +38,7 @@ public class TestUtils {
 		if (value instanceof BigDecimal) {
 			return ((BigDecimal) value).doubleValue();
 		}
-		return null;
+		return value;
 	}
 
 	public static void assertEquals(ResultSetMetaData expectedMetaData, ResultSetMetaData actualMetaData)

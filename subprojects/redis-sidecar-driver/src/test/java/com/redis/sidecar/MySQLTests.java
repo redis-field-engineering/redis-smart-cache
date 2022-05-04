@@ -26,7 +26,7 @@ class MySQLTests extends AbstractSidecarTests {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(MYSQL, redis, "SELECT * FROM Employee");
+		testSimpleStatement(MYSQL, redis, "SELECT * FROM Product");
 	}
 
 	@ParameterizedTest
