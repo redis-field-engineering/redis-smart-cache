@@ -377,7 +377,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	}
 
 	private <T> void write(ResultSet resultSet, T value, ByteBuf output, ByteBufWriter<T> writer) throws SQLException {
-		boolean wasNull = resultSet.wasNull();
+		boolean wasNull = resultSet.wasNull() || value == null;
 		output.writeBoolean(wasNull);
 		if (!wasNull) {
 			writer.write(value);

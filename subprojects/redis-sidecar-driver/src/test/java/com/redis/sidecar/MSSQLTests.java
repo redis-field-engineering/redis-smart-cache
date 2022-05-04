@@ -29,6 +29,9 @@ class MSSQLTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(MSSQL, redis, "SELECT * FROM LOCATIONS");
+		testSimpleStatement(MSSQL, redis, "SELECT * FROM DEPARTMENTS");
+		testSimpleStatement(MSSQL, redis, "SELECT * FROM JOB_HISTORY");
+		testSimpleStatement(MSSQL, redis, "SELECT * FROM EMPLOYEES");
 	}
 
 	@ParameterizedTest

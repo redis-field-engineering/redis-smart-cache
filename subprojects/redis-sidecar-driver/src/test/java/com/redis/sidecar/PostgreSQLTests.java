@@ -37,6 +37,8 @@ class PostgreSQLTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
+		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM employees");
+		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM products");
 	}
 
 	@ParameterizedTest

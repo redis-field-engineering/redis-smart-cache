@@ -19,18 +19,22 @@ public class TestUtils {
 		int count = 0;
 		while (expected.next()) {
 			Assertions.assertTrue(actual.next());
-			for (int index = 1; index <= expectedMetaData.getColumnCount(); index++) {
-				Object expectedValue = expected.getObject(index);
-				Object actualValue = actual.getObject(index);
+			for (int columnIndex = 1; columnIndex <= expectedMetaData.getColumnCount(); columnIndex++) {
+				Object expectedValue = expected.getObject(columnIndex);
+				Object actualValue = actual.getObject(columnIndex);
 				if (expectedValue == null) {
 					Assertions.assertNull(actualValue);
-				} else {
-					Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
-							String.format("Column %s type %s (%s vs %s)", expectedMetaData.getColumnName(index),
-									expectedMetaData.getColumnTypeName(index),
-									expectedMetaData.getColumnClassName(index),
-									actualMetaData.getColumnClassName(index)));
+					continue;
 				}
+				if (expectedValue instanceof byte[]) {
+					Assertions.assertArrayEquals((byte[]) expectedValue, (byte[]) actualValue);
+					continue;
+				}
+				Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
+						String.format("Column %s type %s (%s vs %s)", expectedMetaData.getColumnName(columnIndex),
+								expectedMetaData.getColumnTypeName(columnIndex),
+								expectedMetaData.getColumnClassName(columnIndex),
+								actualMetaData.getColumnClassName(columnIndex)));
 			}
 			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
 				Assertions.assertEquals(expected.isLast(), actual.isLast());
