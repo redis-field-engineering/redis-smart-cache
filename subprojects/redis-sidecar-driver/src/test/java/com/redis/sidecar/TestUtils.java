@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 
 import org.junit.jupiter.api.Assertions;
 
@@ -21,10 +24,13 @@ public class TestUtils {
 				Object actualValue = actual.getObject(index);
 				if (expectedValue == null) {
 					Assertions.assertNull(actualValue);
+				} else {
+					Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
+							String.format("Column %s type %s (%s vs %s)", expectedMetaData.getColumnName(index),
+									expectedMetaData.getColumnTypeName(index),
+									expectedMetaData.getColumnClassName(index),
+									actualMetaData.getColumnClassName(index)));
 				}
-				Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
-						String.format("Column %s type %s (%s)", expectedMetaData.getColumnName(index),
-								expectedMetaData.getColumnTypeName(index), expectedMetaData.getColumnClassName(index)));
 			}
 			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
 				Assertions.assertEquals(expected.isLast(), actual.isLast());
@@ -37,6 +43,12 @@ public class TestUtils {
 	private static Object normalize(Object value) {
 		if (value instanceof BigDecimal) {
 			return ((BigDecimal) value).doubleValue();
+		}
+		if (value instanceof LocalDateTime) {
+			return ((LocalDateTime) value).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+		}
+		if (value instanceof Date) {
+			return ((Date) value).getTime();
 		}
 		return value;
 	}
