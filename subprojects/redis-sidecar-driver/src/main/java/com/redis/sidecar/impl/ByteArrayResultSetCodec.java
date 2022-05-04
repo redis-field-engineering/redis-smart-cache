@@ -1,5 +1,6 @@
 package com.redis.sidecar.impl;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,10 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -241,7 +246,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			return;
 		case Types.NUMERIC:
 		case Types.DECIMAL:
-			write(resultSet, resultSet.getBigDecimal(columnIndex), out, v -> out.writeDouble(v.doubleValue()));
+			write(resultSet, getDouble(resultSet, columnIndex), out, out::writeDouble);
 			return;
 		case Types.CHAR:
 		case Types.VARCHAR:
@@ -252,40 +257,17 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			write(resultSet, resultSet.getString(columnIndex), out, v -> writeString(out, v));
 			return;
 		case Types.DATE:
-			write(resultSet, resultSet.getDate(columnIndex), out, v -> out.writeLong(v.getTime()));
-			return;
 		case Types.TIME:
 		case Types.TIME_WITH_TIMEZONE:
-			write(resultSet, resultSet.getTime(columnIndex), out, v -> out.writeLong(v.getTime()));
-			return;
 		case Types.TIMESTAMP:
 		case Types.TIMESTAMP_WITH_TIMEZONE:
-			write(resultSet, resultSet.getTimestamp(columnIndex), out, v -> out.writeLong(v.getTime()));
+			write(resultSet, getLong(resultSet, columnIndex), out, out::writeLong);
 			return;
 		case Types.ROWID:
 			write(resultSet, resultSet.getRowId(columnIndex), out, v -> writeString(out, v.toString()));
 			return;
 		case Types.CLOB:
-			Clob clob = resultSet.getClob(columnIndex);
-			boolean wasNull = resultSet.wasNull();
-			out.writeBoolean(wasNull);
-			if (!wasNull) {
-				try {
-					int size;
-					try {
-						size = Math.toIntExact(clob.length());
-					} catch (ArithmeticException e) {
-						throw new SQLException("CLOB is too large", e);
-					}
-					writeString(out, size == 0 ? "" : clob.getSubString(1, size));
-				} finally {
-					try {
-						clob.free();
-					} catch (AbstractMethodError e) {
-						// May occur with old JDBC drivers
-					}
-				}
-			}
+			write(resultSet, getString(resultSet, columnIndex), out, v -> writeString(out, v));
 			return;
 		case Types.BINARY:
 		case Types.BLOB:
@@ -306,6 +288,60 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		case Types.REF_CURSOR:
 		default:
 			throw new SQLException("Column type no supported: " + sqlType);
+		}
+	}
+
+	private String getString(ResultSet resultSet, int columnIndex) throws SQLException {
+		Clob clob = resultSet.getClob(columnIndex);
+		if (clob == null) {
+			return null;
+		}
+		try {
+			int size;
+			try {
+				size = Math.toIntExact(clob.length());
+			} catch (ArithmeticException e) {
+				throw new SQLException("CLOB is too large", e);
+			}
+			if (size == 0) {
+				return "";
+			}
+			return clob.getSubString(1, size);
+		} finally {
+			try {
+				clob.free();
+			} catch (AbstractMethodError e) {
+				// May occur with old JDBC drivers
+			}
+		}
+	}
+
+	private Double getDouble(ResultSet resultSet, int columnIndex) throws SQLException {
+		BigDecimal value = resultSet.getBigDecimal(columnIndex);
+		if (value == null) {
+			return null;
+		}
+		return value.doubleValue();
+	}
+
+	private Long getLong(ResultSet resultSet, int columnIndex) throws SQLException {
+		Object value = resultSet.getObject(columnIndex);
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof java.util.Date) {
+			return ((java.util.Date) value).getTime();
+		}
+		if (value instanceof LocalDateTime) {
+			return ((LocalDateTime) value).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+		}
+		if (value instanceof Number) {
+			return ((Number) value).longValue();
+		}
+		try {
+			return DateFormat.getDateInstance().parse(value.toString()).getTime();
+		} catch (ParseException e) {
+			throw new SQLException(String.format("Unexpected value '%s' on column %s", value, columnIndex), e);
 		}
 	}
 
@@ -335,11 +371,17 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	private <T> void write(ResultSet resultSet, T value, ByteBuf output, Consumer<T> function) throws SQLException {
+	private interface ByteBufWriter<T> {
+
+		void write(T value);
+
+	}
+
+	private <T> void write(ResultSet resultSet, T value, ByteBuf output, ByteBufWriter<T> writer) throws SQLException {
 		boolean wasNull = resultSet.wasNull();
 		output.writeBoolean(wasNull);
 		if (!wasNull) {
-			function.accept(value);
+			writer.write(value);
 		}
 	}
 

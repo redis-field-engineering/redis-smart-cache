@@ -15,10 +15,10 @@ public class SidecarConfig {
 	public static final String PROPERTY_REDIS_POOL_SIZE = "sidecar.redis.pool";
 	public static final String PROPERTY_BYTE_BUFFER_SIZE = "sidecar.buffer.bytes";
 	private static final String TRUE = String.valueOf(true);
-	private static final int MEGA_BYTES = 1024 * 1024;
-	private static final int DEFAULT_BYTE_BUFFER_SIZE = 100 * MEGA_BYTES;
-	private static final boolean DEFAULT_REDIS_CLUSTER = false;
-	private static final String DEFAULT_REDIS_URI = "redis://localhost:6379";
+	public static final int MEGA_BYTES = 1024 * 1024;
+	public static final int DEFAULT_BYTE_BUFFER_SIZE = 100 * MEGA_BYTES;
+	public static final boolean DEFAULT_REDIS_CLUSTER = false;
+	public static final String DEFAULT_REDIS_URI = "redis://localhost:6379";
 
 	private String driverClass;
 	private String driverURL;

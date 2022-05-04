@@ -42,7 +42,7 @@ class CodecTests {
 	private static final int MAX_VARCHAR_SIZE = 3000;
 	private static final int KILO = 1024;
 	private static final int MEGA = KILO * KILO;
-	private static final int BYTE_BUFFER_CAPACITY = 100 * MEGA;
+	private static final int BYTE_BUFFER_CAPACITY = 300 * MEGA;
 
 	private final Random random = new Random();
 

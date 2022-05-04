@@ -1,5 +1,6 @@
 package com.redis.sidecar;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -20,11 +21,8 @@ public class TestUtils {
 				Object actualValue = actual.getObject(index);
 				if (expectedValue == null) {
 					Assertions.assertNull(actualValue);
-				} else {
-					Assertions.assertEquals(expectedValue.getClass(), actualValue.getClass(),
-							"Expected type: " + expectedMetaData.getColumnName(index));
 				}
-				Assertions.assertEquals(expectedValue, actualValue,
+				Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
 						String.format("Column %s type %s (%s)", expectedMetaData.getColumnName(index),
 								expectedMetaData.getColumnTypeName(index), expectedMetaData.getColumnClassName(index)));
 			}
@@ -34,6 +32,13 @@ public class TestUtils {
 			count++;
 		}
 		Assertions.assertTrue(count > 0);
+	}
+
+	private static Object normalize(Object value) {
+		if (value instanceof BigDecimal) {
+			return ((BigDecimal) value).doubleValue();
+		}
+		return null;
 	}
 
 	public static void assertEquals(ResultSetMetaData expectedMetaData, ResultSetMetaData actualMetaData)

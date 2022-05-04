@@ -27,7 +27,7 @@ public class SidecarDriver implements Driver {
 
 	private static final Logger log = Logger.getLogger(SidecarDriver.class.getName());
 
-	static final String JDBC_URL_PREFIX = "jdbc:sidecar:";
+	public static final String JDBC_URL_PREFIX = "jdbc:sidecar:";
 
 	static {
 		try {

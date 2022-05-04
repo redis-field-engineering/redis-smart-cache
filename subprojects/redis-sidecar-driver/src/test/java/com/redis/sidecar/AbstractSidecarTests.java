@@ -64,8 +64,8 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	}
 
 	private ResultSetCache cache(RedisTestContext redis) {
-		return SidecarDriver
-				.cache(SidecarConfig.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster()).build());
+		return SidecarDriver.cache(SidecarConfig.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster())
+				.byteBufferSize(300 * SidecarConfig.MEGA_BYTES).build());
 	}
 
 	private static interface StatementExecutor {
