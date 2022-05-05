@@ -1,16 +1,18 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.core;
 
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
+
 public class ListResultSet extends AbstractResultSet {
 
 	private final List<List<Object>> rows;
 	private final AtomicInteger position = new AtomicInteger();
 
-	public ListResultSet(CachedResultSetMetaData metaData, List<List<Object>> rows) {
+	public ListResultSet(SidecarResultSetMetaData metaData, List<List<Object>> rows) {
 		super(metaData);
 		this.rows = rows;
 	}

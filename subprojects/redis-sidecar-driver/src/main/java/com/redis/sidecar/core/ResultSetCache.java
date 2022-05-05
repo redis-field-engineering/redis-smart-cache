@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;

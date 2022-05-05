@@ -1,4 +1,4 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.core;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
@@ -38,6 +38,8 @@ import java.util.Objects;
 
 import javax.sql.rowset.serial.SQLInputImpl;
 
+import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
+
 import io.lettuce.core.internal.LettuceAssert;
 
 @SuppressWarnings("deprecation")
@@ -58,7 +60,7 @@ public abstract class AbstractResultSet implements ResultSet {
 	 * The <code>ResultSetMetaData</code> object that contains information about the
 	 * columns in the <code>ResultSet</code> object.
 	 */
-	private final CachedResultSetMetaData metaData;
+	private final SidecarResultSetMetaData metaData;
 
 	/**
 	 * A <code>SQLWarning</code> which logs on the warnings
@@ -67,7 +69,7 @@ public abstract class AbstractResultSet implements ResultSet {
 
 	private Map<String, Class<?>> typeMap;
 
-	protected AbstractResultSet(CachedResultSetMetaData metaData) {
+	protected AbstractResultSet(SidecarResultSetMetaData metaData) {
 		LettuceAssert.notNull(metaData, "MetaData cannot be null");
 		this.metaData = metaData;
 	}

@@ -1,4 +1,4 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.core;
 
 import java.io.IOException;
 import java.sql.ResultSet;
@@ -9,8 +9,6 @@ import java.util.function.Supplier;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
-import com.redis.sidecar.ResultSetCache;
 
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.sync.BaseRedisCommands;

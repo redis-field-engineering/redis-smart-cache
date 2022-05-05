@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.jdbc;
 
 import java.sql.Connection;
 import java.sql.ResultSet;

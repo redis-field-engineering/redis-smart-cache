@@ -1,7 +1,6 @@
 package com.redis.sidecar;
 
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.ResultSet;
@@ -9,13 +8,18 @@ import java.sql.SQLException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.sql.rowset.RowSetProvider;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.redis.sidecar.impl.ByteArrayResultSetCodec;
-import com.redis.sidecar.impl.RedisStringCache;
+import com.redis.sidecar.core.ByteArrayResultSetCodec;
+import com.redis.sidecar.core.Config;
+import com.redis.sidecar.core.RedisStringCache;
+import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulConnection;
@@ -23,15 +27,16 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.RedisClusterClient;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 
-public class SidecarDriver implements Driver {
+public class Driver implements java.sql.Driver {
 
-	private static final Logger log = Logger.getLogger(SidecarDriver.class.getName());
+	private static final Logger log = Logger.getLogger(Driver.class.getName());
 
-	public static final String JDBC_URL_PREFIX = "jdbc:sidecar:";
+	public static final String JDBC_URL_REGEX = "jdbc\\:(rediss?\\:\\/\\/.*\\w+.*)";
+	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 
 	static {
 		try {
-			DriverManager.registerDriver(new SidecarDriver());
+			DriverManager.registerDriver(new Driver());
 		} catch (SQLException e) {
 			log.log(Level.SEVERE, e.getMessage(), e);
 		}
@@ -39,16 +44,18 @@ public class SidecarDriver implements Driver {
 
 	@Override
 	public Connection connect(String url, Properties info) throws SQLException {
-		if (!acceptsURL(url)) {
+		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
+		if (!matcher.find()) {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
-		SidecarConfig config = SidecarConfig.load(info);
+		Config config = Config.load(info);
+		config.setRedisURI(matcher.group(1));
 		if (isEmpty(config.getDriverClass())) {
 			throw new SQLException("No backend driver class specified");
 		}
-		Driver driver;
+		java.sql.Driver driver;
 		try {
-			driver = (Driver) Class.forName(config.getDriverClass()).getConstructor().newInstance();
+			driver = (java.sql.Driver) Class.forName(config.getDriverClass()).getConstructor().newInstance();
 		} catch (Exception e) {
 			throw new SQLException("Cannot initialize backend driver '" + config.getDriverClass() + "'", e);
 		}
@@ -56,11 +63,10 @@ public class SidecarDriver implements Driver {
 			throw new SQLException("No backend URL specified");
 		}
 		Connection connection = driver.connect(config.getDriverURL(), info);
-		config.setRedisURI(url.substring(JDBC_URL_PREFIX.length()));
 		return new SidecarConnection(connection, cache(config), RowSetProvider.newFactory());
 	}
 
-	public static ResultSetCache cache(SidecarConfig config) {
+	public static ResultSetCache cache(Config config) {
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(config.getByteBufferSize());
 		GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig = new GenericObjectPoolConfig<>();
 		poolConfig.setMaxTotal(config.getPoolSize());
@@ -81,16 +87,19 @@ public class SidecarDriver implements Driver {
 
 	@Override
 	public boolean acceptsURL(String url) {
-		return !isEmpty(url) && url.startsWith(JDBC_URL_PREFIX) && url.length() > JDBC_URL_PREFIX.length();
+		if (url == null) {
+			return false;
+		}
+		return JDBC_URL_PATTERN.matcher(url).find();
 	}
 
 	@Override
 	public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
 		return new DriverPropertyInfo[] {
-				new DriverPropertyInfo(SidecarConfig.PROPERTY_DRIVER_URL,
-						info.getProperty(SidecarConfig.PROPERTY_DRIVER_URL)),
-				new DriverPropertyInfo(SidecarConfig.PROPERTY_DRIVER_CLASS,
-						info.getProperty(SidecarConfig.PROPERTY_DRIVER_CLASS)) };
+				new DriverPropertyInfo(Config.PROPERTY_DRIVER_URL,
+						info.getProperty(Config.PROPERTY_DRIVER_URL)),
+				new DriverPropertyInfo(Config.PROPERTY_DRIVER_CLASS,
+						info.getProperty(Config.PROPERTY_DRIVER_CLASS)) };
 	}
 
 	@Override

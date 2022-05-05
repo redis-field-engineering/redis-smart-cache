@@ -1,4 +1,4 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.core;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
@@ -50,7 +52,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	@Override
 	public ResultSet decodeValue(ByteBuffer bytes) {
 		ByteBuf byteBuf = Unpooled.wrappedBuffer(bytes);
-		CachedResultSetMetaData metaData = readMetaData(byteBuf);
+		SidecarResultSetMetaData metaData = readMetaData(byteBuf);
 		List<List<Object>> rows = new ArrayList<>();
 		int rowIndex = 1;
 		while (byteBuf.isReadable()) {
@@ -59,7 +61,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			}
 			try {
 				List<Object> row = new ArrayList<>(metaData.getColumnCount());
-				for (ColumnMetaData column : metaData.getColumns()) {
+				for (Column column : metaData.getColumns()) {
 					row.add(readValue(byteBuf, column.getColumnType()));
 				}
 				rows.add(row);
@@ -71,11 +73,11 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		return new ListResultSet(metaData, rows);
 	}
 
-	private CachedResultSetMetaData readMetaData(ByteBuf bytes) {
+	private SidecarResultSetMetaData readMetaData(ByteBuf bytes) {
 		int columnCount = bytes.readInt();
-		List<ColumnMetaData> columns = new ArrayList<>(columnCount);
+		List<Column> columns = new ArrayList<>(columnCount);
 		for (int index = 0; index < columnCount; index++) {
-			ColumnMetaData column = new ColumnMetaData();
+			Column column = new Column();
 			column.setCatalogName(readString(bytes));
 			column.setColumnClassName(readString(bytes));
 			column.setColumnLabel(readString(bytes));
@@ -98,7 +100,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			column.setWritable(bytes.readBoolean());
 			columns.add(column);
 		}
-		return new CachedResultSetMetaData(columns);
+		return new SidecarResultSetMetaData(columns);
 	}
 
 	private String readString(ByteBuf buffer) {

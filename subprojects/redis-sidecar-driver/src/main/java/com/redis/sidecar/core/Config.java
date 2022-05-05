@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.util.Properties;
 
@@ -6,7 +6,7 @@ import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import io.lettuce.core.internal.LettuceAssert;
 
-public class SidecarConfig {
+public class Config {
 
 	public static final String PROPERTY_DRIVER_URL = "sidecar.driver.url";
 	public static final String PROPERTY_DRIVER_CLASS = "sidecar.driver.class";
@@ -27,10 +27,10 @@ public class SidecarConfig {
 	private int poolSize;
 	private int byteBufferSize;
 
-	public SidecarConfig() {
+	public Config() {
 	}
 
-	private SidecarConfig(Builder builder) {
+	private Config(Builder builder) {
 		this.driverClass = builder.driverClass;
 		this.driverURL = builder.driverURL;
 		this.redisURI = builder.redisURI;
@@ -87,8 +87,8 @@ public class SidecarConfig {
 		this.byteBufferSize = byteBufferSize;
 	}
 
-	public static SidecarConfig load(Properties info) {
-		SidecarConfig config = new SidecarConfig();
+	public static Config load(Properties info) {
+		Config config = new Config();
 		config.setDriverClass(info.getProperty(PROPERTY_DRIVER_CLASS));
 		config.setDriverURL(info.getProperty(PROPERTY_DRIVER_URL));
 		config.setRedisURI(info.getProperty(PROPERTY_REDIS_URI, DEFAULT_REDIS_URI));
@@ -155,8 +155,8 @@ public class SidecarConfig {
 			return this;
 		}
 
-		public SidecarConfig build() {
-			return new SidecarConfig(this);
+		public Config build() {
+			return new Config(this);
 		}
 	}
 

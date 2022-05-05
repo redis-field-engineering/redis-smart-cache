@@ -20,6 +20,9 @@ import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.sidecar.core.Config;
+import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.jdbc.SidecarConnection;
 import com.redis.testcontainers.RedisClusterContainer;
 import com.redis.testcontainers.RedisContainer;
 import com.redis.testcontainers.RedisServer;
@@ -64,8 +67,8 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	}
 
 	private ResultSetCache cache(RedisTestContext redis) {
-		return SidecarDriver.cache(SidecarConfig.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster())
-				.byteBufferSize(300 * SidecarConfig.MEGA_BYTES).build());
+		return Driver.cache(Config.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster())
+				.byteBufferSize(300 * Config.MEGA_BYTES).build());
 	}
 
 	private static interface StatementExecutor {

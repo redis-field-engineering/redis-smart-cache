@@ -11,10 +11,10 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.redis.sidecar.impl.ByteArrayResultSetCodec;
-import com.redis.sidecar.impl.CachedResultSetMetaData;
-import com.redis.sidecar.impl.ColumnMetaData;
-import com.redis.sidecar.impl.ListResultSet;
+import com.redis.sidecar.core.ByteArrayResultSetCodec;
+import com.redis.sidecar.core.Column;
+import com.redis.sidecar.core.ListResultSet;
+import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
 
 class CodecTests {
 
@@ -49,9 +49,9 @@ class CodecTests {
 	@Test
 	void encodeResultSetTest() throws SQLException {
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(BYTE_BUFFER_CAPACITY);
-		List<ColumnMetaData> columns = new ArrayList<>(COLUMN_COUNT);
+		List<Column> columns = new ArrayList<>(COLUMN_COUNT);
 		for (int index = 0; index < COLUMN_COUNT; index++) {
-			ColumnMetaData column = new ColumnMetaData();
+			Column column = new Column();
 			int type = TYPES[random.nextInt(TYPES.length)];
 			column.setAutoIncrement(nextBoolean());
 			column.setCaseSensitive(nextBoolean());
@@ -78,12 +78,12 @@ class CodecTests {
 		List<List<Object>> rows = new ArrayList<>();
 		for (int index = 0; index < ROW_COUNT; index++) {
 			List<Object> row = new ArrayList<>();
-			for (ColumnMetaData column : columns) {
+			for (Column column : columns) {
 				row.add(value(column.getColumnType()));
 			}
 			rows.add(row);
 		}
-		CachedResultSetMetaData metaData = new CachedResultSetMetaData(columns);
+		SidecarResultSetMetaData metaData = new SidecarResultSetMetaData(columns);
 		ListResultSet expected = new ListResultSet(metaData, rows);
 		ByteBuffer bytes = codec.encodeValue(expected);
 		ResultSet actual = codec.decodeValue(bytes);

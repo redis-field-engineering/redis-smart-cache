@@ -1,8 +1,8 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.core;
 
 import java.util.Objects;
 
-public class ColumnMetaData {
+public class Column {
 
 	private String catalogName;
 	private String columnClassName;
@@ -25,10 +25,10 @@ public class ColumnMetaData {
 	private boolean isSigned;
 	private boolean isWritable;
 
-	public ColumnMetaData() {
+	public Column() {
 	}
 
-	private ColumnMetaData(Builder builder) {
+	private Column(Builder builder) {
 		this.catalogName = builder.catalog;
 		this.columnClassName = builder.className;
 		this.columnLabel = builder.label;
@@ -226,7 +226,7 @@ public class ColumnMetaData {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		ColumnMetaData other = (ColumnMetaData) obj;
+		Column other = (Column) obj;
 		return Objects.equals(catalogName, other.catalogName) && Objects.equals(columnClassName, other.columnClassName)
 				&& columnDisplaySize == other.columnDisplaySize && isAutoIncrement == other.isAutoIncrement
 				&& isCaseSensitive == other.isCaseSensitive && isCurrency == other.isCurrency
@@ -367,8 +367,8 @@ public class ColumnMetaData {
 			return this;
 		}
 
-		public ColumnMetaData build() {
-			return new ColumnMetaData(this);
+		public Column build() {
+			return new Column(this);
 		}
 	}
 

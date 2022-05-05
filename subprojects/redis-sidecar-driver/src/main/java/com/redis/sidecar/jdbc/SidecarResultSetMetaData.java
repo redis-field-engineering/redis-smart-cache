@@ -1,4 +1,4 @@
-package com.redis.sidecar.impl;
+package com.redis.sidecar.jdbc;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -8,20 +8,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class CachedResultSetMetaData implements ResultSetMetaData {
+import com.redis.sidecar.core.Column;
 
-	private final List<ColumnMetaData> columns;
+public class SidecarResultSetMetaData implements ResultSetMetaData {
+
+	private final List<Column> columns;
 	private final Map<String, Integer> columnNames = new HashMap<>();
 
-	public CachedResultSetMetaData(List<ColumnMetaData> columns) {
+	public SidecarResultSetMetaData(List<Column> columns) {
 		this.columns = columns;
 		for (int index = 0; index < columns.size(); index++) {
-			ColumnMetaData column = columns.get(index);
+			Column column = columns.get(index);
 			columnNames.put(column.getColumnName(), index + 1);
 		}
 	}
 
-	public List<ColumnMetaData> getColumns() {
+	public List<Column> getColumns() {
 		return columns;
 	}
 
@@ -30,7 +32,7 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 		return columns.size();
 	}
 
-	private ColumnMetaData getColumn(int column) throws SQLException {
+	private Column getColumn(int column) throws SQLException {
 		if (column == 0 || column > columns.size())
 			throw new SQLException("Wrong column number: " + column);
 		return columns.get(column - 1);
@@ -163,7 +165,7 @@ public class CachedResultSetMetaData implements ResultSetMetaData {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		CachedResultSetMetaData other = (CachedResultSetMetaData) obj;
+		SidecarResultSetMetaData other = (SidecarResultSetMetaData) obj;
 		return Objects.equals(columns, other.columns);
 	}
 

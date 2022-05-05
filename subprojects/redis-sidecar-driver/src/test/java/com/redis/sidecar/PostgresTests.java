@@ -18,7 +18,7 @@ import org.testcontainers.utility.DockerImageName;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-class PostgreSQLTests extends AbstractSidecarTests {
+class PostgresTests extends AbstractSidecarTests {
 
 	private static final DockerImageName POSTGRE_DOCKER_IMAGE_NAME = DockerImageName.parse(PostgreSQLContainer.IMAGE)
 			.withTag(PostgreSQLContainer.DEFAULT_TAG);

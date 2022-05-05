@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.jdbc;
 
 import java.sql.Array;
 import java.sql.Blob;
@@ -21,6 +21,8 @@ import java.util.concurrent.Executor;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
+
+import com.redis.sidecar.core.ResultSetCache;
 
 public class SidecarConnection implements Connection {
 
