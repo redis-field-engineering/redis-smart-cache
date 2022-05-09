@@ -31,7 +31,7 @@ public class Driver implements java.sql.Driver {
 
 	private static final Logger log = Logger.getLogger(Driver.class.getName());
 
-	public static final String JDBC_URL_REGEX = "jdbc\\:(rediss?\\:\\/\\/.*\\w+.*)";
+	public static final String JDBC_URL_REGEX = "jdbc\\:((redis|rediss|redis-socket|redis-sentinel)\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 
 	static {
