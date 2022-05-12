@@ -21,7 +21,9 @@ import java.util.concurrent.Executor;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetProvider;
 
+import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.core.ResultSetCache;
 
 public class SidecarConnection implements Connection {
@@ -29,11 +31,29 @@ public class SidecarConnection implements Connection {
 	private final Connection connection;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
+	private ConfigUpdater configUpdater;
 
-	public SidecarConnection(Connection connection, ResultSetCache cache, RowSetFactory rowSetFactory) {
+	public SidecarConnection(Connection connection, ResultSetCache cache) throws SQLException {
 		this.connection = connection;
 		this.cache = cache;
-		this.rowSetFactory = rowSetFactory;
+		this.rowSetFactory = RowSetProvider.newFactory();
+	}
+
+	public void setConfigUpdater(ConfigUpdater configUpdater) {
+		this.configUpdater = configUpdater;
+	}
+
+	@Override
+	public void close() throws SQLException {
+		if (configUpdater != null) {
+			configUpdater.close();
+		}
+		connection.close();
+		try {
+			cache.close();
+		} catch (Exception e) {
+			throw new SQLException("Could not close ResultSetCache", e);
+		}
 	}
 
 	@Override
@@ -87,16 +107,6 @@ public class SidecarConnection implements Connection {
 	@Override
 	public void rollback() throws SQLException {
 		connection.rollback();
-	}
-
-	@Override
-	public void close() throws SQLException {
-		connection.close();
-		try {
-			cache.close();
-		} catch (Exception e) {
-			// ignore
-		}
 	}
 
 	@Override

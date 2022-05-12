@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.jdbc;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -9,6 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.Db2Container;
 import org.testcontainers.junit.jupiter.Container;
 
+import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -24,7 +25,7 @@ class DB2Tests extends AbstractSidecarTests {
 		runScript(backendConnection, "db2/create.sql");
 		runScript(backendConnection, "db2/data.sql");
 	}
-	
+
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {

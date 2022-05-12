@@ -1,6 +1,8 @@
 dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
     implementation 'org.apache.commons:commons-pool2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
     testImplementation 'org.slf4j:slf4j-jdk14'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
@@ -14,4 +16,5 @@ dependencies {
     testImplementation group: 'org.testcontainers', name: 'mssqlserver', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'db2', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
+    testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
 }

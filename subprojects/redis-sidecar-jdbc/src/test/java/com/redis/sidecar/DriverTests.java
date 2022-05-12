@@ -8,7 +8,6 @@ import java.util.Properties;
 import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 
-import com.redis.sidecar.core.Config;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -27,8 +26,8 @@ class DriverTests extends AbstractSidecarTests {
 		DriverPropertyInfo[] infos = driver.getPropertyInfo(null, new Properties());
 		Assert.assertNotNull(infos);
 		Assert.assertEquals(2, infos.length);
-		Assert.assertEquals(Config.PROPERTY_DRIVER_URL, infos[0].name);
-		Assert.assertEquals(Config.PROPERTY_DRIVER_CLASS, infos[1].name);
+		Assert.assertEquals("sidecar.driver.url", infos[0].name);
+		Assert.assertEquals("sidecar.driver.class-name", infos[1].name);
 	}
 
 }

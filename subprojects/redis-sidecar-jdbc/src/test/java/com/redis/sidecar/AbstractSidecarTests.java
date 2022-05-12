@@ -14,32 +14,27 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 
-import javax.sql.rowset.RowSetProvider;
-
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.ResultSetCache;
 import com.redis.sidecar.jdbc.SidecarConnection;
-import com.redis.testcontainers.RedisClusterContainer;
-import com.redis.testcontainers.RedisContainer;
+import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 
-abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
+public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
-	private final RedisContainer redis = new RedisContainer(
-			RedisContainer.DEFAULT_IMAGE_NAME.withTag(RedisContainer.DEFAULT_TAG)).withKeyspaceNotifications();
-	private final RedisClusterContainer redisCluster = new RedisClusterContainer(
-			RedisClusterContainer.DEFAULT_IMAGE_NAME.withTag(RedisClusterContainer.DEFAULT_TAG))
-					.withKeyspaceNotifications();
+	private final RedisModulesContainer redis = new RedisModulesContainer(
+			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
-		return Arrays.asList(redis, redisCluster);
+		return Arrays.asList(redis);
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -63,12 +58,17 @@ abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase 
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
 		Connection connection = connection(database);
-		return new SidecarConnection(connection, cache(redis), RowSetProvider.newFactory());
+		try {
+			return new SidecarConnection(connection, cache(redis));
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not initialize ResultSet cache", e);
+		}
 	}
 
-	private ResultSetCache cache(RedisTestContext redis) {
-		return Driver.cache(Config.builder().redisURI(redis.getRedisURI()).redisCluster(redis.isCluster())
-				.byteBufferSize(300 * Config.MEGA_BYTES).build());
+	private ResultSetCache cache(RedisTestContext redis) throws JsonProcessingException {
+		Config config = new Config();
+		config.setBufferSize(300 * 1024 * 1024);
+		return Driver.cache(redis.getClient(), config);
 	}
 
 	private static interface StatementExecutor {

@@ -62,6 +62,7 @@ public class TestUtils {
 		Assertions.assertEquals(expectedMetaData.getColumnCount(), actualMetaData.getColumnCount());
 		for (int index = 1; index <= expectedMetaData.getColumnCount(); index++) {
 			Assertions.assertEquals(expectedMetaData.getColumnName(index), actualMetaData.getColumnName(index));
+			Assertions.assertEquals(expectedMetaData.getColumnLabel(index), actualMetaData.getColumnLabel(index));
 			Assertions.assertEquals(expectedMetaData.getColumnType(index), actualMetaData.getColumnType(index));
 			Assertions.assertEquals(expectedMetaData.getColumnDisplaySize(index),
 					actualMetaData.getColumnDisplaySize(index));

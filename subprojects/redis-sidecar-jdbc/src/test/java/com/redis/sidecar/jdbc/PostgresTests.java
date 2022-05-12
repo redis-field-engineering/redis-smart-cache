@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.jdbc;
 
 import java.io.IOException;
 import java.sql.CallableStatement;
@@ -15,6 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
+import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -64,9 +65,9 @@ class PostgresTests extends AbstractSidecarTests {
 	void testCallableStatementParams(RedisTestContext redis) throws SQLException {
 		String runFunction = "{ ? = call hello( ? ) }";
 
-		try (Connection conn = connection(POSTGRESQL, redis);
-				Statement statement = conn.createStatement();
-				CallableStatement callableStatement = conn.prepareCall(runFunction)) {
+		try (Connection connection = connection(POSTGRESQL, redis);
+				Statement statement = connection.createStatement();
+				CallableStatement callableStatement = connection.prepareCall(runFunction)) {
 			callableStatement.registerOutParameter(1, Types.VARCHAR);
 			callableStatement.setString(2, "julien");
 			callableStatement.executeUpdate();
@@ -80,12 +81,12 @@ class PostgresTests extends AbstractSidecarTests {
 
 		String runFunction = "{? = call getUsers()}";
 
-		try (Connection conn = connection(POSTGRESQL, redis);
-				Statement statement = conn.createStatement();
-				CallableStatement cs = conn.prepareCall(runFunction)) {
+		try (Connection connection = connection(POSTGRESQL, redis);
+				Statement statement = connection.createStatement();
+				CallableStatement cs = connection.prepareCall(runFunction)) {
 
 			// We must be inside a transaction for cursors to work.
-			conn.setAutoCommit(false);
+			connection.setAutoCommit(false);
 
 			// register output
 			cs.registerOutParameter(1, Types.REF_CURSOR);

@@ -100,7 +100,7 @@ announce:
     message: '🚀 Redis-Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
-  redis-sidecar-driver:
+  redis-sidecar-jdbc:
     artifacts:
       - path: subprojects/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'

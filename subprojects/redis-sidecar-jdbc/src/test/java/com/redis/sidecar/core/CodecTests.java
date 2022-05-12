@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.nio.ByteBuffer;
 import java.sql.ResultSet;
@@ -11,9 +11,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.redis.sidecar.core.ByteArrayResultSetCodec;
-import com.redis.sidecar.core.Column;
-import com.redis.sidecar.core.ListResultSet;
+import com.redis.sidecar.TestUtils;
 import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
 
 class CodecTests {
