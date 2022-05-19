@@ -55,7 +55,7 @@ public class SidecarStatement implements Statement {
 	protected RowSet cache(String sql, ResultSetProvider provider) throws SQLException {
 		CachedRowSet rowSet = connection.createCachedRowSet();
 		rowSet.populate(provider.get());
-		connection.getCache().set(sql, rowSet);
+		connection.getCache().put(sql, rowSet);
 		rowSet.beforeFirst();
 		return rowSet;
 	}

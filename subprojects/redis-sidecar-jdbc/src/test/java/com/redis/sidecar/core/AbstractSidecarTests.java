@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,12 +15,11 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.redis.sidecar.core.Config;
-import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.Driver;
+import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.jdbc.SidecarConnection;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
@@ -57,18 +56,21 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
-		Connection connection = connection(database);
 		try {
-			return new SidecarConnection(connection, cache(redis));
+			return new SidecarConnection(connection(database), Driver.cache(redis.getClient(), config(redis)));
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}
 	}
 
-	private ResultSetCache cache(RedisTestContext redis) throws JsonProcessingException {
+	protected Config config(RedisTestContext redis) {
 		Config config = new Config();
 		config.setBufferSize(300 * 1024 * 1024);
-		return Driver.cache(redis.getClient(), config);
+		Redis redisConfig = new Redis();
+		redisConfig.setCluster(redis.isCluster());
+		redisConfig.setUri(redis.getRedisURI());
+		config.setRedis(redisConfig);
+		return config;
 	}
 
 	private static interface StatementExecutor {
@@ -127,15 +129,11 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		try (Connection databaseConnection = connection(databaseContainer);
 				SidecarConnection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
-			Assertions.assertEquals(0, connection.getCache().getHits());
-			Assertions.assertEquals(1, connection.getCache().getMisses());
 			ResultSet resultSet = null;
 			int count = 100;
 			for (int index = 0; index < count; index++) {
 				resultSet = executor.execute(connection);
 			}
-			Assertions.assertEquals(count, connection.getCache().getHits());
-			Assertions.assertEquals(1, connection.getCache().getMisses());
 			TestUtils.assertEquals(executor.execute(databaseConnection), resultSet);
 		}
 	}

@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.StringJoiner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -21,16 +22,24 @@ import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.micrometer.RedisTimeSeriesConfig;
+import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
+import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.core.Config.Redis.Pool;
 import com.redis.sidecar.core.ConfigUpdater;
-import com.redis.sidecar.core.RedisClusterStringResultSetCache;
-import com.redis.sidecar.core.RedisStringResultSetCache;
 import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.core.StringResultSetCache;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+import io.lettuce.core.support.ConnectionPoolSupport;
+import io.micrometer.core.instrument.Clock;
 
 public class Driver implements java.sql.Driver {
 
@@ -38,7 +47,10 @@ public class Driver implements java.sql.Driver {
 
 	public static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
-	private static final String PROPERTY_PREFIX = "sidecar";
+	public static final String PROPERTY_PREFIX = "sidecar";
+
+	public static final String KEYSPACE = "sidecar";
+	public static final char KEY_SEPARATOR = ':';
 
 	static {
 		try {
@@ -89,18 +101,71 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Cannot initialize ResultSet cache", e);
 		}
 		Connection connection = driver.connect(config.getDriver().getUrl(), info);
-		SidecarConnection sidecarConnection = new SidecarConnection(connection, cache);
-		sidecarConnection.setConfigUpdater(
-				new ConfigUpdater(config.getRedis().isCluster() ? ((RedisModulesClusterClient) client).connect()
-						: ((RedisModulesClient) client).connect(), config.getKey(), config));
-		return sidecarConnection;
+		return new SidecarConnection(connection, cache, configUpdater(client, config));
+	}
+
+	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) {
+		return new ConfigUpdater(config.getRedis().isCluster() ? ((RedisModulesClusterClient) client).connect()
+				: ((RedisModulesClient) client).connect(), key(config.getCacheName(), "config"), config);
+	}
+
+	public static String key(String... segments) {
+		StringJoiner joiner = new StringJoiner(String.valueOf(KEY_SEPARATOR));
+		joiner.add(KEYSPACE);
+		for (String segment : segments) {
+			joiner.add(segment);
+		}
+		return joiner.toString();
 	}
 
 	public static ResultSetCache cache(AbstractRedisClient client, Config config) throws JsonProcessingException {
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(config.getBufferSize());
+		RedisTimeSeriesMeterRegistry meterRegistry = meterRegistry(config);
+		String keyspace = keyspace(config);
 		if (config.getRedis().isCluster()) {
-			return new RedisClusterStringResultSetCache((RedisModulesClusterClient) client, poolConfig(config), config);
+			return new StringResultSetCache<>(meterRegistry, ConnectionPoolSupport
+					.createGenericObjectPool(() -> ((RedisClusterClient) client).connect(codec), poolConfig(config)),
+					StatefulRedisClusterConnection::sync, keyspace);
 		}
-		return new RedisStringResultSetCache((RedisModulesClient) client, poolConfig(config), config);
+		return new StringResultSetCache<>(
+				meterRegistry, ConnectionPoolSupport
+						.createGenericObjectPool(() -> ((RedisClient) client).connect(codec), poolConfig(config)),
+				StatefulRedisConnection::sync, keyspace);
+	}
+
+	public static RedisTimeSeriesMeterRegistry meterRegistry(Config config) {
+		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public String uri() {
+				return config.getRedis().getUri();
+			}
+
+			@Override
+			public boolean cluster() {
+				return config.getRedis().isCluster();
+			}
+
+			@Override
+			public String keyspace() {
+				return Driver.keyspace(config);
+			}
+
+			@Override
+			public Duration step() {
+				return Duration.ofSeconds(config.getMetrics().getPublishInterval());
+			}
+
+		}, Clock.SYSTEM);
+	}
+
+	public static String keyspace(Config config) {
+		return KEYSPACE + KEY_SEPARATOR + config.getCacheName();
 	}
 
 	private AbstractRedisClient client(Redis redis) {

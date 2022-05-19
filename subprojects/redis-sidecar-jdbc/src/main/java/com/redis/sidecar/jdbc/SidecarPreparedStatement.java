@@ -23,6 +23,8 @@ import java.util.Calendar;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import com.redis.sidecar.Driver;
+
 public class SidecarPreparedStatement extends SidecarStatement implements PreparedStatement {
 
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
@@ -40,7 +42,7 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 	}
 
 	protected void appendParameters(StringBuilder stringBuilder) {
-		parameters.forEach((index, value) -> stringBuilder.append('•').append(index).append(value));
+		parameters.forEach((index, value) -> stringBuilder.append(Driver.KEY_SEPARATOR).append(index).append(value));
 	}
 
 	@Override

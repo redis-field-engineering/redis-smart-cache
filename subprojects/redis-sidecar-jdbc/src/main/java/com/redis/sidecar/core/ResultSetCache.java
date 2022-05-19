@@ -7,10 +7,6 @@ public interface ResultSetCache extends AutoCloseable {
 
 	ResultSet get(String sql) throws SQLException;
 
-	void set(String sql, ResultSet resultSet) throws SQLException;
-
-	long getMisses();
-
-	long getHits();
+	void put(String sql, ResultSet resultSet) throws SQLException;
 
 }

@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;

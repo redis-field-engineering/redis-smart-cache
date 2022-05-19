@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.core;
 
 import java.io.IOException;
 import java.io.LineNumberReader;

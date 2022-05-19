@@ -31,15 +31,17 @@ public class SidecarConnection implements Connection {
 	private final Connection connection;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
-	private ConfigUpdater configUpdater;
+	private final ConfigUpdater configUpdater;
 
 	public SidecarConnection(Connection connection, ResultSetCache cache) throws SQLException {
+		this(connection, cache, null);
+	}
+
+	public SidecarConnection(Connection connection, ResultSetCache cache, ConfigUpdater configUpdater)
+			throws SQLException {
 		this.connection = connection;
 		this.cache = cache;
 		this.rowSetFactory = RowSetProvider.newFactory();
-	}
-
-	public void setConfigUpdater(ConfigUpdater configUpdater) {
 		this.configUpdater = configUpdater;
 	}
 

@@ -6,21 +6,29 @@ import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 public class Config {
 
-	private static final int DEFAULT_BUFFER_SIZE = 100 * 1024 * 1024;
-	public static final String DEFAULT_KEY = "com.redis.sidecar";
+	public static final ByteSize DEFAULT_BUFFER_SIZE = ByteSize.ofMB(100);
+	public static final String DEFAULT_CACHE_NAME = "default";
+	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
+	public static final Duration DEFAULT_METRICS_PUBLISH_INTERVAL = Duration.ofMinutes(1);
+	public static final int DEFAULT_POOL_MAX_IDLE = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
+	public static final int DEFAULT_POOL_MIN_IDLE = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
+	public static final int DEFAULT_POOL_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
+	public static final Duration DEFAULT_POOL_MAX_WAIT = GenericObjectPoolConfig.DEFAULT_MAX_WAIT;
+	public static final Duration DEFAULT_POOL_TIME_BETWEEN_EVICTION_RUNS = GenericObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
 
-	private String key = DEFAULT_KEY;
-	private int bufferSize = DEFAULT_BUFFER_SIZE;
-	private long refreshRate = Duration.ofSeconds(10).toMillis();
+	private String cacheName = DEFAULT_CACHE_NAME;
+	private int bufferSize = DEFAULT_BUFFER_SIZE.toBytes();
+	private long refreshRate = DEFAULT_REFRESH_RATE.toMillis();
 	private Redis redis = new Redis();
 	private Driver driver = new Driver();
+	private Metrics metrics = new Metrics();
 
-	public String getKey() {
-		return key;
+	public String getCacheName() {
+		return cacheName;
 	}
 
-	public void setKey(String key) {
-		this.key = key;
+	public void setCacheName(String cacheName) {
+		this.cacheName = cacheName;
 	}
 
 	public long getRefreshRate() {
@@ -47,12 +55,57 @@ public class Config {
 		this.driver = driver;
 	}
 
+	public Metrics getMetrics() {
+		return metrics;
+	}
+
+	public void setMetrics(Metrics metrics) {
+		this.metrics = metrics;
+	}
+
 	public int getBufferSize() {
 		return bufferSize;
 	}
 
 	public void setBufferSize(int bufferSize) {
 		this.bufferSize = bufferSize;
+	}
+
+	public static class ByteSize {
+
+		private static final int KB = 1024;
+		private static final int MB = KB * KB;
+
+		private final int bytes;
+
+		private ByteSize(int bytes) {
+			this.bytes = bytes;
+		}
+
+		public int toBytes() {
+			return bytes;
+		}
+
+		public static ByteSize ofMB(int number) {
+			return new ByteSize(number * MB);
+		}
+
+		public static ByteSize ofKB(int number) {
+			return new ByteSize(number * KB);
+		}
+	}
+
+	public static class Metrics {
+
+		private long publishInterval = DEFAULT_METRICS_PUBLISH_INTERVAL.toSeconds();
+
+		public long getPublishInterval() {
+			return publishInterval;
+		}
+
+		public void setPublishInterval(long publishInterval) {
+			this.publishInterval = publishInterval;
+		}
 	}
 
 	public static class Redis {
@@ -91,34 +144,33 @@ public class Config {
 			 * Maximum number of "idle" connections in the pool. Use a negative value to
 			 * indicate an unlimited number of idle connections.
 			 */
-			private int maxIdle = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
+			private int maxIdle = DEFAULT_POOL_MAX_IDLE;
 
 			/**
 			 * Target for the minimum number of idle connections to maintain in the pool.
 			 * This setting only has an effect if both it and time between eviction runs are
 			 * positive.
 			 */
-			private int minIdle = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
+			private int minIdle = DEFAULT_POOL_MIN_IDLE;
 
 			/**
 			 * Maximum number of connections that can be allocated by the pool at a given
 			 * time. Use a negative value for no limit.
 			 */
-			private int maxActive = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
+			private int maxActive = DEFAULT_POOL_MAX_TOTAL;
 
 			/**
 			 * Maximum amount of time a connection allocation should block before throwing
 			 * an exception when the pool is exhausted. Use a negative value to block
 			 * indefinitely.
 			 */
-			private long maxWait = GenericObjectPoolConfig.DEFAULT_MAX_WAIT.toMillis();
+			private long maxWait = DEFAULT_POOL_MAX_WAIT.toMillis();
 
 			/**
 			 * Time between runs of the idle object evictor thread. When positive, the idle
 			 * object evictor thread starts, otherwise no idle object eviction is performed.
 			 */
-			private long timeBetweenEvictionRuns = GenericObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS
-					.toMillis();
+			private long timeBetweenEvictionRuns = DEFAULT_POOL_TIME_BETWEEN_EVICTION_RUNS.toMillis();
 
 			public int getMaxIdle() {
 				return this.maxIdle;

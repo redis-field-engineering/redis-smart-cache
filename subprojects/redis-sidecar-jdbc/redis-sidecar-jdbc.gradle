@@ -3,6 +3,7 @@ dependencies {
     implementation 'org.apache.commons:commons-pool2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
+    implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRTSVersion
     testImplementation 'org.slf4j:slf4j-jdk14'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
