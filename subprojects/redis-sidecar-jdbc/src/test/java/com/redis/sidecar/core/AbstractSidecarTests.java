@@ -23,6 +23,7 @@ import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.sidecar.Driver;
+import com.redis.sidecar.core.Config.ByteSize;
 import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.jdbc.SidecarConnection;
 import com.redis.testcontainers.RedisModulesContainer;
@@ -76,7 +77,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	protected Config config(RedisTestContext redis) {
 		Config config = new Config();
-		config.setBufferSize(300 * 1024 * 1024);
+		config.setBufferSize(ByteSize.ofMB(500).toBytes());
 		Redis redisConfig = new Redis();
 		redisConfig.setCluster(redis.isCluster());
 		redisConfig.setUri(redis.getRedisURI());
