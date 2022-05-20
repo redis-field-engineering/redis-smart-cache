@@ -48,7 +48,7 @@ announce:
   slack:
     active: release
     channel: '#field-engineering-announcements'
-    message: '🚀 Redis-Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '🏍️ Redis-Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
   redis-sidecar-jdbc:
