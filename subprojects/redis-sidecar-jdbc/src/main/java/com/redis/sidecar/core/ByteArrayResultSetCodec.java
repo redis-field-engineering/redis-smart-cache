@@ -195,11 +195,6 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	private void writeBytes(ByteBuf buffer, byte[] value) {
-		buffer.writeInt(value.length);
-		buffer.writeBytes(value);
-	}
-
 	@Override
 	public ByteBuffer encodeValue(ResultSet resultSet) {
 		if (resultSet == null) {
@@ -309,8 +304,9 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.VARBINARY:
 			case Types.LONGVARBINARY:
 				byte[] bytes = resultSet.getBytes(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
-					writeBytes(byteBuf, bytes);
+				if (!writeNull(resultSet, byteBuf) && bytes != null) {
+					byteBuf.writeInt(bytes.length);
+					byteBuf.writeBytes(bytes);
 				}
 				break;
 			case Types.NULL:
