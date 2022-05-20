@@ -8,6 +8,7 @@ import java.sql.Clob;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -16,10 +17,12 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
 
-import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
+import javax.sql.RowSet;
+import javax.sql.RowSetMetaData;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetMetaDataImpl;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
@@ -33,9 +36,11 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 
+	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ByteArrayResultSetCodec(int maxByteBufferCapacity) {
+	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
+		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
@@ -50,68 +55,133 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	}
 
 	@Override
-	public ResultSet decodeValue(ByteBuffer bytes) {
-		ByteBuf byteBuf = Unpooled.wrappedBuffer(bytes);
-		SidecarResultSetMetaData metaData = readMetaData(byteBuf);
-		List<List<Object>> rows = new ArrayList<>();
-		int rowIndex = 1;
-		while (byteBuf.isReadable()) {
-			if (byteBuf.readInt() != rowIndex) {
-				throw new IllegalStateException("Missing ResultSet row #" + rowIndex);
-			}
-			try {
-				List<Object> row = new ArrayList<>(metaData.getColumnCount());
-				for (Column column : metaData.getColumns()) {
-					row.add(readValue(byteBuf, column.getColumnType()));
-				}
-				rows.add(row);
-			} catch (SQLException e) {
-				throw new IllegalStateException("Could not decode row", e);
-			}
-			rowIndex++;
+	public RowSet decodeValue(ByteBuffer bytes) {
+		try {
+			return decode(Unpooled.wrappedBuffer(bytes));
+		} catch (SQLException e) {
+			throw new IllegalStateException("Could not decode rowset", e);
 		}
-		return new ListResultSet(metaData, rows);
 	}
 
-	private SidecarResultSetMetaData readMetaData(ByteBuf bytes) {
-		int columnCount = bytes.readInt();
-		List<Column> columns = new ArrayList<>(columnCount);
-		for (int index = 0; index < columnCount; index++) {
-			Column column = new Column();
-			column.setCatalogName(readString(bytes));
-			column.setColumnClassName(readString(bytes));
-			column.setColumnLabel(readString(bytes));
-			column.setColumnName(readString(bytes));
-			column.setColumnTypeName(readString(bytes));
-			column.setColumnType(bytes.readInt());
-			column.setColumnDisplaySize(bytes.readInt());
-			column.setPrecision(bytes.readInt());
-			column.setTableName(readString(bytes));
-			column.setScale(bytes.readInt());
-			column.setSchemaName(readString(bytes));
-			column.setAutoIncrement(bytes.readBoolean());
-			column.setCaseSensitive(bytes.readBoolean());
-			column.setCurrency(bytes.readBoolean());
-			column.setDefinitelyWritable(bytes.readBoolean());
-			column.setIsNullable(bytes.readInt());
-			column.setReadOnly(bytes.readBoolean());
-			column.setSearchable(bytes.readBoolean());
-			column.setSigned(bytes.readBoolean());
-			column.setWritable(bytes.readBoolean());
-			columns.add(column);
+	private RowSet decode(ByteBuf byteBuf) throws SQLException {
+		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+		rowSet.setMetaData(readMetaData(byteBuf));
+		while (byteBuf.isReadable()) {
+			rowSet.moveToInsertRow();
+			decodeRow(byteBuf, rowSet);
+			rowSet.insertRow();
 		}
-		return new SidecarResultSetMetaData(columns);
+		rowSet.moveToCurrentRow();
+		rowSet.beforeFirst();
+		return rowSet;
+	}
+
+	public void decodeRow(ByteBuf byteBuf, CachedRowSet rowSet) throws SQLException {
+		for (int column = 1; column <= rowSet.getMetaData().getColumnCount(); column++) {
+			if (byteBuf.readBoolean()) {
+				rowSet.updateNull(column);
+				continue;
+			}
+			switch (rowSet.getMetaData().getColumnType(column)) {
+			case Types.BIT:
+			case Types.BOOLEAN:
+				rowSet.updateBoolean(column, byteBuf.readBoolean());
+				break;
+			case Types.TINYINT:
+			case Types.SMALLINT:
+			case Types.INTEGER:
+				rowSet.updateInt(column, byteBuf.readInt());
+				break;
+			case Types.BIGINT:
+				rowSet.updateLong(column, byteBuf.readLong());
+				break;
+			case Types.FLOAT:
+			case Types.REAL:
+				rowSet.updateFloat(column, byteBuf.readFloat());
+				break;
+			case Types.DOUBLE:
+			case Types.NUMERIC:
+			case Types.DECIMAL:
+				rowSet.updateDouble(column, byteBuf.readDouble());
+				break;
+			case Types.CHAR:
+			case Types.VARCHAR:
+			case Types.LONGVARCHAR:
+			case Types.NCHAR:
+			case Types.NVARCHAR:
+			case Types.LONGNVARCHAR:
+				rowSet.updateString(column, readString(byteBuf));
+				break;
+			case Types.DATE:
+				rowSet.updateDate(column, new Date(byteBuf.readLong()));
+				break;
+			case Types.TIME:
+			case Types.TIME_WITH_TIMEZONE:
+				rowSet.updateTime(column, new Time(byteBuf.readLong()));
+				break;
+			case Types.TIMESTAMP:
+			case Types.TIMESTAMP_WITH_TIMEZONE:
+				rowSet.updateTimestamp(column, new Timestamp(byteBuf.readLong()));
+				break;
+			case Types.ROWID:
+				rowSet.updateRowId(column, new com.redis.sidecar.jdbc.RowId(readString(byteBuf)));
+				break;
+			case Types.CLOB:
+				rowSet.updateClob(column, new com.redis.sidecar.jdbc.Clob(readString(byteBuf)));
+				break;
+			case Types.BINARY:
+			case Types.BLOB:
+			case Types.VARBINARY:
+			case Types.LONGVARBINARY:
+				byte[] bytes = new byte[byteBuf.readInt()];
+				byteBuf.readBytes(bytes);
+				rowSet.updateBytes(column, bytes);
+				break;
+			case Types.NULL:
+			case Types.OTHER:
+			case Types.JAVA_OBJECT:
+			case Types.DISTINCT:
+			case Types.STRUCT:
+			case Types.ARRAY:
+			case Types.REF:
+			case Types.DATALINK:
+			case Types.NCLOB:
+			case Types.SQLXML:
+			case Types.REF_CURSOR:
+			default:
+				throw new SQLException("Column type no supported: " + rowSet.getMetaData().getColumnType(column));
+			}
+		}
+	}
+
+	private RowSetMetaData readMetaData(ByteBuf bytes) throws SQLException {
+		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
+		int columnCount = bytes.readInt();
+		metaData.setColumnCount(columnCount);
+		for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+			metaData.setCatalogName(columnIndex, readString(bytes));
+			metaData.setColumnLabel(columnIndex, readString(bytes));
+			metaData.setColumnName(columnIndex, readString(bytes));
+			metaData.setColumnTypeName(columnIndex, readString(bytes));
+			metaData.setColumnType(columnIndex, bytes.readInt());
+			metaData.setColumnDisplaySize(columnIndex, bytes.readInt());
+			metaData.setPrecision(columnIndex, bytes.readInt());
+			metaData.setTableName(columnIndex, readString(bytes));
+			metaData.setScale(columnIndex, bytes.readInt());
+			metaData.setSchemaName(columnIndex, readString(bytes));
+			metaData.setAutoIncrement(columnIndex, bytes.readBoolean());
+			metaData.setCaseSensitive(columnIndex, bytes.readBoolean());
+			metaData.setCurrency(columnIndex, bytes.readBoolean());
+			metaData.setNullable(columnIndex, bytes.readInt());
+			metaData.setSearchable(columnIndex, bytes.readBoolean());
+			metaData.setSigned(columnIndex, bytes.readBoolean());
+		}
+		return metaData;
 	}
 
 	private String readString(ByteBuf buffer) {
 		int length = buffer.readShort();
 		return buffer.readCharSequence(length, CHARSET).toString();
-	}
-
-	private byte[] readBytes(ByteBuf buffer) {
-		byte[] bytes = new byte[buffer.readInt()];
-		buffer.readBytes(bytes);
-		return bytes;
 	}
 
 	private void writeString(ByteBuf buffer, String value) {
@@ -130,67 +200,6 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		buffer.writeBytes(value);
 	}
 
-	private Object readValue(ByteBuf bytes, int sqlType) throws SQLException {
-		if (bytes.readBoolean()) {
-			return null;
-		}
-		switch (sqlType) {
-		case Types.BIT:
-		case Types.BOOLEAN:
-			return bytes.readBoolean();
-		case Types.TINYINT:
-		case Types.SMALLINT:
-		case Types.INTEGER:
-			return bytes.readInt();
-		case Types.BIGINT:
-			return bytes.readLong();
-		case Types.FLOAT:
-		case Types.REAL:
-			return bytes.readFloat();
-		case Types.DOUBLE:
-		case Types.NUMERIC:
-		case Types.DECIMAL:
-			return bytes.readDouble();
-		case Types.CHAR:
-		case Types.VARCHAR:
-		case Types.LONGVARCHAR:
-		case Types.NCHAR:
-		case Types.NVARCHAR:
-		case Types.LONGNVARCHAR:
-			return readString(bytes);
-		case Types.DATE:
-			return new Date(bytes.readLong());
-		case Types.TIME:
-		case Types.TIME_WITH_TIMEZONE:
-			return new Time(bytes.readLong());
-		case Types.TIMESTAMP:
-		case Types.TIMESTAMP_WITH_TIMEZONE:
-			return new Timestamp(bytes.readLong());
-		case Types.ROWID:
-			return readString(bytes);
-		case Types.CLOB:
-			return readString(bytes);
-		case Types.BINARY:
-		case Types.BLOB:
-		case Types.VARBINARY:
-		case Types.LONGVARBINARY:
-			return readBytes(bytes);
-		case Types.NULL:
-		case Types.OTHER:
-		case Types.JAVA_OBJECT:
-		case Types.DISTINCT:
-		case Types.STRUCT:
-		case Types.ARRAY:
-		case Types.REF:
-		case Types.DATALINK:
-		case Types.NCLOB:
-		case Types.SQLXML:
-		case Types.REF_CURSOR:
-		default:
-			throw new SQLException("Column type no supported: " + sqlType);
-		}
-	}
-
 	@Override
 	public ByteBuffer encodeValue(ResultSet resultSet) {
 		if (resultSet == null) {
@@ -207,89 +216,124 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	public void encode(ResultSet resultSet, ByteBuf byteBuf) {
 		try {
-			ResultSetMetaData metaData = resultSet.getMetaData();
-			writeMetaData(metaData, byteBuf);
-			int columnCount = metaData.getColumnCount();
-			int rowIndex = 1;
+			writeMetaData(resultSet.getMetaData(), byteBuf);
 			while (resultSet.next()) {
-				byteBuf.writeInt(rowIndex);
-				for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-					writeValue(resultSet, columnIndex, byteBuf);
-				}
-				rowIndex++;
+				encodeRow(resultSet, byteBuf);
 			}
+			resultSet.beforeFirst();
 		} catch (SQLException e) {
 			throw new IllegalStateException(e);
 		}
 	}
 
-	private void writeValue(ResultSet resultSet, int columnIndex, ByteBuf out) throws SQLException {
-		int sqlType = resultSet.getMetaData().getColumnType(columnIndex);
-		switch (sqlType) {
-		case Types.BIT:
-		case Types.BOOLEAN:
-			write(resultSet, resultSet.getBoolean(columnIndex), out, out::writeBoolean);
-			return;
-		case Types.TINYINT:
-		case Types.SMALLINT:
-		case Types.INTEGER:
-			write(resultSet, resultSet.getInt(columnIndex), out, out::writeInt);
-			return;
-		case Types.BIGINT:
-			write(resultSet, resultSet.getLong(columnIndex), out, out::writeLong);
-			return;
-		case Types.FLOAT:
-		case Types.REAL:
-			write(resultSet, resultSet.getFloat(columnIndex), out, out::writeFloat);
-			return;
-		case Types.DOUBLE:
-			write(resultSet, resultSet.getDouble(columnIndex), out, out::writeDouble);
-			return;
-		case Types.NUMERIC:
-		case Types.DECIMAL:
-			write(resultSet, getDouble(resultSet, columnIndex), out, out::writeDouble);
-			return;
-		case Types.CHAR:
-		case Types.VARCHAR:
-		case Types.LONGVARCHAR:
-		case Types.NCHAR:
-		case Types.NVARCHAR:
-		case Types.LONGNVARCHAR:
-			write(resultSet, resultSet.getString(columnIndex), out, v -> writeString(out, v));
-			return;
-		case Types.DATE:
-		case Types.TIME:
-		case Types.TIME_WITH_TIMEZONE:
-		case Types.TIMESTAMP:
-		case Types.TIMESTAMP_WITH_TIMEZONE:
-			write(resultSet, getLong(resultSet, columnIndex), out, out::writeLong);
-			return;
-		case Types.ROWID:
-			write(resultSet, resultSet.getRowId(columnIndex), out, v -> writeString(out, v.toString()));
-			return;
-		case Types.CLOB:
-			write(resultSet, getString(resultSet, columnIndex), out, v -> writeString(out, v));
-			return;
-		case Types.BINARY:
-		case Types.BLOB:
-		case Types.VARBINARY:
-		case Types.LONGVARBINARY:
-			write(resultSet, resultSet.getBytes(columnIndex), out, v -> writeBytes(out, v));
-			return;
-		case Types.NULL:
-		case Types.OTHER:
-		case Types.JAVA_OBJECT:
-		case Types.DISTINCT:
-		case Types.STRUCT:
-		case Types.ARRAY:
-		case Types.REF:
-		case Types.DATALINK:
-		case Types.NCLOB:
-		case Types.SQLXML:
-		case Types.REF_CURSOR:
-		default:
-			throw new SQLException("Column type no supported: " + sqlType);
+	public void encodeRow(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
+		for (int columnIndex = 1; columnIndex <= resultSet.getMetaData().getColumnCount(); columnIndex++) {
+			int sqlType = resultSet.getMetaData().getColumnType(columnIndex);
+			switch (sqlType) {
+			case Types.BIT:
+			case Types.BOOLEAN:
+				boolean booleanValue = resultSet.getBoolean(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeBoolean(booleanValue);
+				}
+				break;
+			case Types.TINYINT:
+			case Types.SMALLINT:
+			case Types.INTEGER:
+				int intValue = resultSet.getInt(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeInt(intValue);
+				}
+				break;
+			case Types.BIGINT:
+				long longValue = resultSet.getLong(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeLong(longValue);
+				}
+				break;
+			case Types.FLOAT:
+			case Types.REAL:
+				float floatValue = resultSet.getFloat(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeFloat(floatValue);
+				}
+				break;
+			case Types.DOUBLE:
+				double doubleValue = resultSet.getDouble(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeDouble(doubleValue);
+				}
+				break;
+			case Types.NUMERIC:
+			case Types.DECIMAL:
+				Double bigDecimalDoubleValue = getBigDecimalDouble(resultSet, columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeDouble(bigDecimalDoubleValue);
+				}
+				break;
+			case Types.CHAR:
+			case Types.VARCHAR:
+			case Types.LONGVARCHAR:
+			case Types.NCHAR:
+			case Types.NVARCHAR:
+			case Types.LONGNVARCHAR:
+				String string = resultSet.getString(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					writeString(byteBuf, string);
+				}
+				break;
+			case Types.DATE:
+			case Types.TIME:
+			case Types.TIME_WITH_TIMEZONE:
+			case Types.TIMESTAMP:
+			case Types.TIMESTAMP_WITH_TIMEZONE:
+				Long timestamp = getLong(resultSet, columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					byteBuf.writeLong(timestamp);
+				}
+				break;
+			case Types.ROWID:
+				RowId rowId = resultSet.getRowId(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					writeString(byteBuf, rowId.toString());
+				}
+				break;
+			case Types.CLOB:
+				String clob = getString(resultSet, columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					writeString(byteBuf, clob);
+				}
+				break;
+			case Types.BINARY:
+			case Types.BLOB:
+			case Types.VARBINARY:
+			case Types.LONGVARBINARY:
+				byte[] bytes = resultSet.getBytes(columnIndex);
+				if (!writeNull(resultSet, byteBuf)) {
+					writeBytes(byteBuf, bytes);
+				}
+				break;
+			case Types.NULL:
+			case Types.OTHER:
+			case Types.JAVA_OBJECT:
+			case Types.DISTINCT:
+			case Types.STRUCT:
+			case Types.ARRAY:
+			case Types.REF:
+			case Types.DATALINK:
+			case Types.NCLOB:
+			case Types.SQLXML:
+			case Types.REF_CURSOR:
+			default:
+				throw new SQLException("Column type no supported: " + sqlType);
+			}
 		}
+	}
+
+	private boolean writeNull(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
+		boolean wasNull = resultSet.wasNull();
+		byteBuf.writeBoolean(wasNull);
+		return wasNull;
 	}
 
 	private String getString(ResultSet resultSet, int columnIndex) throws SQLException {
@@ -317,7 +361,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	private Double getDouble(ResultSet resultSet, int columnIndex) throws SQLException {
+	private Double getBigDecimalDouble(ResultSet resultSet, int columnIndex) throws SQLException {
 		BigDecimal value = resultSet.getBigDecimal(columnIndex);
 		if (value == null) {
 			return null;
@@ -350,7 +394,6 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 		bytes.writeInt(metaData.getColumnCount());
 		for (int index = 1; index <= metaData.getColumnCount(); index++) {
 			writeString(bytes, metaData.getCatalogName(index));
-			writeString(bytes, metaData.getColumnClassName(index));
 			writeString(bytes, metaData.getColumnLabel(index));
 			writeString(bytes, metaData.getColumnName(index));
 			writeString(bytes, metaData.getColumnTypeName(index));
@@ -363,26 +406,9 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			bytes.writeBoolean(metaData.isAutoIncrement(index));
 			bytes.writeBoolean(metaData.isCaseSensitive(index));
 			bytes.writeBoolean(metaData.isCurrency(index));
-			bytes.writeBoolean(metaData.isDefinitelyWritable(index));
 			bytes.writeInt(metaData.isNullable(index));
-			bytes.writeBoolean(metaData.isReadOnly(index));
 			bytes.writeBoolean(metaData.isSearchable(index));
 			bytes.writeBoolean(metaData.isSigned(index));
-			bytes.writeBoolean(metaData.isWritable(index));
-		}
-	}
-
-	private interface ByteBufWriter<T> {
-
-		void write(T value);
-
-	}
-
-	private <T> void write(ResultSet resultSet, T value, ByteBuf output, ByteBufWriter<T> writer) throws SQLException {
-		boolean wasNull = resultSet.wasNull() || value == null;
-		output.writeBoolean(wasNull);
-		if (!wasNull) {
-			writer.write(value);
 		}
 	}
 

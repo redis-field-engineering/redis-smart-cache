@@ -20,21 +20,21 @@ public class TestUtils {
 		while (expected.next()) {
 			Assertions.assertTrue(actual.next());
 			for (int columnIndex = 1; columnIndex <= expectedMetaData.getColumnCount(); columnIndex++) {
+				String columnInfo = String.format("Column %s type %s (%s vs %s)",
+						expectedMetaData.getColumnName(columnIndex), expectedMetaData.getColumnTypeName(columnIndex),
+						expectedMetaData.getColumnClassName(columnIndex),
+						actualMetaData.getColumnClassName(columnIndex));
 				Object expectedValue = expected.getObject(columnIndex);
 				Object actualValue = actual.getObject(columnIndex);
 				if (expectedValue == null) {
-					Assertions.assertNull(actualValue);
+					Assertions.assertNull(actualValue, columnInfo);
 					continue;
 				}
 				if (expectedValue instanceof byte[]) {
-					Assertions.assertArrayEquals((byte[]) expectedValue, (byte[]) actualValue);
+					Assertions.assertArrayEquals((byte[]) expectedValue, (byte[]) actualValue, columnInfo);
 					continue;
 				}
-				Assertions.assertEquals(normalize(expectedValue), normalize(actualValue),
-						String.format("Column %s type %s (%s vs %s)", expectedMetaData.getColumnName(columnIndex),
-								expectedMetaData.getColumnTypeName(columnIndex),
-								expectedMetaData.getColumnClassName(columnIndex),
-								actualMetaData.getColumnClassName(columnIndex)));
+				Assertions.assertEquals(normalize(expectedValue), normalize(actualValue), columnInfo);
 			}
 			if (expected.getType() != ResultSet.TYPE_FORWARD_ONLY && actual.getType() != ResultSet.TYPE_FORWARD_ONLY) {
 				Assertions.assertEquals(expected.isLast(), actual.isLast());
@@ -53,6 +53,9 @@ public class TestUtils {
 		}
 		if (value instanceof Date) {
 			return ((Date) value).getTime();
+		}
+		if (value instanceof Short) {
+			return ((Short) value).intValue();
 		}
 		return value;
 	}

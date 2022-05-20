@@ -21,7 +21,6 @@ import java.util.concurrent.Executor;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
 
 import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.core.ResultSetCache;
@@ -33,15 +32,15 @@ public class SidecarConnection implements Connection {
 	private final RowSetFactory rowSetFactory;
 	private final ConfigUpdater configUpdater;
 
-	public SidecarConnection(Connection connection, ResultSetCache cache) throws SQLException {
-		this(connection, cache, null);
+	public SidecarConnection(Connection connection, ResultSetCache cache, RowSetFactory rowSetFactory) {
+		this(connection, cache, rowSetFactory, null);
 	}
 
-	public SidecarConnection(Connection connection, ResultSetCache cache, ConfigUpdater configUpdater)
-			throws SQLException {
+	public SidecarConnection(Connection connection, ResultSetCache cache, RowSetFactory rowSetFactory,
+			ConfigUpdater configUpdater) {
 		this.connection = connection;
 		this.cache = cache;
-		this.rowSetFactory = RowSetProvider.newFactory();
+		this.rowSetFactory = rowSetFactory;
 		this.configUpdater = configUpdater;
 	}
 

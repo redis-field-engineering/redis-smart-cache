@@ -14,7 +14,11 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 
+import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetProvider;
+
 import org.junit.Assert;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,12 +32,18 @@ import com.redis.testcontainers.junit.RedisTestContext;
 
 public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
+	private static RowSetFactory rowSetFactory;
 	private final RedisModulesContainer redis = new RedisModulesContainer(
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
+	}
+
+	@BeforeAll
+	public void setupRowSetFactory() throws SQLException {
+		rowSetFactory = RowSetProvider.newFactory();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -57,7 +67,8 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
 		try {
-			return new SidecarConnection(connection(database), Driver.cache(redis.getClient(), config(redis)));
+			return new SidecarConnection(connection(database),
+					Driver.cache(redis.getClient(), rowSetFactory, config(redis)), rowSetFactory);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}

@@ -1,17 +1,18 @@
 package com.redis.sidecar.core;
 
-import java.nio.ByteBuffer;
-import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
-import org.junit.jupiter.api.Test;
+import javax.sql.RowSet;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetMetaDataImpl;
+import javax.sql.rowset.RowSetProvider;
 
-import com.redis.sidecar.jdbc.SidecarResultSetMetaData;
+import org.junit.jupiter.api.Test;
 
 class CodecTests {
 
@@ -22,8 +23,8 @@ class CodecTests {
 			Types.DOUBLE, Types.VARCHAR };
 	private static final int MAX_DISPLAY_SIZE = 1024;
 	private static final int MIN_DISPLAY_SIZE = 5;
-	private static final int MIN_COLUMN_NAME_SIZE = 5;
-	private static final int MAX_COLUMN_NAME_SIZE = 20;
+	private static final int MIN_COLUMN_NAME_SIZE = 2;
+	private static final int MAX_COLUMN_NAME_SIZE = 3;
 	private static final int MIN_COLUMN_LABEL_SIZE = 5;
 	private static final int MAX_COLUMN_LABEL_SIZE = 20;
 	private static final int MIN_SCALE = 0;
@@ -33,8 +34,8 @@ class CodecTests {
 	private static final String CATALOG_NAME = "";
 	private static final String SCHEMA_NAME = "myschema";
 	private static final String TABLE_NAME = "mytable";
-	private static final int ROW_COUNT = 12345;
-	private static final int COLUMN_COUNT = 33;
+	private static final int ROW_COUNT = 10;
+	private static final int COLUMN_COUNT = 10;
 	private static final int MIN_VARCHAR_SIZE = 0;
 	private static final int MAX_VARCHAR_SIZE = 3000;
 	private static final int KILO = 1024;
@@ -45,47 +46,66 @@ class CodecTests {
 
 	@Test
 	void encodeResultSetTest() throws SQLException {
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(BYTE_BUFFER_CAPACITY);
-		List<Column> columns = new ArrayList<>(COLUMN_COUNT);
-		for (int index = 0; index < COLUMN_COUNT; index++) {
-			Column column = new Column();
+		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
+		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
+		metaData.setColumnCount(COLUMN_COUNT);
+		for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
 			int type = TYPES[random.nextInt(TYPES.length)];
-			column.setAutoIncrement(nextBoolean());
-			column.setCaseSensitive(nextBoolean());
-			column.setCatalogName(CATALOG_NAME);
-			column.setColumnClassName(typeClass(type).getName());
-			column.setColumnDisplaySize(randomInt(MIN_DISPLAY_SIZE, MAX_DISPLAY_SIZE));
-			column.setColumnLabel(string(MIN_COLUMN_LABEL_SIZE, MAX_COLUMN_LABEL_SIZE));
-			column.setColumnName(string(MIN_COLUMN_NAME_SIZE, MAX_COLUMN_NAME_SIZE));
-			column.setColumnType(type);
-			column.setColumnTypeName(typeName(type));
-			column.setCurrency(nextBoolean());
-			column.setDefinitelyWritable(nextBoolean());
-			column.setIsNullable(random.nextInt());
-			column.setPrecision(randomInt(MIN_PRECISION, MAX_PRECISION));
-			column.setReadOnly(nextBoolean());
-			column.setScale(randomInt(MIN_SCALE, MAX_SCALE));
-			column.setSchemaName(SCHEMA_NAME);
-			column.setSearchable(nextBoolean());
-			column.setSigned(nextBoolean());
-			column.setTableName(TABLE_NAME);
-			column.setWritable(nextBoolean());
-			columns.add(column);
+			metaData.setAutoIncrement(columnIndex, nextBoolean());
+			metaData.setCaseSensitive(columnIndex, nextBoolean());
+			metaData.setCatalogName(columnIndex, CATALOG_NAME);
+			metaData.setColumnDisplaySize(columnIndex, randomInt(MIN_DISPLAY_SIZE, MAX_DISPLAY_SIZE));
+			metaData.setColumnLabel(columnIndex, string(MIN_COLUMN_LABEL_SIZE, MAX_COLUMN_LABEL_SIZE));
+			metaData.setColumnName(columnIndex, string(MIN_COLUMN_NAME_SIZE, MAX_COLUMN_NAME_SIZE));
+			metaData.setColumnType(columnIndex, type);
+			metaData.setColumnTypeName(columnIndex, typeName(type));
+			metaData.setCurrency(columnIndex, nextBoolean());
+			metaData.setNullable(columnIndex, random.nextInt(ResultSetMetaData.columnNullableUnknown + 1));
+			metaData.setPrecision(columnIndex, randomInt(MIN_PRECISION, MAX_PRECISION));
+			metaData.setScale(columnIndex, randomInt(MIN_SCALE, MAX_SCALE));
+			metaData.setSchemaName(columnIndex, SCHEMA_NAME);
+			metaData.setSearchable(columnIndex, nextBoolean());
+			metaData.setSigned(columnIndex, nextBoolean());
+			metaData.setTableName(columnIndex, TABLE_NAME);
 		}
-		List<List<Object>> rows = new ArrayList<>();
+		rowSet.setMetaData(metaData);
 		for (int index = 0; index < ROW_COUNT; index++) {
-			List<Object> row = new ArrayList<>();
-			for (Column column : columns) {
-				row.add(value(column.getColumnType()));
+			rowSet.moveToInsertRow();
+			for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
+				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && random.nextBoolean()) {
+					rowSet.updateNull(columnIndex);
+				} else {
+					rowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
+				}
 			}
-			rows.add(row);
+			rowSet.insertRow();
 		}
-		SidecarResultSetMetaData metaData = new SidecarResultSetMetaData(columns);
-		ListResultSet expected = new ListResultSet(metaData, rows);
-		ByteBuffer bytes = codec.encodeValue(expected);
-		ResultSet actual = codec.decodeValue(bytes);
-		expected.beforeFirst();
-		TestUtils.assertEquals(expected, actual);
+		rowSet.moveToCurrentRow();
+		rowSet.beforeFirst();
+		rowSet.beforeFirst();
+		CachedRowSet input = rowSetFactory.createCachedRowSet();
+		input.populate(rowSet);
+		rowSet.beforeFirst();
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		RowSet actual = codec.decodeValue(codec.encodeValue(input));
+		actual.beforeFirst();
+		TestUtils.assertEquals(rowSet, actual);
+	}
+
+	public String toString(RowSet rowSet) throws SQLException {
+		StringBuilder builder = new StringBuilder();
+		int rowIndex = 1;
+		while (rowSet.next()) {
+			builder.append("\n");
+			builder.append(String.format("%2d", rowIndex)).append(":");
+			for (int columnIndex = 1; columnIndex <= rowSet.getMetaData().getColumnCount(); columnIndex++) {
+				builder.append(" ").append(rowSet.getMetaData().getColumnName(columnIndex)).append("=")
+						.append(rowSet.getObject(columnIndex));
+			}
+			rowIndex++;
+		}
+		return builder.toString();
 	}
 
 	private int randomInt(int min, int max) {
@@ -94,25 +114,6 @@ class CodecTests {
 
 	private boolean nextBoolean() {
 		return random.nextBoolean();
-	}
-
-	private Class<?> typeClass(int type) {
-		switch (type) {
-		case Types.BIGINT:
-			return Long.class;
-		case Types.INTEGER:
-			return Integer.class;
-		case Types.BOOLEAN:
-			return Boolean.class;
-		case Types.TIMESTAMP:
-			return Timestamp.class;
-		case Types.DOUBLE:
-			return Double.class;
-		case Types.REAL:
-			return Float.class;
-		default:
-			return String.class;
-		}
 	}
 
 	private String typeName(int type) {

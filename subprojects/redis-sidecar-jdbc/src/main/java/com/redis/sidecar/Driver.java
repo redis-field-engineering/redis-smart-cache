@@ -15,6 +15,9 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetProvider;
+
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -94,14 +97,15 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Cannot initialize backend driver '" + config.getDriver().getClassName() + "'", e);
 		}
 		AbstractRedisClient client = client(config.getRedis());
+		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		ResultSetCache cache;
 		try {
-			cache = cache(client, config);
+			cache = cache(client, rowSetFactory, config);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Cannot initialize ResultSet cache", e);
 		}
 		Connection connection = driver.connect(config.getDriver().getUrl(), info);
-		return new SidecarConnection(connection, cache, configUpdater(client, config));
+		return new SidecarConnection(connection, cache, rowSetFactory, configUpdater(client, config));
 	}
 
 	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) {
@@ -118,8 +122,9 @@ public class Driver implements java.sql.Driver {
 		return joiner.toString();
 	}
 
-	public static ResultSetCache cache(AbstractRedisClient client, Config config) throws JsonProcessingException {
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(config.getBufferSize());
+	public static ResultSetCache cache(AbstractRedisClient client, RowSetFactory rowSetFactory, Config config)
+			throws JsonProcessingException {
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize());
 		RedisTimeSeriesMeterRegistry meterRegistry = meterRegistry(config);
 		String keyspace = keyspace(config);
 		if (config.getRedis().isCluster()) {
