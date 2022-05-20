@@ -19,3 +19,9 @@ dependencies {
     testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
     testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
 }
+
+shadowJar {
+   archiveClassifier.set('')
+}
+
+jar.finalizedBy shadowJar
