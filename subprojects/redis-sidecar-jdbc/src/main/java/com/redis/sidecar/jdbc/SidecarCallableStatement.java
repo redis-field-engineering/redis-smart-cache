@@ -32,9 +32,14 @@ public class SidecarCallableStatement extends SidecarPreparedStatement implement
 	}
 
 	@Override
-	protected void appendParameters(StringBuilder stringBuilder) {
-		super.appendParameters(stringBuilder);
-		parameters.forEach((name, value) -> stringBuilder.append('•').append(name).append(value));
+	protected String key(String sql) {
+		StringBuilder stringBuilder = new StringBuilder(sql);
+		for (String parameter : parameters.keySet()) {
+			stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter).append("=")
+					.append(parameters.get(parameter));
+		}
+		return stringBuilder.toString();
+
 	}
 
 	@Override

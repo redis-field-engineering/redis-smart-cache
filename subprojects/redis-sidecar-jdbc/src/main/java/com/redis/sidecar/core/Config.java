@@ -1,11 +1,18 @@
 package com.redis.sidecar.core;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.logging.Logger;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 public class Config {
 
+	private static final Logger log = Logger.getLogger(Config.class.getName());
+
+	public static final String DEFAULT_KEYSPACE = "sidecar";
+	public static final String DEFAULT_KEY_SEPARATOR = ":";
 	public static final ByteSize DEFAULT_BUFFER_SIZE = ByteSize.ofMB(100);
 	public static final String DEFAULT_CACHE_NAME = "default";
 	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
@@ -15,13 +22,39 @@ public class Config {
 	public static final int DEFAULT_POOL_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
 	public static final Duration DEFAULT_POOL_MAX_WAIT = GenericObjectPoolConfig.DEFAULT_MAX_WAIT;
 	public static final Duration DEFAULT_POOL_TIME_BETWEEN_EVICTION_RUNS = GenericObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
+	public static final Duration DEFAULT_TTL = Duration.ofHours(1);
+	public static final long TTL_NO_CACHE = 0;
+	public static final long TTL_NO_EXPIRATION = -1;
 
+	private String keyspace = DEFAULT_KEYSPACE;
+	private String keySeparator = DEFAULT_KEY_SEPARATOR;
 	private String cacheName = DEFAULT_CACHE_NAME;
 	private int bufferSize = DEFAULT_BUFFER_SIZE.toBytes();
-	private long refreshRate = DEFAULT_REFRESH_RATE.toMillis();
+	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
 	private Redis redis = new Redis();
 	private Driver driver = new Driver();
 	private Metrics metrics = new Metrics();
+	private List<Rule> rules = Arrays.asList(Rule.builder().ttl(DEFAULT_TTL.toSeconds()).build());
+
+	public String getKeyspace() {
+		return keyspace;
+	}
+
+	public void setKeyspace(String keyspace) {
+		this.keyspace = keyspace;
+	}
+
+	public String key(String id) {
+		return keyspace + keySeparator + id;
+	}
+
+	public String getKeySeparator() {
+		return keySeparator;
+	}
+
+	public void setKeySeparator(String keySeparator) {
+		this.keySeparator = keySeparator;
+	}
 
 	public String getCacheName() {
 		return cacheName;
@@ -69,6 +102,99 @@ public class Config {
 
 	public void setBufferSize(int bufferSize) {
 		this.bufferSize = bufferSize;
+	}
+
+	public List<Rule> getRules() {
+		return rules;
+	}
+
+	public void setRules(List<Rule> rules) {
+		log.info("Updating rules: " + rules.toArray());
+		this.rules = rules;
+	}
+
+	public static class Rule {
+
+		private String table;
+		private boolean noCache;
+		private long ttl = DEFAULT_TTL.toSeconds();
+
+		public Rule() {
+		}
+
+		private Rule(Builder builder) {
+			this.table = builder.table;
+			this.noCache = builder.noCache;
+			this.ttl = builder.ttl;
+		}
+
+		public String getTable() {
+			return table;
+		}
+
+		public void setTable(String table) {
+			this.table = table;
+		}
+
+		public boolean isNoCache() {
+			return noCache;
+		}
+
+		public void setNoCache(boolean noCache) {
+			this.noCache = noCache;
+		}
+
+		/**
+		 * 
+		 * @return Key expiration duration in seconds. Use 0 for no caching, -1 for no
+		 *         expiration
+		 */
+		public long getTtl() {
+			return ttl;
+		}
+
+		public void setTtl(long ttl) {
+			this.ttl = ttl;
+		}
+
+		@Override
+		public String toString() {
+			return "Rule [table=" + table + ", noCache=" + noCache + ", ttl=" + ttl + "]";
+		}
+
+		public static Builder builder() {
+			return new Builder();
+		}
+
+		public static final class Builder {
+
+			private String table;
+			private boolean noCache;
+			private long ttl = DEFAULT_TTL.toSeconds();
+
+			private Builder() {
+			}
+
+			public Builder table(String table) {
+				this.table = table;
+				return this;
+			}
+
+			public Builder noCache(boolean noCache) {
+				this.noCache = noCache;
+				return this;
+			}
+
+			public Builder ttl(long ttl) {
+				this.ttl = ttl;
+				return this;
+			}
+
+			public Rule build() {
+				return new Rule(this);
+			}
+		}
+
 	}
 
 	public static class ByteSize {

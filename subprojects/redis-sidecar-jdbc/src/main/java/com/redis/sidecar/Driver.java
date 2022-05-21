@@ -52,9 +52,6 @@ public class Driver implements java.sql.Driver {
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 	public static final String PROPERTY_PREFIX = "sidecar";
 
-	public static final String KEYSPACE = "sidecar";
-	public static final char KEY_SEPARATOR = ':';
-
 	static {
 		try {
 			DriverManager.registerDriver(new Driver());
@@ -105,17 +102,23 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Cannot initialize ResultSet cache", e);
 		}
 		Connection connection = driver.connect(config.getDriver().getUrl(), info);
-		return new SidecarConnection(connection, cache, rowSetFactory, configUpdater(client, config));
+		ConfigUpdater configUpdater;
+		try {
+			configUpdater = configUpdater(client, config);
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not start config updater", e);
+		}
+		return new SidecarConnection(connection, cache, rowSetFactory, configUpdater);
 	}
 
-	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) {
+	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) throws JsonProcessingException {
 		return new ConfigUpdater(config.getRedis().isCluster() ? ((RedisModulesClusterClient) client).connect()
-				: ((RedisModulesClient) client).connect(), key(config.getCacheName(), "config"), config);
+				: ((RedisModulesClient) client).connect(), config);
 	}
 
-	public static String key(String... segments) {
-		StringJoiner joiner = new StringJoiner(String.valueOf(KEY_SEPARATOR));
-		joiner.add(KEYSPACE);
+	public static String key(Config config, String... segments) {
+		StringJoiner joiner = new StringJoiner(config.getKeySeparator());
+		joiner.add(config.getKeyspace());
 		for (String segment : segments) {
 			joiner.add(segment);
 		}
@@ -126,16 +129,15 @@ public class Driver implements java.sql.Driver {
 			throws JsonProcessingException {
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize());
 		RedisTimeSeriesMeterRegistry meterRegistry = meterRegistry(config);
-		String keyspace = keyspace(config);
 		if (config.getRedis().isCluster()) {
-			return new StringResultSetCache<>(meterRegistry, ConnectionPoolSupport
+			return new StringResultSetCache<>(config, meterRegistry, ConnectionPoolSupport
 					.createGenericObjectPool(() -> ((RedisClusterClient) client).connect(codec), poolConfig(config)),
-					StatefulRedisClusterConnection::sync, keyspace);
+					StatefulRedisClusterConnection::sync);
 		}
 		return new StringResultSetCache<>(
-				meterRegistry, ConnectionPoolSupport
+				config, meterRegistry, ConnectionPoolSupport
 						.createGenericObjectPool(() -> ((RedisClient) client).connect(codec), poolConfig(config)),
-				StatefulRedisConnection::sync, keyspace);
+				StatefulRedisConnection::sync);
 	}
 
 	public static RedisTimeSeriesMeterRegistry meterRegistry(Config config) {
@@ -170,7 +172,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	public static String keyspace(Config config) {
-		return KEYSPACE + KEY_SEPARATOR + config.getCacheName();
+		return config.getKeyspace() + config.getKeySeparator() + config.getCacheName();
 	}
 
 	private AbstractRedisClient client(Redis redis) {

@@ -23,8 +23,6 @@ import java.util.Calendar;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import com.redis.sidecar.Driver;
-
 public class SidecarPreparedStatement extends SidecarStatement implements PreparedStatement {
 
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
@@ -35,20 +33,18 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 		this.statement = statement;
 	}
 
-	private String executedSql() {
-		StringBuilder stringBuilder = new StringBuilder(this.sql);
-		appendParameters(stringBuilder);
+	@Override
+	protected String key(String sql) {
+		StringBuilder stringBuilder = new StringBuilder(sql);
+		for (String parameter : parameters.values()) {
+			stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter);
+		}
 		return stringBuilder.toString();
-	}
-
-	protected void appendParameters(StringBuilder stringBuilder) {
-		parameters.forEach((index, value) -> stringBuilder.append(Driver.KEY_SEPARATOR).append(index).append(value));
 	}
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		this.sql = executedSql();
-		resultSet = connection.getCache().get(sql);
+		resultSet = get(sql);
 		if (resultSet == null) {
 			resultSet = cache(sql, statement::executeQuery);
 		}
@@ -181,8 +177,7 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public boolean execute() throws SQLException {
-		sql = executedSql();
-		resultSet = connection.getCache().get(sql);
+		resultSet = get(sql);
 		if (resultSet == null) {
 			return statement.execute();
 		}

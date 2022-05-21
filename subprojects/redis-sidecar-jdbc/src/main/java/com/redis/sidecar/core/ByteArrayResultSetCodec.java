@@ -228,7 +228,10 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.BIT:
 			case Types.BOOLEAN:
 				boolean booleanValue = resultSet.getBoolean(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull()) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeBoolean(booleanValue);
 				}
 				break;
@@ -236,33 +239,48 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.SMALLINT:
 			case Types.INTEGER:
 				int intValue = resultSet.getInt(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull()) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeInt(intValue);
 				}
 				break;
 			case Types.BIGINT:
 				long longValue = resultSet.getLong(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull()) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeLong(longValue);
 				}
 				break;
 			case Types.FLOAT:
 			case Types.REAL:
 				float floatValue = resultSet.getFloat(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull()) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeFloat(floatValue);
 				}
 				break;
 			case Types.DOUBLE:
 				double doubleValue = resultSet.getDouble(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull()) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeDouble(doubleValue);
 				}
 				break;
 			case Types.NUMERIC:
 			case Types.DECIMAL:
 				Double bigDecimalDoubleValue = getBigDecimalDouble(resultSet, columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull() || bigDecimalDoubleValue == null) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeDouble(bigDecimalDoubleValue);
 				}
 				break;
@@ -273,7 +291,10 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.NVARCHAR:
 			case Types.LONGNVARCHAR:
 				String string = resultSet.getString(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull() || string == null) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					writeString(byteBuf, string);
 				}
 				break;
@@ -283,20 +304,44 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.TIMESTAMP:
 			case Types.TIMESTAMP_WITH_TIMEZONE:
 				Long timestamp = getLong(resultSet, columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull() || timestamp == null) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeLong(timestamp);
 				}
 				break;
 			case Types.ROWID:
 				RowId rowId = resultSet.getRowId(columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
+				if (resultSet.wasNull() || rowId == null) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					writeString(byteBuf, rowId.toString());
 				}
 				break;
 			case Types.CLOB:
-				String clob = getString(resultSet, columnIndex);
-				if (!writeNull(resultSet, byteBuf)) {
-					writeString(byteBuf, clob);
+				Clob clob = resultSet.getClob(columnIndex);
+				try {
+					if (resultSet.wasNull() || clob == null) {
+						byteBuf.writeBoolean(true);
+					} else {
+						int size;
+						try {
+							size = Math.toIntExact(clob.length());
+						} catch (ArithmeticException e) {
+							throw new SQLException("CLOB is too large", e);
+						}
+						String clobString = size == 0 ? "" : clob.getSubString(1, size);
+						byteBuf.writeBoolean(false);
+						writeString(byteBuf, clobString);
+					}
+				} finally {
+					try {
+						clob.free();
+					} catch (AbstractMethodError e) {
+						// May occur with old JDBC drivers
+					}
 				}
 				break;
 			case Types.BINARY:
@@ -304,7 +349,10 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.VARBINARY:
 			case Types.LONGVARBINARY:
 				byte[] bytes = resultSet.getBytes(columnIndex);
-				if (!writeNull(resultSet, byteBuf) && bytes != null) {
+				if (resultSet.wasNull() || bytes == null) {
+					byteBuf.writeBoolean(true);
+				} else {
+					byteBuf.writeBoolean(false);
 					byteBuf.writeInt(bytes.length);
 					byteBuf.writeBytes(bytes);
 				}
@@ -322,37 +370,6 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.REF_CURSOR:
 			default:
 				throw new SQLException("Column type no supported: " + sqlType);
-			}
-		}
-	}
-
-	private boolean writeNull(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-		boolean wasNull = resultSet.wasNull();
-		byteBuf.writeBoolean(wasNull);
-		return wasNull;
-	}
-
-	private String getString(ResultSet resultSet, int columnIndex) throws SQLException {
-		Clob clob = resultSet.getClob(columnIndex);
-		if (clob == null) {
-			return null;
-		}
-		try {
-			int size;
-			try {
-				size = Math.toIntExact(clob.length());
-			} catch (ArithmeticException e) {
-				throw new SQLException("CLOB is too large", e);
-			}
-			if (size == 0) {
-				return "";
-			}
-			return clob.getSubString(1, size);
-		} finally {
-			try {
-				clob.free();
-			} catch (AbstractMethodError e) {
-				// May occur with old JDBC drivers
 			}
 		}
 	}

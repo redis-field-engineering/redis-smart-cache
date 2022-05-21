@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.Config.ByteSize;
 import com.redis.sidecar.core.Config.Redis;
@@ -32,6 +33,8 @@ import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 
 public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
+
+	private static final int BUFFER_SIZE = ByteSize.ofMB(300).toBytes();
 
 	private static RowSetFactory rowSetFactory;
 	private final RedisModulesContainer redis = new RedisModulesContainer(
@@ -67,17 +70,31 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
+		Config config = config(redis);
+		ConfigUpdater updater;
 		try {
-			return new SidecarConnection(connection(database),
-					Driver.cache(redis.getClient(), rowSetFactory, config(redis)), rowSetFactory);
+			updater = new ConfigUpdater(connection(redis), config);
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not start config updater", e);
+		}
+		try {
+			return new SidecarConnection(connection(database), Driver.cache(redis.getClient(), rowSetFactory, config),
+					rowSetFactory, updater);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}
 	}
 
+	private StatefulRedisModulesConnection<String, String> connection(RedisTestContext redis) {
+		if (redis.isCluster()) {
+			return redis.getRedisClusterClient().connect();
+		}
+		return redis.getRedisClient().connect();
+	}
+
 	protected Config config(RedisTestContext redis) {
 		Config config = new Config();
-		config.setBufferSize(ByteSize.ofMB(500).toBytes());
+		config.setBufferSize(BUFFER_SIZE);
 		Redis redisConfig = new Redis();
 		redisConfig.setCluster(redis.isCluster());
 		redisConfig.setUri(redis.getRedisURI());

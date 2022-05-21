@@ -3,19 +3,24 @@ package com.redis.sidecar.core;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
 abstract class AbstractResultSetCache implements ResultSetCache {
 
+	private final Config config;
 	private final Timer getTimer;
 	private final Timer putTimer;
 	private final Counter missCounter;
 	private final Counter hitCounter;
 	private final Counter putCounter;
 
-	protected AbstractResultSetCache(MeterRegistry meterRegistry) {
+	protected AbstractResultSetCache(Config config, MeterRegistry meterRegistry) {
+		LettuceAssert.notNull(config, "Config must not be null");
+		LettuceAssert.notNull(meterRegistry, "MeterRegistry must not be null");
+		this.config = config;
 		this.missCounter = Counter.builder("gets").tag("result", "miss")
 				.description("The number of times cache lookup methods have returned null").register(meterRegistry);
 		this.hitCounter = Counter.builder("gets").tag("result", "hit")
@@ -27,11 +32,15 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		this.putTimer = Timer.builder("puts.latency").description("Cache put latency").register(meterRegistry);
 	}
 
+	protected String key(String id) {
+		return config.key(id);
+	}
+
 	@Override
-	public ResultSet get(String sql) throws SQLException {
+	public ResultSet get(String key) throws SQLException {
 		ResultSet resultSet;
 		try {
-			resultSet = getTimer.recordCallable(() -> doGet(sql));
+			resultSet = getTimer.recordCallable(() -> doGet(key));
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
@@ -45,12 +54,15 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		return resultSet;
 	}
 
-	protected abstract ResultSet doGet(String sql) throws SQLException;
+	protected abstract ResultSet doGet(String key) throws SQLException;
 
 	@Override
-	public void put(String sql, ResultSet resultSet) throws SQLException {
+	public void put(String key, long ttl, ResultSet resultSet) throws SQLException {
+		if (ttl == Config.TTL_NO_CACHE) {
+			return;
+		}
 		try {
-			putTimer.recordCallable(() -> doPut(sql, resultSet));
+			putTimer.recordCallable(() -> doPut(key, ttl, resultSet));
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
@@ -59,6 +71,6 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		putCounter.increment();
 	}
 
-	protected abstract ResultSet doPut(String sql, ResultSet resultSet) throws SQLException;
+	protected abstract ResultSet doPut(String sql, long ttl, ResultSet resultSet) throws SQLException;
 
 }

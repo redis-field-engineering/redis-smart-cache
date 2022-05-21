@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.json.SetMode;
+import com.redis.sidecar.Driver;
 
 public class ConfigUpdater implements Runnable, AutoCloseable {
 
@@ -21,36 +22,40 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 	private final StatefulRedisModulesConnection<String, String> connection;
-	private final String key;
-	private final Object object;
+	private final Config config;
 	private final ObjectWriter writer;
 	private final ObjectReader reader;
-	private ScheduledFuture<?> future;
+	private final ScheduledFuture<?> future;
 
-	public ConfigUpdater(StatefulRedisModulesConnection<String, String> connection, String key, Object object) {
+	public ConfigUpdater(StatefulRedisModulesConnection<String, String> connection, Config config)
+			throws JsonProcessingException {
 		this.connection = connection;
-		this.key = key;
-		this.object = object;
-		this.writer = mapper.writerFor(object.getClass());
-		this.reader = mapper.readerForUpdating(object);
+		this.config = config;
+		this.writer = mapper.writerFor(config.getClass());
+		this.reader = mapper.readerForUpdating(config);
+		connection.sync().jsonSet(key(), "$", writer.writeValueAsString(config), SetMode.NX);
+		this.future = executor.scheduleAtFixedRate(this, 0, config.getRefreshRate(), TimeUnit.SECONDS);
+
 	}
 
-	public void schedule(long refreshRate) throws JsonProcessingException {
-		String json = writer.writeValueAsString(object);
-		connection.sync().jsonSet(key, "$", json, SetMode.NX);
-		this.future = executor.scheduleAtFixedRate(this, 0, refreshRate, TimeUnit.MILLISECONDS);
+	public Config getConfig() {
+		return config;
+	}
+
+	private String key() {
+		return Driver.key(config, config.getCacheName(), "config");
 	}
 
 	@Override
 	public void run() {
-		String json = connection.sync().jsonGet(key);
+		String json = connection.sync().jsonGet(key());
 		if (json == null || json.isEmpty()) {
 			return;
 		}
 		try {
 			reader.readValue(json);
 		} catch (JsonProcessingException e) {
-			log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key), e);
+			log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key()), e);
 		}
 	}
 

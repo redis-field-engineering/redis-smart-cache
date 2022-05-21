@@ -17,11 +17,10 @@ class ConfigUpdaterTests extends AbstractSidecarTests {
 	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException, JsonProcessingException {
 		String key = "myjson";
 		Config config = new Config();
+		config.setRefreshRate(1);
 		config.getRedis().setUri(redis.getRedisURI());
 		config.getRedis().setCluster(redis.isCluster());
-		try (ConfigUpdater updater = new ConfigUpdater(redis.getConnection(), key, config)) {
-			long refreshRate = 1000;
-			updater.schedule(refreshRate);
+		try (ConfigUpdater updater = new ConfigUpdater(redis.getConnection(), config)) {
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
 			Awaitility.await().atMost(bufferSize * 2, TimeUnit.MILLISECONDS)

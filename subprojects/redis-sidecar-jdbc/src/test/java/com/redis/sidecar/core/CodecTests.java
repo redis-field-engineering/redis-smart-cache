@@ -34,8 +34,8 @@ class CodecTests {
 	private static final String CATALOG_NAME = "";
 	private static final String SCHEMA_NAME = "myschema";
 	private static final String TABLE_NAME = "mytable";
-	private static final int ROW_COUNT = 10;
-	private static final int COLUMN_COUNT = 10;
+	private static final int ROW_COUNT = 12345;
+	private static final int COLUMN_COUNT = 31;
 	private static final int MIN_VARCHAR_SIZE = 0;
 	private static final int MAX_VARCHAR_SIZE = 3000;
 	private static final int KILO = 1024;
