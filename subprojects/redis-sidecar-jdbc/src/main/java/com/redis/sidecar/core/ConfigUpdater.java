@@ -13,7 +13,6 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.json.SetMode;
-import com.redis.sidecar.Driver;
 
 public class ConfigUpdater implements Runnable, AutoCloseable {
 
@@ -42,8 +41,8 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 		return config;
 	}
 
-	private String key() {
-		return Driver.key(config, config.getCacheName(), "config");
+	public String key() {
+		return config.key(config.getCacheName(), "config");
 	}
 
 	@Override

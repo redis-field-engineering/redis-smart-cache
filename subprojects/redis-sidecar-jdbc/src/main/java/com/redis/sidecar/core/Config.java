@@ -3,6 +3,7 @@ package com.redis.sidecar.core;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.logging.Logger;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
@@ -44,8 +45,13 @@ public class Config {
 		this.keyspace = keyspace;
 	}
 
-	public String key(String id) {
-		return keyspace + keySeparator + id;
+	public String key(String... ids) {
+		StringJoiner joiner = new StringJoiner(keySeparator);
+		joiner.add(keyspace);
+		for (String id : ids) {
+			joiner.add(id);
+		}
+		return joiner.toString();
 	}
 
 	public String getKeySeparator() {

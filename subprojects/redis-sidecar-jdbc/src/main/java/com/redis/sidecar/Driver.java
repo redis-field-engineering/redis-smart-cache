@@ -9,7 +9,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.StringJoiner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -114,15 +113,6 @@ public class Driver implements java.sql.Driver {
 	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) throws JsonProcessingException {
 		return new ConfigUpdater(config.getRedis().isCluster() ? ((RedisModulesClusterClient) client).connect()
 				: ((RedisModulesClient) client).connect(), config);
-	}
-
-	public static String key(Config config, String... segments) {
-		StringJoiner joiner = new StringJoiner(config.getKeySeparator());
-		joiner.add(config.getKeyspace());
-		for (String segment : segments) {
-			joiner.add(segment);
-		}
-		return joiner.toString();
 	}
 
 	public static ResultSetCache cache(AbstractRedisClient client, RowSetFactory rowSetFactory, Config config)
