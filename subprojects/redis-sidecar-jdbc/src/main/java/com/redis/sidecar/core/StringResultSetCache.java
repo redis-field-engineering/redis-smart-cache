@@ -12,13 +12,14 @@ import io.lettuce.core.api.sync.RedisStringCommands;
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class StringResultSetCache<T extends StatefulConnection<String, ResultSet>> extends AbstractResultSetCache {
+public class StringResultSetCache extends AbstractResultSetCache {
 
-	private final GenericObjectPool<T> pool;
-	private final Function<T, RedisStringCommands<String, ResultSet>> sync;
+	private final GenericObjectPool<StatefulConnection<String, ResultSet>> pool;
+	private final Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync;
 
-	public StringResultSetCache(Config config, MeterRegistry meterRegistry, GenericObjectPool<T> pool,
-			Function<T, RedisStringCommands<String, ResultSet>> sync) {
+	public StringResultSetCache(Config config, MeterRegistry meterRegistry,
+			GenericObjectPool<StatefulConnection<String, ResultSet>> pool,
+			Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync) {
 		super(config, meterRegistry);
 		LettuceAssert.notNull(pool, "Connection pool must not be null");
 		LettuceAssert.notNull(sync, "Sync commands must not be null");
@@ -33,7 +34,7 @@ public class StringResultSetCache<T extends StatefulConnection<String, ResultSet
 
 	@Override
 	protected ResultSet doGet(String key) throws SQLException {
-		try (T connection = pool.borrowObject()) {
+		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
 			return sync.apply(connection).get(key(key));
 		} catch (IOException e) {
 			throw new SQLException("Could not decode ResultSet", e);
@@ -44,7 +45,7 @@ public class StringResultSetCache<T extends StatefulConnection<String, ResultSet
 
 	@Override
 	protected ResultSet doPut(String key, long ttl, ResultSet resultSet) throws SQLException {
-		try (T connection = pool.borrowObject()) {
+		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
 			RedisStringCommands<String, ResultSet> commands = sync.apply(connection);
 			commands.setex(key(key), ttl, resultSet);
 		} catch (IOException e) {

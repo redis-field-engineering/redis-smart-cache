@@ -28,7 +28,8 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 	private final PreparedStatement statement;
 
-	public SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql) {
+	public SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql)
+			throws SQLException {
 		super(connection, statement, sql);
 		this.statement = statement;
 	}
@@ -44,9 +45,17 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		resultSet = get(sql);
+		resultSet = get();
 		if (resultSet == null) {
-			resultSet = cache(sql, statement::executeQuery);
+			ResultSet databaseResultSet;
+			try {
+				databaseResultSet = databaseTimer.recordCallable(() -> statement.executeQuery());
+			} catch (SQLException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new SQLException(e);
+			}
+			resultSet = cache(databaseResultSet);
 		}
 		return resultSet;
 	}
@@ -177,9 +186,15 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public boolean execute() throws SQLException {
-		resultSet = get(sql);
+		resultSet = get();
 		if (resultSet == null) {
-			return statement.execute();
+			try {
+				return databaseTimer.recordCallable(() -> statement.execute());
+			} catch (SQLException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new SQLException(e);
+			}
 		}
 		return true;
 	}

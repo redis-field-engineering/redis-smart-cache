@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.NClob;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -15,34 +16,121 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
+import javax.sql.rowset.RowSetProvider;
 
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.redis.micrometer.RedisTimeSeriesConfig;
+import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
+import com.redis.sidecar.Driver;
+import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.Config;
+import com.redis.sidecar.core.Config.Redis.Pool;
 import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.core.StringResultSetCache;
+
+import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulConnection;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisStringCommands;
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+import io.lettuce.core.support.ConnectionPoolSupport;
+import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.MeterRegistry;
 
 public class SidecarConnection implements Connection {
 
 	private final Connection connection;
+	private final Config config;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
 	private final ConfigUpdater configUpdater;
+	private final MeterRegistry meterRegistry;
 
-	public SidecarConnection(Connection connection, ResultSetCache cache, RowSetFactory rowSetFactory,
-			ConfigUpdater configUpdater) {
+	public SidecarConnection(Connection connection, AbstractRedisClient client, Config config)
+			throws SQLException, JsonProcessingException {
 		this.connection = connection;
-		this.cache = cache;
-		this.rowSetFactory = rowSetFactory;
-		this.configUpdater = configUpdater;
+		this.config = config;
+		this.rowSetFactory = RowSetProvider.newFactory();
+		this.meterRegistry = meterRegistry(config);
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize());
+		Supplier<StatefulConnection<String, ResultSet>> connectionSupplier = client instanceof RedisClusterClient
+				? () -> ((RedisClusterClient) client).connect(codec)
+				: () -> ((RedisClient) client).connect(codec);
+		this.cache = new StringResultSetCache(config, meterRegistry,
+				ConnectionPoolSupport.createGenericObjectPool(connectionSupplier, poolConfig(config)), sync(client));
+		this.configUpdater = ConfigUpdater.create(client, config);
+	}
+
+	public MeterRegistry getMeterRegistry() {
+		return meterRegistry;
+	}
+
+	private static <T> GenericObjectPoolConfig<T> poolConfig(Config config) {
+		Pool pool = config.getRedis().getPool();
+		GenericObjectPoolConfig<T> poolConfig = new GenericObjectPoolConfig<>();
+		poolConfig.setMaxTotal(pool.getMaxActive());
+		poolConfig.setMaxIdle(pool.getMaxIdle());
+		poolConfig.setMinIdle(pool.getMinIdle());
+		poolConfig.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
+		poolConfig.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
+		return poolConfig;
+	}
+
+	private Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync(
+			AbstractRedisClient client) {
+		if (client instanceof RedisClusterClient) {
+			return c -> ((StatefulRedisClusterConnection<String, ResultSet>) c).sync();
+		}
+		return c -> ((StatefulRedisConnection<String, ResultSet>) c).sync();
+	}
+
+	public static RedisTimeSeriesMeterRegistry meterRegistry(Config config) {
+		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public String uri() {
+				return config.getRedis().getUri();
+			}
+
+			@Override
+			public boolean cluster() {
+				return config.getRedis().isCluster();
+			}
+
+			@Override
+			public String keyspace() {
+				return Driver.keyspace(config);
+			}
+
+			@Override
+			public Duration step() {
+				return Duration.ofSeconds(config.getMetrics().getPublishInterval());
+			}
+
+		}, Clock.SYSTEM);
 	}
 
 	public Config getConfig() {
-		return configUpdater.getConfig();
+		return config;
 	}
 
 	@Override

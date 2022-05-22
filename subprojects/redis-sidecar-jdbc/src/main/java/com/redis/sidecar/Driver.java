@@ -5,7 +5,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -14,34 +13,15 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
-
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
-import com.redis.micrometer.RedisTimeSeriesConfig;
-import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
-import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Redis;
-import com.redis.sidecar.core.Config.Redis.Pool;
-import com.redis.sidecar.core.ConfigUpdater;
-import com.redis.sidecar.core.ResultSetCache;
-import com.redis.sidecar.core.StringResultSetCache;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.cluster.RedisClusterClient;
-import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
-import io.lettuce.core.support.ConnectionPoolSupport;
-import io.micrometer.core.instrument.Clock;
 
 public class Driver implements java.sql.Driver {
 
@@ -93,72 +73,12 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Cannot initialize backend driver '" + config.getDriver().getClassName() + "'", e);
 		}
 		AbstractRedisClient client = client(config.getRedis());
-		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
-		ResultSetCache cache;
-		try {
-			cache = cache(client, rowSetFactory, config);
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Cannot initialize ResultSet cache", e);
-		}
 		Connection connection = driver.connect(config.getDriver().getUrl(), info);
-		ConfigUpdater configUpdater;
 		try {
-			configUpdater = configUpdater(client, config);
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Could not start config updater", e);
+			return new SidecarConnection(connection, client, config);
+		} catch (Exception e) {
+			throw new SQLException("Could not create Sidecar connection", e);
 		}
-		return new SidecarConnection(connection, cache, rowSetFactory, configUpdater);
-	}
-
-	private ConfigUpdater configUpdater(AbstractRedisClient client, Config config) throws JsonProcessingException {
-		return new ConfigUpdater(config.getRedis().isCluster() ? ((RedisModulesClusterClient) client).connect()
-				: ((RedisModulesClient) client).connect(), config);
-	}
-
-	public static ResultSetCache cache(AbstractRedisClient client, RowSetFactory rowSetFactory, Config config)
-			throws JsonProcessingException {
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize());
-		RedisTimeSeriesMeterRegistry meterRegistry = meterRegistry(config);
-		if (config.getRedis().isCluster()) {
-			return new StringResultSetCache<>(config, meterRegistry, ConnectionPoolSupport
-					.createGenericObjectPool(() -> ((RedisClusterClient) client).connect(codec), poolConfig(config)),
-					StatefulRedisClusterConnection::sync);
-		}
-		return new StringResultSetCache<>(
-				config, meterRegistry, ConnectionPoolSupport
-						.createGenericObjectPool(() -> ((RedisClient) client).connect(codec), poolConfig(config)),
-				StatefulRedisConnection::sync);
-	}
-
-	public static RedisTimeSeriesMeterRegistry meterRegistry(Config config) {
-		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
-
-			@Override
-			public String get(String key) {
-				return null;
-			}
-
-			@Override
-			public String uri() {
-				return config.getRedis().getUri();
-			}
-
-			@Override
-			public boolean cluster() {
-				return config.getRedis().isCluster();
-			}
-
-			@Override
-			public String keyspace() {
-				return Driver.keyspace(config);
-			}
-
-			@Override
-			public Duration step() {
-				return Duration.ofSeconds(config.getMetrics().getPublishInterval());
-			}
-
-		}, Clock.SYSTEM);
 	}
 
 	public static String keyspace(Config config) {
@@ -172,17 +92,6 @@ public class Driver implements java.sql.Driver {
 		}
 		return redisClients.put(redisURI,
 				redis.isCluster() ? RedisModulesClusterClient.create(redisURI) : RedisModulesClient.create(redisURI));
-	}
-
-	private static <T> GenericObjectPoolConfig<T> poolConfig(Config sidecarConfig) {
-		Pool pool = sidecarConfig.getRedis().getPool();
-		GenericObjectPoolConfig<T> config = new GenericObjectPoolConfig<>();
-		config.setMaxTotal(pool.getMaxActive());
-		config.setMaxIdle(pool.getMaxIdle());
-		config.setMinIdle(pool.getMinIdle());
-		config.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
-		config.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
-		return config;
 	}
 
 	private boolean isEmpty(String string) {

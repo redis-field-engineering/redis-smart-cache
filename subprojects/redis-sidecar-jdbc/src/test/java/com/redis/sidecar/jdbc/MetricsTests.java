@@ -14,7 +14,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.lettucemod.api.sync.RedisModulesCommands;
-import com.redis.lettucemod.timeseries.Sample;
 import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.AbstractSidecarTests;
 import com.redis.sidecar.core.Config;
@@ -59,8 +58,7 @@ class MetricsTests extends AbstractSidecarTests {
 		RedisModulesCommands<String, String> sync = redis.sync();
 		Awaitility.await().until(() -> {
 			try {
-				Sample tsGet = sync.tsGet("sidecar:default:gets:latency:mean");
-				return tsGet != null;
+				return sync.tsGet("sidecar:default:gets:latency:mean") != null;
 			} catch (RedisCommandExecutionException e) {
 				return false;
 			}

@@ -14,16 +14,10 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 
-import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
-
 import org.junit.Assert;
-import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.Config.ByteSize;
 import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.jdbc.SidecarConnection;
@@ -36,18 +30,12 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	private static final int BUFFER_SIZE = ByteSize.ofMB(300).toBytes();
 
-	private static RowSetFactory rowSetFactory;
 	private final RedisModulesContainer redis = new RedisModulesContainer(
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
-	}
-
-	@BeforeAll
-	public void setupRowSetFactory() throws SQLException {
-		rowSetFactory = RowSetProvider.newFactory();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -71,25 +59,11 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException {
 		Config config = config(redis);
-		ConfigUpdater updater;
 		try {
-			updater = new ConfigUpdater(connection(redis), config);
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Could not start config updater", e);
-		}
-		try {
-			return new SidecarConnection(connection(database), Driver.cache(redis.getClient(), rowSetFactory, config),
-					rowSetFactory, updater);
+			return new SidecarConnection(connection(database), redis.getClient(), config);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}
-	}
-
-	private StatefulRedisModulesConnection<String, String> connection(RedisTestContext redis) {
-		if (redis.isCluster()) {
-			return redis.getRedisClusterClient().connect();
-		}
-		return redis.getRedisClient().connect();
 	}
 
 	protected Config config(RedisTestContext redis) {

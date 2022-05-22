@@ -11,8 +11,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
+import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.json.SetMode;
+
+import io.lettuce.core.AbstractRedisClient;
 
 public class ConfigUpdater implements Runnable, AutoCloseable {
 
@@ -37,12 +41,8 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 
 	}
 
-	public Config getConfig() {
-		return config;
-	}
-
-	public String key() {
-		return config.key(config.getCacheName(), "config");
+	private String key() {
+		return config.key("config");
 	}
 
 	@Override
@@ -62,5 +62,12 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 	public void close() {
 		future.cancel(false);
 		connection.close();
+	}
+
+	public static ConfigUpdater create(AbstractRedisClient client, Config config) throws JsonProcessingException {
+		if (client instanceof RedisModulesClusterClient) {
+			return new ConfigUpdater(((RedisModulesClusterClient) client).connect(), config);
+		}
+		return new ConfigUpdater(((RedisModulesClient) client).connect(), config);
 	}
 }

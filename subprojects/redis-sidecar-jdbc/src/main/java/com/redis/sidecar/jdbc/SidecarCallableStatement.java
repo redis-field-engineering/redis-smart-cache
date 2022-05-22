@@ -26,7 +26,8 @@ public class SidecarCallableStatement extends SidecarPreparedStatement implement
 	private final SortedMap<String, String> parameters = new TreeMap<>();
 	private final CallableStatement statement;
 
-	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement, String sql) {
+	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement, String sql)
+			throws SQLException {
 		super(connection, statement, sql);
 		this.statement = statement;
 	}

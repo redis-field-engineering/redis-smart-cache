@@ -4,13 +4,10 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.logging.Logger;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 public class Config {
-
-	private static final Logger log = Logger.getLogger(Config.class.getName());
 
 	public static final String DEFAULT_KEYSPACE = "sidecar";
 	public static final String DEFAULT_KEY_SEPARATOR = ":";
@@ -48,6 +45,7 @@ public class Config {
 	public String key(String... ids) {
 		StringJoiner joiner = new StringJoiner(keySeparator);
 		joiner.add(keyspace);
+		joiner.add(cacheName);
 		for (String id : ids) {
 			joiner.add(id);
 		}
@@ -115,14 +113,12 @@ public class Config {
 	}
 
 	public void setRules(List<Rule> rules) {
-		log.info("Updating rules: " + rules.toArray());
 		this.rules = rules;
 	}
 
 	public static class Rule {
 
 		private String table;
-		private boolean noCache;
 		private long ttl = DEFAULT_TTL.toSeconds();
 
 		public Rule() {
@@ -130,7 +126,6 @@ public class Config {
 
 		private Rule(Builder builder) {
 			this.table = builder.table;
-			this.noCache = builder.noCache;
 			this.ttl = builder.ttl;
 		}
 
@@ -140,14 +135,6 @@ public class Config {
 
 		public void setTable(String table) {
 			this.table = table;
-		}
-
-		public boolean isNoCache() {
-			return noCache;
-		}
-
-		public void setNoCache(boolean noCache) {
-			this.noCache = noCache;
 		}
 
 		/**
@@ -165,7 +152,7 @@ public class Config {
 
 		@Override
 		public String toString() {
-			return "Rule [table=" + table + ", noCache=" + noCache + ", ttl=" + ttl + "]";
+			return "Rule [table=" + table + ", ttl=" + ttl + "]";
 		}
 
 		public static Builder builder() {
@@ -175,7 +162,6 @@ public class Config {
 		public static final class Builder {
 
 			private String table;
-			private boolean noCache;
 			private long ttl = DEFAULT_TTL.toSeconds();
 
 			private Builder() {
@@ -183,11 +169,6 @@ public class Config {
 
 			public Builder table(String table) {
 				this.table = table;
-				return this;
-			}
-
-			public Builder noCache(boolean noCache) {
-				this.noCache = noCache;
 				return this;
 			}
 

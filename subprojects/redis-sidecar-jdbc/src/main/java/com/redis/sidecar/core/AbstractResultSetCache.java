@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.Timer;
 
 abstract class AbstractResultSetCache implements ResultSetCache {
 
+	private static final String KEY_PREFIX = "cache";
 	private final Config config;
 	private final Timer getTimer;
 	private final Timer putTimer;
@@ -33,7 +34,7 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 	}
 
 	protected String key(String id) {
-		return config.key(id);
+		return config.key(KEY_PREFIX, id);
 	}
 
 	@Override
