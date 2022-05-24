@@ -3,7 +3,7 @@
 :project-owner:   redis-field-engineering
 :project-name:    redis-sidecar
 :project-group:   com.redis
-:project-version: 0.0.1
+:project-version: 0.1.0
 :artifact-id:     redis-sidecar-driver
 :codecov-token:   y0NMn7uIJ0
 
