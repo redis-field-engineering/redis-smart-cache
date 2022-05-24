@@ -45,16 +45,13 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
+		return recordQuery(this::doExecuteQuery);
+	}
+
+	private ResultSet doExecuteQuery() throws SQLException {
 		resultSet = get();
 		if (resultSet == null) {
-			ResultSet databaseResultSet;
-			try {
-				databaseResultSet = databaseTimer.recordCallable(() -> statement.executeQuery());
-			} catch (SQLException e) {
-				throw e;
-			} catch (Exception e) {
-				throw new SQLException(e);
-			}
+			ResultSet databaseResultSet = recordDatabase(() -> statement.executeQuery());
 			resultSet = cache(databaseResultSet);
 		}
 		return resultSet;
@@ -186,15 +183,13 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public boolean execute() throws SQLException {
+		return recordQuery(this::doExecute);
+	}
+
+	private boolean doExecute() throws SQLException {
 		resultSet = get();
 		if (resultSet == null) {
-			try {
-				return databaseTimer.recordCallable(() -> statement.execute());
-			} catch (SQLException e) {
-				throw e;
-			} catch (Exception e) {
-				throw new SQLException(e);
-			}
+			return recordDatabase(() -> statement.execute());
 		}
 		return true;
 	}

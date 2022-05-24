@@ -13,6 +13,8 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
@@ -47,15 +49,9 @@ public class Driver implements java.sql.Driver {
 		if (!matcher.find()) {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
-		Properties properties = new Properties();
-		properties.putAll(System.getenv());
-		properties.putAll(System.getProperties());
-		properties.putAll(info);
-		JavaPropsMapper propsMapper = new JavaPropsMapper();
-		JavaPropsSchema propsSchema = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
 		Config config;
 		try {
-			config = propsMapper.readPropertiesAs(info, propsSchema, Config.class);
+			config = config(info);
 		} catch (IOException e) {
 			throw new SQLException("Could not load configuration", e);
 		}
@@ -81,6 +77,18 @@ public class Driver implements java.sql.Driver {
 		}
 	}
 
+	public static Config config(Properties info) throws IOException {
+		Properties properties = new Properties();
+		properties.putAll(System.getenv());
+		properties.putAll(System.getProperties());
+		properties.putAll(info);
+		JavaPropsMapper propsMapper = new JavaPropsMapper();
+		propsMapper.setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE);
+		propsMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+		JavaPropsSchema propsSchema = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
+		return propsMapper.readPropertiesAs(properties, propsSchema, Config.class);
+	}
+
 	public static String keyspace(Config config) {
 		return config.getKeyspace() + config.getKeySeparator() + config.getCacheName();
 	}
@@ -90,8 +98,10 @@ public class Driver implements java.sql.Driver {
 		if (redisClients.containsKey(redisURI)) {
 			return redisClients.get(redisURI);
 		}
-		return redisClients.put(redisURI,
-				redis.isCluster() ? RedisModulesClusterClient.create(redisURI) : RedisModulesClient.create(redisURI));
+		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(redisURI)
+				: RedisModulesClient.create(redisURI);
+		redisClients.put(redisURI, client);
+		return client;
 	}
 
 	private boolean isEmpty(String string) {

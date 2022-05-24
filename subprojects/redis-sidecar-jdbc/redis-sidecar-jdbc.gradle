@@ -19,6 +19,7 @@ dependencies {
     testImplementation group: 'org.testcontainers', name: 'db2', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
     testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
+    testImplementation 'com.zaxxer:HikariCP'
 }
 
 shadowJar {

@@ -107,7 +107,7 @@ CREATE TABLE employee_territories (
 --
 
 CREATE TABLE order_details (
-    order_id smallint NOT NULL,
+    order_id int NOT NULL,
     product_id smallint NOT NULL,
     unit_price real NOT NULL,
     quantity smallint NOT NULL,
@@ -120,7 +120,7 @@ CREATE TABLE order_details (
 --
 
 CREATE TABLE orders (
-    order_id smallint NOT NULL,
+    order_id int NOT NULL,
     customer_id bpchar,
     employee_id smallint,
     order_date date,
