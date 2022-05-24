@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -13,21 +14,29 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.micrometer.RedisTimeSeriesConfig;
+import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Redis;
+import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.AbstractRedisClient;
+import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.Metrics;
 
 public class Driver implements java.sql.Driver {
 
 	private static final Logger log = Logger.getLogger(Driver.class.getName());
+
+	private static RedisTimeSeriesMeterRegistry meterRegistry;
 
 	public static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
@@ -68,12 +77,55 @@ public class Driver implements java.sql.Driver {
 		} catch (Exception e) {
 			throw new SQLException("Cannot initialize backend driver '" + config.getDriver().getClassName() + "'", e);
 		}
+		addMeterRegistry(config);
 		AbstractRedisClient client = client(config.getRedis());
 		Connection connection = driver.connect(config.getDriver().getUrl(), info);
+		ConfigUpdater configUpdater;
 		try {
-			return new SidecarConnection(connection, client, config);
+			configUpdater = ConfigUpdater.create(client, config);
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not initialize config updater", e);
+		}
+		try {
+			return new SidecarConnection(connection, client, config, configUpdater);
 		} catch (Exception e) {
 			throw new SQLException("Could not create Sidecar connection", e);
+		}
+	}
+
+	public static void addMeterRegistry(Config config) {
+		synchronized (log) {
+			if (meterRegistry == null) {
+				meterRegistry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+
+					@Override
+					public String get(String key) {
+						return null;
+					}
+
+					@Override
+					public String uri() {
+						return config.getRedis().getUri();
+					}
+
+					@Override
+					public boolean cluster() {
+						return config.getRedis().isCluster();
+					}
+
+					@Override
+					public String keyspace() {
+						return Driver.keyspace(config);
+					}
+
+					@Override
+					public Duration step() {
+						return Duration.ofSeconds(config.getMetrics().getPublishInterval());
+					}
+
+				}, Clock.SYSTEM);
+				Metrics.addRegistry(meterRegistry);
+			}
 		}
 	}
 

@@ -10,17 +10,14 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.sync.RedisStringCommands;
 import io.lettuce.core.internal.LettuceAssert;
-import io.micrometer.core.instrument.MeterRegistry;
 
 public class StringResultSetCache extends AbstractResultSetCache {
 
 	private final GenericObjectPool<StatefulConnection<String, ResultSet>> pool;
 	private final Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync;
 
-	public StringResultSetCache(Config config, MeterRegistry meterRegistry,
-			GenericObjectPool<StatefulConnection<String, ResultSet>> pool,
+	public StringResultSetCache(GenericObjectPool<StatefulConnection<String, ResultSet>> pool,
 			Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync) {
-		super(config, meterRegistry);
 		LettuceAssert.notNull(pool, "Connection pool must not be null");
 		LettuceAssert.notNull(sync, "Sync commands must not be null");
 		this.pool = pool;
@@ -35,7 +32,7 @@ public class StringResultSetCache extends AbstractResultSetCache {
 	@Override
 	protected ResultSet doGet(String key) throws SQLException {
 		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
-			return sync.apply(connection).get(key(key));
+			return sync.apply(connection).get(key);
 		} catch (IOException e) {
 			throw new SQLException("Could not decode ResultSet", e);
 		} catch (Exception e) {
@@ -47,7 +44,7 @@ public class StringResultSetCache extends AbstractResultSetCache {
 	protected ResultSet doPut(String key, long ttl, ResultSet resultSet) throws SQLException {
 		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
 			RedisStringCommands<String, ResultSet> commands = sync.apply(connection);
-			commands.setex(key(key), ttl, resultSet);
+			commands.setex(key, ttl, resultSet);
 		} catch (IOException e) {
 			throw new SQLException("Could not encode ResultSet", e);
 		} catch (Exception e) {

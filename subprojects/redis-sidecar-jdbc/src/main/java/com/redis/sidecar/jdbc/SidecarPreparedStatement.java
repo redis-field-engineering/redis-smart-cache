@@ -35,7 +35,7 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 	}
 
 	@Override
-	protected String key(String sql) {
+	protected String executedSQL(String sql) {
 		StringBuilder stringBuilder = new StringBuilder(sql);
 		for (String parameter : parameters.values()) {
 			stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter);

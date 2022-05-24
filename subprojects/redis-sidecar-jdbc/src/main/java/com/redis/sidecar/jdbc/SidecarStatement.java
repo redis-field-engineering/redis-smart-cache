@@ -1,5 +1,8 @@
 package com.redis.sidecar.jdbc;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,6 +16,7 @@ import javax.sql.rowset.CachedRowSet;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Rule;
 
+import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -21,22 +25,25 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 
 public class SidecarStatement implements Statement {
 
+	private static final String KEY_PREFIX = "cache";
 	protected final SidecarConnection connection;
 	private final Statement statement;
-	private final Timer queryTimer;
-	private final Timer databaseTimer;
+	private final MessageDigest digest;
+	private final Timer requestTimer = Metrics.timer("requests");
+	private final Timer queryTimer = Metrics.timer("queries");
 
 	protected String sql;
 	private long ttl;
 	protected ResultSet resultSet;
 
-	public SidecarStatement(SidecarConnection connection, Statement statement) {
+	public SidecarStatement(SidecarConnection connection, Statement statement) throws SQLException {
 		this.connection = connection;
 		this.statement = statement;
-		this.queryTimer = Timer.builder("query.latency").description("Query latency")
-				.register(connection.getMeterRegistry());
-		this.databaseTimer = Timer.builder("db.latency").description("Database query latency")
-				.register(connection.getMeterRegistry());
+		try {
+			this.digest = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new SQLException("Could not initialize digest", e);
+		}
 	}
 
 	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) throws SQLException {
@@ -60,7 +67,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected <T> T recordQuery(Callable<T> callable) throws SQLException {
-		return record(queryTimer, callable);
+		return record(requestTimer, callable);
 	}
 
 	private ResultSet doExecuteQuery(String sql) throws SQLException {
@@ -74,7 +81,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected <T> T recordDatabase(Callable<T> callable) throws SQLException {
-		return record(databaseTimer, callable);
+		return record(queryTimer, callable);
 	}
 
 	private <T> T record(Timer timer, Callable<T> callable) throws SQLException {
@@ -94,7 +101,16 @@ public class SidecarStatement implements Statement {
 		return connection.getCache().get(key(sql));
 	}
 
-	protected String key(String sql) {
+	protected final String key(String sql) {
+		byte[] hash = digest.digest(executedSQL(sql).getBytes(StandardCharsets.UTF_8));
+		StringBuffer sb = new StringBuffer();
+		for (int i = 0; i < hash.length; i++) {
+			sb.append(Integer.toString((hash[i] & 0xff) + 0x100, 16).substring(1));
+		}
+		return connection.getConfig().key(KEY_PREFIX, sb.toString());
+	}
+
+	protected String executedSQL(String sql) {
 		return sql;
 	}
 

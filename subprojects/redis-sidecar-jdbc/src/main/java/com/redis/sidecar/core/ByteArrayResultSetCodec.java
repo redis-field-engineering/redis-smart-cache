@@ -26,6 +26,8 @@ import javax.sql.rowset.RowSetMetaDataImpl;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -36,6 +38,8 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 
+	private final Timer encodeTimer = Metrics.timer("encoding");
+	private final Timer decodeTimer = Metrics.timer("decoding");
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
@@ -57,9 +61,11 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	@Override
 	public RowSet decodeValue(ByteBuffer bytes) {
 		try {
-			return decode(Unpooled.wrappedBuffer(bytes));
-		} catch (SQLException e) {
-			throw new IllegalStateException("Could not decode rowset", e);
+			return decodeTimer.recordCallable(() -> {
+				return decode(Unpooled.wrappedBuffer(bytes));
+			});
+		} catch (Exception e) {
+			throw new IllegalStateException("Could not decode RowSet", e);
 		}
 	}
 
@@ -197,16 +203,22 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	@Override
 	public ByteBuffer encodeValue(ResultSet resultSet) {
-		if (resultSet == null) {
-			return ByteBuffer.wrap(EMPTY);
+		try {
+			return encodeTimer.recordCallable(() -> {
+				if (resultSet == null) {
+					return ByteBuffer.wrap(EMPTY);
+				}
+				ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
+				ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
+				byteBuf.clear();
+				encode(resultSet, byteBuf);
+				int writerIndex = byteBuf.writerIndex();
+				buffer.limit(writerIndex);
+				return buffer;
+			});
+		} catch (Exception e) {
+			throw new IllegalStateException("Could not encode ResultSet", e);
 		}
-		ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
-		ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
-		byteBuf.clear();
-		encode(resultSet, byteBuf);
-		int writerIndex = byteBuf.writerIndex();
-		buffer.limit(writerIndex);
-		return buffer;
 	}
 
 	public void encode(ResultSet resultSet, ByteBuf byteBuf) {

@@ -33,14 +33,13 @@ public class SidecarCallableStatement extends SidecarPreparedStatement implement
 	}
 
 	@Override
-	protected String key(String sql) {
+	protected String executedSQL(String sql) {
 		StringBuilder stringBuilder = new StringBuilder(sql);
 		for (String parameter : parameters.keySet()) {
 			stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter).append("=")
 					.append(parameters.get(parameter));
 		}
 		return stringBuilder.toString();
-
 	}
 
 	@Override

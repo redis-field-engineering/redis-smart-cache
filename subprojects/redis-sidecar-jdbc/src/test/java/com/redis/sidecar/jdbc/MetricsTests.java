@@ -17,6 +17,7 @@ import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
@@ -61,13 +62,14 @@ class MetricsTests extends AbstractSidecarTests {
 		return config;
 	}
 
+	@Test
 	void testPreparedStatement() throws Exception {
 		HikariConfig config = new HikariConfig();
 		config.setJdbcUrl("jdbc:redis://localhost:6379");
 		config.setDriverClassName("com.redis.sidecar.Driver");
 		System.setProperty("sidecar.driver.url", POSTGRESQL.getJdbcUrl());
 		System.setProperty("sidecar.driver.class-name", POSTGRESQL.getDriverClassName());
-		System.setProperty("sidecar.metrics.publish-interval", "5");
+		System.setProperty("sidecar.metrics.publish-interval", "1");
 		config.setUsername(POSTGRESQL.getUsername());
 		config.setPassword(POSTGRESQL.getPassword());
 		HikariDataSource ds = new HikariDataSource(config);
@@ -104,8 +106,9 @@ class MetricsTests extends AbstractSidecarTests {
 									+ "                     INNER JOIN employees e ON e.employee_id = o.employee_id"
 									+ "                     INNER JOIN employee_territories t ON t.employee_id = e.employee_id"
 									+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
-									+ "     WHERE d.quantity<>?");
-					statement.setInt(1, random.nextInt(100));
+									+ "     WHERE d.quantity BETWEEN ? AND ?");
+					statement.setInt(1, random.nextInt(10));
+					statement.setInt(2, 100 + random.nextInt(10));
 					ResultSet resultSet = statement.executeQuery();
 					int resultCount = 0;
 					while (resultSet.next()) {
@@ -126,7 +129,7 @@ class MetricsTests extends AbstractSidecarTests {
 	private void populateDatabase() throws SQLException {
 		Random random = new Random();
 		Connection connection = connection(POSTGRESQL);
-		int orderCount = 10000;
+		int orderCount = 300000;
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		PreparedStatement insertOrderStatement = connection.prepareStatement(insertOrderSQL);
@@ -137,7 +140,7 @@ class MetricsTests extends AbstractSidecarTests {
 			int employeeId = 1 + random.nextInt(9);
 			int productId = 1 + random.nextInt(77);
 			double price = random.nextDouble();
-			int quantity = random.nextInt(30000);
+			int quantity = random.nextInt(10000);
 
 			insertOrderStatement.setInt(1, orderId);
 			insertOrderStatement.setString(2, customerId);

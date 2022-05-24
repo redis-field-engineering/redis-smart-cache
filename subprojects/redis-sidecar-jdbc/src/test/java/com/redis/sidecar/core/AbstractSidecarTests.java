@@ -60,7 +60,8 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 			throws SQLException {
 		Config config = config(redis);
 		try {
-			return new SidecarConnection(connection(database), redis.getClient(), config);
+			return new SidecarConnection(connection(database), redis.getClient(), config,
+					ConfigUpdater.create(redis.getClient(), config));
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}
