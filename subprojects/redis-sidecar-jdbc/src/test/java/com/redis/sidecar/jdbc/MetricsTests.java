@@ -62,7 +62,7 @@ class MetricsTests extends AbstractSidecarTests {
 		return config;
 	}
 
-	@Test
+//	@Test
 	void testPreparedStatement() throws Exception {
 		HikariConfig config = new HikariConfig();
 		config.setJdbcUrl("jdbc:redis://localhost:6379");
