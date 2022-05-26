@@ -4,7 +4,7 @@
 :project-name:    redis-sidecar
 :project-group:   com.redis
 :project-version: 0.0.1
-:artifact-id:     redis-sidecar-driver
+:artifact-id:     redis-sidecar-jdbc
 :codecov-token:   y0NMn7uIJ0
 
 
