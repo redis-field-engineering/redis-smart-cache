@@ -1,8 +1,6 @@
 package com.redis.sidecar.jdbc;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -10,6 +8,7 @@ import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.zip.CRC32;
 
 import javax.sql.rowset.CachedRowSet;
 
@@ -28,7 +27,6 @@ public class SidecarStatement implements Statement {
 	private static final String KEY_PREFIX = "cache";
 	protected final SidecarConnection connection;
 	private final Statement statement;
-	private final MessageDigest digest;
 	private final Timer requestTimer = Metrics.timer("requests");
 	private final Timer queryTimer = Metrics.timer("queries");
 
@@ -36,17 +34,12 @@ public class SidecarStatement implements Statement {
 	private long ttl;
 	protected ResultSet resultSet;
 
-	public SidecarStatement(SidecarConnection connection, Statement statement) throws SQLException {
+	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
-		try {
-			this.digest = MessageDigest.getInstance("MD5");
-		} catch (NoSuchAlgorithmException e) {
-			throw new SQLException("Could not initialize digest", e);
-		}
 	}
 
-	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) throws SQLException {
+	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) {
 		this(connection, statement);
 		setSQL(sql);
 	}
@@ -98,20 +91,17 @@ public class SidecarStatement implements Statement {
 		if (ttl == Config.TTL_NO_CACHE) {
 			return null;
 		}
-		return connection.getCache().get(key(sql));
+		return connection.getCache().get(key());
 	}
 
-	protected final String key(String sql) {
-		byte[] hash = digest.digest(executedSQL(sql).getBytes(StandardCharsets.UTF_8));
-		StringBuffer sb = new StringBuffer();
-		for (int i = 0; i < hash.length; i++) {
-			sb.append(Integer.toString((hash[i] & 0xff) + 0x100, 16).substring(1));
-		}
-		return connection.getConfig().key(KEY_PREFIX, sb.toString());
+	protected String key() {
+		return connection.getConfig().key(KEY_PREFIX, crc(sql));
 	}
 
-	protected String executedSQL(String sql) {
-		return sql;
+	protected final String crc(String string) {
+		CRC32 crc = new CRC32();
+		crc.update(string.getBytes(StandardCharsets.UTF_8));
+		return String.valueOf(crc.getValue());
 	}
 
 	protected ResultSet cache(ResultSet resultSet) throws SQLException {
@@ -120,7 +110,7 @@ public class SidecarStatement implements Statement {
 		}
 		CachedRowSet rowSet = connection.createCachedRowSet();
 		rowSet.populate(resultSet);
-		connection.getCache().put(key(sql), ttl, rowSet);
+		connection.getCache().put(key(), ttl, rowSet);
 		rowSet.beforeFirst();
 		return rowSet;
 	}

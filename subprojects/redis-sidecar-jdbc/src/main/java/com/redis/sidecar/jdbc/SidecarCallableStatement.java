@@ -26,20 +26,15 @@ public class SidecarCallableStatement extends SidecarPreparedStatement implement
 	private final SortedMap<String, String> parameters = new TreeMap<>();
 	private final CallableStatement statement;
 
-	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement, String sql)
-			throws SQLException {
+	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement, String sql) {
 		super(connection, statement, sql);
 		this.statement = statement;
 	}
 
 	@Override
-	protected String executedSQL(String sql) {
-		StringBuilder stringBuilder = new StringBuilder(sql);
-		for (String parameter : parameters.keySet()) {
-			stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter).append("=")
-					.append(parameters.get(parameter));
-		}
-		return stringBuilder.toString();
+	protected StringBuilder appendParameters(StringBuilder stringBuilder) {
+		parameters.forEach((k, v) -> appendParameter(stringBuilder, k + "=" + v));
+		return stringBuilder;
 	}
 
 	@Override
