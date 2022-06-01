@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -17,7 +18,8 @@ import javax.sql.rowset.CachedRowSet;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Rule;
 
-import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -29,14 +31,16 @@ public class SidecarStatement implements Statement {
 	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
 
 	private static final String KEY_PREFIX = "cache";
+	private static final String QUERY_TIMER_ID = "metrics.database.calls";
+	private static final String TAG_TABLES = "tables";
 
 	private final SidecarConnection connection;
 	private final Statement statement;
-	private final Timer queryTimer = Metrics.timer("database.calls");
 
 	protected String sql;
 	private long ttl = Config.TTL_NO_CACHE;
 	private Optional<ResultSet> resultSet = Optional.empty();
+	private List<String> tables = Collections.emptyList();
 
 	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
@@ -74,13 +78,21 @@ public class SidecarStatement implements Statement {
 			return true;
 		}
 		try {
-			return queryTimer.recordCallable(executable::execute);
+			return Timer.builder(QUERY_TIMER_ID).tags(tableTags()).register(connection.getMeterRegistry())
+					.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			// Should not happen but rethrow anyway
 			throw new SQLException(e);
 		}
+	}
+
+	private Iterable<Tag> tableTags() {
+		if (tables.isEmpty()) {
+			return Tags.empty();
+		}
+		return Tags.of(TAG_TABLES, String.join(",", tables));
 	}
 
 	private void checkClosed() throws SQLException {
@@ -102,7 +114,8 @@ public class SidecarStatement implements Statement {
 		}
 		ResultSet resultSet;
 		try {
-			resultSet = queryTimer.recordCallable(executable::execute);
+			resultSet = Timer.builder(QUERY_TIMER_ID).tags(tableTags()).register(connection.getMeterRegistry())
+					.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
@@ -145,7 +158,7 @@ public class SidecarStatement implements Statement {
 			statement = CCJSqlParserUtil.parse(sql);
 			if (statement instanceof Select) {
 				TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
-				List<String> tables = tablesNamesFinder.getTableList((Select) statement);
+				tables = tablesNamesFinder.getTableList((Select) statement);
 				for (Rule rule : connection.getConfig().getRules()) {
 					if (rule.getTable() == null || tables.contains(rule.getTable())) {
 						ttl = rule.getTtl();

@@ -216,8 +216,8 @@ public class Config {
 			return publishInterval;
 		}
 
-		public void setPublishInterval(long publishInterval) {
-			this.publishInterval = publishInterval;
+		public void setPublishInterval(long seconds) {
+			this.publishInterval = seconds;
 		}
 	}
 

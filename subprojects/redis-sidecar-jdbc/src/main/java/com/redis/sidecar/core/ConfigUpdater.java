@@ -38,7 +38,6 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 		this.reader = mapper.readerForUpdating(config);
 		connection.sync().jsonSet(key(), "$", writer.writeValueAsString(config), SetMode.NX);
 		this.future = executor.scheduleAtFixedRate(this, 0, config.getRefreshRate(), TimeUnit.SECONDS);
-
 	}
 
 	private String key() {

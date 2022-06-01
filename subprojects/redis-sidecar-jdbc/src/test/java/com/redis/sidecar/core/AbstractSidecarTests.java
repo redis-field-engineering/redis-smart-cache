@@ -56,8 +56,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
-	protected SidecarConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
-			throws SQLException {
+	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis) throws SQLException {
 		Config config = config(redis);
 		try {
 			return new SidecarConnection(connection(database), redis.getClient(), config,
@@ -70,6 +69,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	protected Config config(RedisTestContext redis) {
 		Config config = new Config();
 		config.setBufferSize(BUFFER_SIZE);
+		config.getMetrics().setPublishInterval(1);
 		Redis redisConfig = new Redis();
 		redisConfig.setCluster(redis.isCluster());
 		redisConfig.setUri(redis.getRedisURI());
@@ -131,7 +131,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			StatementExecutor executor) throws SQLException {
 		try (Connection databaseConnection = connection(databaseContainer);
-				SidecarConnection connection = connection(databaseContainer, redis)) {
+				Connection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			ResultSet resultSet = null;
 			int count = 100;
@@ -144,7 +144,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
 			throws SQLException {
-		try (SidecarConnection connection = connection(databaseContainer, redis)) {
+		try (Connection connection = connection(databaseContainer, redis)) {
 			Statement statement = connection.createStatement();
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();

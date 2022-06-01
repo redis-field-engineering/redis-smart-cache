@@ -30,6 +30,9 @@ import javax.sql.rowset.RowSetProvider;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.redis.micrometer.RedisTimeSeriesConfig;
+import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
+import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Redis.Pool;
@@ -44,7 +47,10 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisStringCommands;
 import io.lettuce.core.cluster.RedisClusterClient;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.support.ConnectionPoolSupport;
+import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.MeterRegistry;
 
 public class SidecarConnection implements Connection {
 
@@ -53,19 +59,58 @@ public class SidecarConnection implements Connection {
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
 	private final ConfigUpdater configUpdater;
+	private final MeterRegistry meterRegistry;
 
-	public SidecarConnection(Connection connection, AbstractRedisClient client, Config config,
+	public SidecarConnection(Connection connection, AbstractRedisClient redisClient, Config config,
 			ConfigUpdater configUpdater) throws SQLException, JsonProcessingException {
+		LettuceAssert.notNull(connection, "Connection is required");
+		LettuceAssert.notNull(redisClient, "Redis client is required");
+		LettuceAssert.notNull(config, "Config is required");
+		LettuceAssert.notNull(configUpdater, "Config updater is required");
 		this.connection = connection;
 		this.config = config;
 		this.configUpdater = configUpdater;
+		this.meterRegistry = meterRegistry(config, redisClient);
 		this.rowSetFactory = RowSetProvider.newFactory();
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize());
-		Supplier<StatefulConnection<String, ResultSet>> connectionSupplier = client instanceof RedisClusterClient
-				? () -> ((RedisClusterClient) client).connect(codec)
-				: () -> ((RedisClient) client).connect(codec);
-		this.cache = new StringResultSetCache(
-				ConnectionPoolSupport.createGenericObjectPool(connectionSupplier, poolConfig(config)), sync(client));
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize(),
+				meterRegistry);
+		Supplier<StatefulConnection<String, ResultSet>> connectionSupplier = redisClient instanceof RedisClusterClient
+				? () -> ((RedisClusterClient) redisClient).connect(codec)
+				: () -> ((RedisClient) redisClient).connect(codec);
+		this.cache = new StringResultSetCache(meterRegistry,
+				ConnectionPoolSupport.createGenericObjectPool(connectionSupplier, poolConfig(config)),
+				sync(redisClient));
+	}
+
+	private static RedisTimeSeriesMeterRegistry meterRegistry(Config config, AbstractRedisClient client) {
+		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public String uri() {
+				return config.getRedis().getUri();
+			}
+
+			@Override
+			public boolean cluster() {
+				return config.getRedis().isCluster();
+			}
+
+			@Override
+			public String keyspace() {
+				return Driver.keyspace(config);
+			}
+
+			@Override
+			public Duration step() {
+				return Duration.ofSeconds(config.getMetrics().getPublishInterval());
+			}
+
+		}, Clock.SYSTEM, client);
 	}
 
 	private static <T> GenericObjectPoolConfig<T> poolConfig(Config config) {
@@ -93,9 +138,8 @@ public class SidecarConnection implements Connection {
 
 	@Override
 	public void close() throws SQLException {
-		if (configUpdater != null) {
-			configUpdater.close();
-		}
+		meterRegistry.close();
+		configUpdater.close();
 		connection.close();
 		try {
 			cache.close();
@@ -393,6 +437,10 @@ public class SidecarConnection implements Connection {
 
 	public CachedRowSet createCachedRowSet() throws SQLException {
 		return rowSetFactory.createCachedRowSet();
+	}
+
+	public MeterRegistry getMeterRegistry() {
+		return meterRegistry;
 	}
 
 }
