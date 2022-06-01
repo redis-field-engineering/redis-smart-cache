@@ -1,8 +1,6 @@
 package com.redis.sidecar.core;
 
-import java.io.IOException;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.function.Function;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -30,25 +28,17 @@ public class StringResultSetCache extends AbstractResultSetCache {
 	}
 
 	@Override
-	protected ResultSet doGet(String key) throws SQLException {
+	protected ResultSet doGet(String key) throws Exception {
 		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
 			return sync.apply(connection).get(key);
-		} catch (IOException e) {
-			throw new SQLException("Could not decode ResultSet", e);
-		} catch (Exception e) {
-			throw new SQLException("Could not get cache connection", e);
 		}
 	}
 
 	@Override
-	protected ResultSet doPut(String key, long ttl, ResultSet resultSet) throws SQLException {
+	protected ResultSet doPut(String key, long ttl, ResultSet resultSet) throws Exception {
 		try (StatefulConnection<String, ResultSet> connection = pool.borrowObject()) {
 			RedisStringCommands<String, ResultSet> commands = sync.apply(connection);
 			commands.setex(key, ttl, resultSet);
-		} catch (IOException e) {
-			throw new SQLException("Could not encode ResultSet", e);
-		} catch (Exception e) {
-			throw new SQLException("Could not get cache connection", e);
 		}
 		return resultSet;
 	}

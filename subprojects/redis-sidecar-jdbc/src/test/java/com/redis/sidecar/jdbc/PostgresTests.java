@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,8 +39,14 @@ class PostgresTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
+		List<String> keys = redis.sync().keys("sidecar:default:cache:*");
+		Assertions.assertEquals(1, keys.size());
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM employees");
+		keys = redis.sync().keys("sidecar:default:cache:*");
+		Assertions.assertEquals(2, keys.size());
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM products");
+		keys = redis.sync().keys("sidecar:default:cache:*");
+		Assertions.assertEquals(3, keys.size());
 	}
 
 	@ParameterizedTest

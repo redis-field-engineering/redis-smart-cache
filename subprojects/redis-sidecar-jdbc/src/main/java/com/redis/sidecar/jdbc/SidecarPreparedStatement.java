@@ -25,17 +25,39 @@ import java.util.TreeMap;
 
 public class SidecarPreparedStatement extends SidecarStatement implements PreparedStatement {
 
+	private static final String METHOD_CANNOT_BE_USED = "Query methods that take a query string cannot be used on a PreparedStatement";
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 	private final PreparedStatement statement;
 
 	public SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql) {
-		super(connection, statement, sql);
+		super(connection, statement);
 		this.statement = statement;
+		this.sql = sql;
 	}
 
 	@Override
-	protected String key() {
-		return appendParameters(new StringBuilder(super.key())).toString();
+	public ResultSet executeQuery(String sql) throws SQLException {
+		throw new SQLException(METHOD_CANNOT_BE_USED);
+	}
+
+	@Override
+	public int executeUpdate(String sql) throws SQLException {
+		throw new SQLException(METHOD_CANNOT_BE_USED);
+	}
+
+	@Override
+	public void addBatch(String sql) throws SQLException {
+		throw new SQLException(METHOD_CANNOT_BE_USED);
+	}
+
+	@Override
+	public boolean execute(String sql) throws SQLException {
+		throw new SQLException(METHOD_CANNOT_BE_USED);
+	}
+
+	@Override
+	protected String key(String sql) {
+		return appendParameters(new StringBuilder(super.key(sql))).toString();
 	}
 
 	protected StringBuilder appendParameters(StringBuilder stringBuilder) {
@@ -43,22 +65,9 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 		return stringBuilder;
 	}
 
-	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
-		return stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter);
-	}
-
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		return recordQuery(this::doExecuteQuery);
-	}
-
-	private ResultSet doExecuteQuery() throws SQLException {
-		resultSet = get();
-		if (resultSet == null) {
-			ResultSet databaseResultSet = recordDatabase(() -> statement.executeQuery());
-			resultSet = cache(databaseResultSet);
-		}
-		return resultSet;
+		return executeQuery(statement::executeQuery);
 	}
 
 	@Override
@@ -187,15 +196,7 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public boolean execute() throws SQLException {
-		return recordQuery(this::doExecute);
-	}
-
-	private boolean doExecute() throws SQLException {
-		resultSet = get();
-		if (resultSet == null) {
-			return recordDatabase(() -> statement.execute());
-		}
-		return true;
+		return execute(statement::execute);
 	}
 
 	@Override

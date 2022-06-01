@@ -6,7 +6,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.concurrent.Callable;
+import java.util.List;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
 import javax.sql.rowset.CachedRowSet;
@@ -16,27 +19,32 @@ import com.redis.sidecar.core.Config.Rule;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import net.sf.jsqlparser.JSQLParserException;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.util.TablesNamesFinder;
 
 public class SidecarStatement implements Statement {
 
-	private static final String KEY_PREFIX = "cache";
-	protected final SidecarConnection connection;
-	private final Statement statement;
-	private final Timer requestTimer = Metrics.timer("requests");
-	private final Timer queryTimer = Metrics.timer("queries");
+	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
 
-	protected ParsedSQL parsedSQL;
-	private long ttl;
-	protected ResultSet resultSet;
+	private static final String KEY_PREFIX = "cache";
+
+	private final SidecarConnection connection;
+	private final Statement statement;
+	private final Timer queryTimer = Metrics.timer("database.calls");
+
+	protected String sql;
+	private long ttl = Config.TTL_NO_CACHE;
+	private Optional<ResultSet> resultSet = Optional.empty();
 
 	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
 	}
 
-	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) {
-		this(connection, statement);
-		parseSQL(sql);
+	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
+		return stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter);
 	}
 
 	@Override
@@ -51,84 +59,109 @@ public class SidecarStatement implements Statement {
 
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
-		return recordQuery(() -> doExecuteQuery(sql));
+		return executeQuery(sql, () -> statement.executeQuery(sql));
 	}
 
-	protected <T> T recordQuery(Callable<T> callable) throws SQLException {
-		return record(requestTimer, callable);
+	protected boolean execute(String sql, Executable executable) throws SQLException {
+		this.sql = sql;
+		return execute(executable);
 	}
 
-	private ResultSet doExecuteQuery(String sql) throws SQLException {
-		parseSQL(sql);
-		this.resultSet = get();
-		if (this.resultSet == null) {
-			ResultSet databaseResultSet = recordDatabase(() -> statement.executeQuery(sql));
-			this.resultSet = cache(databaseResultSet);
+	protected boolean execute(Executable executable) throws SQLException {
+		checkClosed();
+		parseSQL();
+		if (resultSet.isPresent()) {
+			return true;
 		}
-		return this.resultSet;
-	}
-
-	protected <T> T recordDatabase(Callable<T> callable) throws SQLException {
-		return record(queryTimer, callable);
-	}
-
-	private <T> T record(Timer timer, Callable<T> callable) throws SQLException {
 		try {
-			return timer.recordCallable(callable);
+			return queryTimer.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
+			// Should not happen but rethrow anyway
 			throw new SQLException(e);
 		}
 	}
 
-	protected ResultSet get() throws SQLException {
-		if (ttl == Config.TTL_NO_CACHE) {
-			return null;
+	private void checkClosed() throws SQLException {
+		if (isClosed()) {
+			throw new SQLException("This statement has been closed.");
 		}
-		return connection.getCache().get(key());
 	}
 
-	protected String key() {
-		return connection.getConfig().key(KEY_PREFIX, crc(parsedSQL.getSQL()));
+	protected ResultSet executeQuery(String sql, QueryExecutable executable) throws SQLException {
+		this.sql = sql;
+		return executeQuery(executable);
 	}
 
-	protected final String crc(String string) {
+	protected ResultSet executeQuery(QueryExecutable executable) throws SQLException {
+		checkClosed();
+		parseSQL();
+		if (resultSet.isPresent()) {
+			return resultSet.get();
+		}
+		ResultSet resultSet;
+		try {
+			resultSet = queryTimer.recordCallable(executable::execute);
+		} catch (SQLException e) {
+			throw e;
+		} catch (Exception e) {
+			// Should not happen but rethrow anyway
+			throw new SQLException(e);
+		}
+		if (isCachingEnabled()) {
+			return cache(resultSet);
+		}
+		return resultSet;
+
+	}
+
+	protected String key(String sql) {
+		return connection.getConfig().key(KEY_PREFIX, crc(sql));
+	}
+
+	private final String crc(String string) {
 		CRC32 crc = new CRC32();
 		crc.update(string.getBytes(StandardCharsets.UTF_8));
 		return String.valueOf(crc.getValue());
 	}
 
-	protected ResultSet cache(ResultSet resultSet) throws SQLException {
-		if (ttl == Config.TTL_NO_CACHE) {
-			return resultSet;
-		}
+	private CachedRowSet cache(ResultSet resultSet) throws SQLException {
 		CachedRowSet rowSet = connection.createCachedRowSet();
 		rowSet.populate(resultSet);
-		connection.getCache().put(key(), ttl, rowSet);
+		connection.getCache().put(key(sql), ttl, rowSet);
 		rowSet.beforeFirst();
 		return rowSet;
 	}
 
-	private void parseSQL(String sql) {
-		this.parsedSQL = ParsedSQL.parse(sql);
-		this.ttl = ttl(parsedSQL);
+	private boolean isCachingEnabled() {
+		return ttl != Config.TTL_NO_CACHE;
 	}
 
-	private long ttl(ParsedSQL parsedSQL) {
-		if (!parsedSQL.getTables().isEmpty()) {
-			for (Rule rule : connection.getConfig().getRules()) {
-				if (rule.getTable() == null || parsedSQL.getTables().contains(rule.getTable())) {
-					return rule.getTtl();
+	protected void parseSQL() {
+		String key = key(sql);
+		net.sf.jsqlparser.statement.Statement statement;
+		try {
+			statement = CCJSqlParserUtil.parse(sql);
+			if (statement instanceof Select) {
+				TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
+				List<String> tables = tablesNamesFinder.getTableList((Select) statement);
+				for (Rule rule : connection.getConfig().getRules()) {
+					if (rule.getTable() == null || tables.contains(rule.getTable())) {
+						ttl = rule.getTtl();
+					}
+				}
+				if (isCachingEnabled()) {
+					resultSet = connection.getCache().get(key);
 				}
 			}
+		} catch (JSQLParserException e) {
+			log.log(Level.FINE, "Could not parse SQL: " + sql, e);
 		}
-		return Config.TTL_NO_CACHE;
 	}
 
 	@Override
 	public int executeUpdate(String sql) throws SQLException {
-		setSQLNoCache(sql);
 		return statement.executeUpdate(sql);
 	}
 
@@ -194,22 +227,17 @@ public class SidecarStatement implements Statement {
 
 	@Override
 	public boolean execute(String sql) throws SQLException {
-		return recordQuery(() -> doExecute(sql));
-	}
-
-	private boolean doExecute(String sql) throws SQLException {
-		parseSQL(sql);
-		resultSet = get();
-		if (resultSet == null) {
-			recordDatabase(() -> statement.execute(sql));
-		}
-		return true;
+		return execute(sql, () -> statement.execute(sql));
 	}
 
 	@Override
 	public ResultSet getResultSet() throws SQLException {
-		if (resultSet == null) {
-			resultSet = cache(statement.getResultSet());
+		if (resultSet.isPresent()) {
+			return resultSet.get();
+		}
+		ResultSet resultSet = statement.getResultSet();
+		if (isCachingEnabled()) {
+			return cache(resultSet);
 		}
 		return resultSet;
 	}
@@ -256,7 +284,6 @@ public class SidecarStatement implements Statement {
 
 	@Override
 	public void addBatch(String sql) throws SQLException {
-		setSQLNoCache(sql);
 		statement.addBatch(sql);
 	}
 
@@ -287,67 +314,43 @@ public class SidecarStatement implements Statement {
 
 	@Override
 	public int executeUpdate(String sql, int autoGeneratedKeys) throws SQLException {
-		setSQLNoCache(sql);
 		return statement.executeUpdate(sql, autoGeneratedKeys);
-	}
-
-	private void setSQLNoCache(String sql) {
-		this.parsedSQL = new ParsedSQL(sql);
-		this.ttl = Config.TTL_NO_CACHE;
 	}
 
 	@Override
 	public int executeUpdate(String sql, int[] columnIndexes) throws SQLException {
-		setSQLNoCache(sql);
 		return statement.executeUpdate(sql, columnIndexes);
 	}
 
 	@Override
 	public int executeUpdate(String sql, String[] columnNames) throws SQLException {
-		setSQLNoCache(sql);
 		return statement.executeUpdate(sql, columnNames);
 	}
 
 	@Override
 	public boolean execute(String sql, int autoGeneratedKeys) throws SQLException {
-		return recordQuery(() -> doExecute(sql, autoGeneratedKeys));
+		return execute(sql, () -> statement.execute(sql, autoGeneratedKeys));
 	}
 
-	private boolean doExecute(String sql, int autoGeneratedKeys) throws SQLException {
-		parseSQL(sql);
-		resultSet = get();
-		if (resultSet == null) {
-			return recordDatabase(() -> statement.execute(sql, autoGeneratedKeys));
-		}
-		return true;
+	protected static interface Executable {
+
+		boolean execute() throws SQLException;
+	}
+
+	protected static interface QueryExecutable {
+
+		ResultSet execute() throws SQLException;
+
 	}
 
 	@Override
 	public boolean execute(String sql, int[] columnIndexes) throws SQLException {
-		return recordQuery(() -> doExecute(sql, columnIndexes));
-	}
-
-	private boolean doExecute(String sql, int[] columnIndexes) throws SQLException {
-		parseSQL(sql);
-		resultSet = get();
-		if (resultSet == null) {
-			return recordDatabase(() -> statement.execute(sql, columnIndexes));
-		}
-		return true;
+		return execute(sql, () -> statement.execute(sql, columnIndexes));
 	}
 
 	@Override
 	public boolean execute(String sql, String[] columnNames) throws SQLException {
-		return recordQuery(() -> doExecute(sql, columnNames));
-	}
-
-	private boolean doExecute(String sql, String[] columnNames) throws SQLException {
-		parseSQL(sql);
-		resultSet = get();
-		if (resultSet == null) {
-			return recordDatabase(() -> statement.execute(sql, columnNames));
-		}
-		return true;
+		return execute(sql, () -> statement.execute(sql, columnNames));
 	}
 
 	@Override
