@@ -18,6 +18,7 @@ import org.junit.Assert;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.Config.ByteSize;
 import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.jdbc.SidecarConnection;
@@ -60,7 +61,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		Config config = config(redis);
 		try {
 			return new SidecarConnection(connection(database), redis.getClient(), config,
-					ConfigUpdater.create(redis.getClient(), config));
+					ConfigUpdater.create(redis.getClient(), config), Driver.meterRegistry(config, redis.getClient()));
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize ResultSet cache", e);
 		}
