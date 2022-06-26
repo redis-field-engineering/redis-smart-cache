@@ -29,7 +29,7 @@ config {
 		enabled = false
 		licenses {
 			license {
-				id = 'Apache-2.0'
+				id = 'MIT'
 			}
 		}
 	}

@@ -5,7 +5,7 @@ project:
   website: https://github.com/redis-field-engineering/redis-sidecar
   authors:
     - Julien Ruaux
-  license: Apache-2.0
+  license: MIT
   java:
     groupId: com.redis
     version: 8
