@@ -75,15 +75,6 @@ subprojects {
         useJUnitPlatform()
         maxHeapSize = "1024m"
     }
-    
-	bootJar {
-		enabled = false
-	}
-	
-	jar {
-		enabled = true
-		archiveClassifier = ''
-	}
 
 	sourceCompatibility = 8
     targetCompatibility = 8

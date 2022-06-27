@@ -22,6 +22,16 @@ dependencies {
     testImplementation 'com.zaxxer:HikariCP'
 }
 
+    
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+    archiveClassifier = ''
+}
+
 shadowJar {
    archiveClassifier.set('')
 }
