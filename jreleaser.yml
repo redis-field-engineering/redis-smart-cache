@@ -53,7 +53,7 @@ announce:
 distributions:
   redis-sidecar-jdbc:
     artifacts:
-      - path: subprojects/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar
+      - path: core/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.jar'
 
 files:
