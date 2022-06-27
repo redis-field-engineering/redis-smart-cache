@@ -1,4 +1,4 @@
-= Redis-Sidecar
+= Redis Sidecar
 :linkattrs:
 :project-owner:   redis-field-engineering
 :project-name:    redis-sidecar
@@ -13,4 +13,4 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-Redis-Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
+Redis Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
