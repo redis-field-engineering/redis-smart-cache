@@ -13,15 +13,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
 
 import org.junit.Assert;
+import org.junit.jupiter.api.AfterEach;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.Config.ByteSize;
-import com.redis.sidecar.core.Config.Redis;
-import com.redis.sidecar.jdbc.SidecarConnection;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -37,6 +36,11 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
+	}
+
+	@AfterEach
+	protected void shutdownDriver() {
+		Driver.shutdown();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -58,24 +62,16 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis) throws SQLException {
-		Config config = config(redis);
-		try {
-			return new SidecarConnection(connection(database), redis.getClient(), config,
-					ConfigUpdater.create(redis.getClient(), config), Driver.meterRegistry(config, redis.getClient()));
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Could not initialize ResultSet cache", e);
-		}
-	}
-
-	protected Config config(RedisTestContext redis) {
-		Config config = new Config();
-		config.setBufferSize(BUFFER_SIZE);
-		config.getMetrics().setPublishInterval(1);
-		Redis redisConfig = new Redis();
-		redisConfig.setCluster(redis.isCluster());
-		redisConfig.setUri(redis.getRedisURI());
-		config.setRedis(redisConfig);
-		return config;
+		Driver driver = new Driver();
+		Properties info = new Properties();
+		info.put("sidecar.buffer-size", String.valueOf(BUFFER_SIZE));
+		info.put("sidecar.metrics.publish-interval", "1");
+		info.put("sidecar.redis.cluster", String.valueOf(redis.isCluster()));
+		info.put("sidecar.driver.class-name", database.getDriverClassName());
+		info.put("sidecar.driver.url", database.getJdbcUrl());
+		info.put("user", database.getUsername());
+		info.put("password", database.getPassword());
+		return driver.connect("jdbc:" + redis.getRedisURI(), info);
 	}
 
 	private static interface StatementExecutor {

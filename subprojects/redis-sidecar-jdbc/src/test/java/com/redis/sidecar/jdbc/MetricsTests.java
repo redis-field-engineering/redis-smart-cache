@@ -17,14 +17,13 @@ import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.AbstractSidecarTests;
-import com.redis.sidecar.core.Config;
-import com.redis.testcontainers.junit.RedisTestContext;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -52,13 +51,6 @@ class MetricsTests extends AbstractSidecarTests {
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
 		runScript(backendConnection, "postgres/northwind.sql");
-	}
-
-	@Override
-	protected Config config(RedisTestContext redis) {
-		Config config = super.config(redis);
-		config.getMetrics().setPublishInterval(1);
-		return config;
 	}
 
 //	@Test
@@ -107,17 +99,14 @@ class MetricsTests extends AbstractSidecarTests {
 									+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
 									+ "     WHERE d.quantity BETWEEN ? AND ?");
 					statement.setInt(1, random.nextInt(10));
-					statement.setInt(2, 100 + random.nextInt(10));
+					statement.setInt(2, 10 + random.nextInt(10));
 					ResultSet resultSet = statement.executeQuery();
-					int resultCount = 0;
 					while (resultSet.next()) {
 						for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
 								.getColumnCount(); columnIndex++) {
 							resultSet.getObject(columnIndex);
 						}
-						resultCount++;
 					}
-					log.info("Result count: " + resultCount);
 				}
 			}
 			return count;

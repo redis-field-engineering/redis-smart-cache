@@ -29,11 +29,9 @@ import javax.sql.rowset.RowSetProvider;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Redis.Pool;
-import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.core.ResultSetCache;
 import com.redis.sidecar.core.StringResultSetCache;
 
@@ -54,18 +52,15 @@ public class SidecarConnection implements Connection {
 	private final Config config;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
-	private final ConfigUpdater configUpdater;
 	private final MeterRegistry meterRegistry;
 
 	public SidecarConnection(Connection connection, AbstractRedisClient redisClient, Config config,
-			ConfigUpdater configUpdater, MeterRegistry meterRegistry) throws SQLException, JsonProcessingException {
+			MeterRegistry meterRegistry) throws SQLException {
 		LettuceAssert.notNull(connection, "Connection is required");
 		LettuceAssert.notNull(redisClient, "Redis client is required");
 		LettuceAssert.notNull(config, "Config is required");
-		LettuceAssert.notNull(configUpdater, "Config updater is required");
 		this.connection = connection;
 		this.config = config;
-		this.configUpdater = configUpdater;
 		this.meterRegistry = meterRegistry;
 		this.rowSetFactory = RowSetProvider.newFactory();
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize(),
@@ -103,8 +98,6 @@ public class SidecarConnection implements Connection {
 
 	@Override
 	public void close() throws SQLException {
-		meterRegistry.close();
-		configUpdater.close();
 		connection.close();
 		try {
 			cache.close();

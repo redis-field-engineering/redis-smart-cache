@@ -352,4 +352,8 @@ public class Config {
 
 	}
 
+	public String configKey() {
+		return key("config");
+	}
+
 }

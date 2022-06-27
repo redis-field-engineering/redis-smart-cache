@@ -11,12 +11,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.json.SetMode;
-
-import io.lettuce.core.AbstractRedisClient;
 
 public class ConfigUpdater implements Runnable, AutoCloseable {
 
@@ -36,24 +32,20 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 		this.config = config;
 		this.writer = mapper.writerFor(config.getClass());
 		this.reader = mapper.readerForUpdating(config);
-		connection.sync().jsonSet(key(), "$", writer.writeValueAsString(config), SetMode.NX);
+		connection.sync().jsonSet(config.configKey(), "$", writer.writeValueAsString(config), SetMode.NX);
 		this.future = executor.scheduleAtFixedRate(this, 0, config.getRefreshRate(), TimeUnit.SECONDS);
-	}
-
-	private String key() {
-		return config.key("config");
 	}
 
 	@Override
 	public void run() {
-		String json = connection.sync().jsonGet(key());
+		String json = connection.sync().jsonGet(config.configKey());
 		if (json == null || json.isEmpty()) {
 			return;
 		}
 		try {
 			reader.readValue(json);
 		} catch (JsonProcessingException e) {
-			log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key()), e);
+			log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", config.configKey()), e);
 		}
 	}
 
@@ -63,10 +55,4 @@ public class ConfigUpdater implements Runnable, AutoCloseable {
 		connection.close();
 	}
 
-	public static ConfigUpdater create(AbstractRedisClient client, Config config) throws JsonProcessingException {
-		if (client instanceof RedisModulesClusterClient) {
-			return new ConfigUpdater(((RedisModulesClusterClient) client).connect(), config);
-		}
-		return new ConfigUpdater(((RedisModulesClient) client).connect(), config);
-	}
 }

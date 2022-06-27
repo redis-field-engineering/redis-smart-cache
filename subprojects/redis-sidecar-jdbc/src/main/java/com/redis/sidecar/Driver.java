@@ -20,11 +20,11 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 import com.redis.sidecar.core.Config;
-import com.redis.sidecar.core.Config.Redis;
 import com.redis.sidecar.core.ConfigUpdater;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
@@ -48,8 +48,9 @@ public class Driver implements java.sql.Driver {
 		}
 	}
 
-	private Map<String, AbstractRedisClient> redisClients = new HashMap<>();
-	private Map<String, MeterRegistry> meterRegistries = new HashMap<>();
+	private static final Map<String, AbstractRedisClient> redisClients = new HashMap<>();
+	private static final Map<String, MeterRegistry> meterRegistries = new HashMap<>();
+	private static final Map<String, ConfigUpdater> configUpdaters = new HashMap<>();
 
 	@Override
 	public Connection connect(String url, Properties info) throws SQLException {
@@ -70,32 +71,37 @@ public class Driver implements java.sql.Driver {
 		if (isEmpty(config.getDriver().getUrl())) {
 			throw new SQLException("No backend URL specified");
 		}
+		AbstractRedisClient client = redisClient(config);
+		try {
+			configUpdater(config, client);
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not initialize config updater", e);
+		}
+		return new SidecarConnection(databaseConnection(config, info), client, config, meterRegistry(config, client));
+	}
+
+	public static ConfigUpdater configUpdater(Config config, AbstractRedisClient client)
+			throws JsonProcessingException {
+		String key = config.getRedis().getUri() + ":" + config.configKey();
+		if (configUpdaters.containsKey(key)) {
+			return configUpdaters.get(key);
+		}
+		StatefulRedisModulesConnection<String, String> connection = client instanceof RedisModulesClusterClient
+				? ((RedisModulesClusterClient) client).connect()
+				: ((RedisModulesClient) client).connect();
+		ConfigUpdater configUpdater = new ConfigUpdater(connection, config);
+		configUpdaters.put(key, configUpdater);
+		return configUpdater;
+	}
+
+	private Connection databaseConnection(Config config, Properties info) throws SQLException {
 		java.sql.Driver driver;
 		try {
 			driver = (java.sql.Driver) Class.forName(config.getDriver().getClassName()).getConstructor().newInstance();
 		} catch (Exception e) {
 			throw new SQLException("Cannot initialize backend driver '" + config.getDriver().getClassName() + "'", e);
 		}
-		AbstractRedisClient client = client(config.getRedis());
-		MeterRegistry meterRegistry;
-		if (meterRegistries.containsKey(config.getRedis().getUri())) {
-			meterRegistry = meterRegistries.get(config.getRedis().getUri());
-		} else {
-			meterRegistry = meterRegistry(config, client);
-			meterRegistries.put(config.getRedis().getUri(), meterRegistry);
-		}
-		Connection connection = driver.connect(config.getDriver().getUrl(), info);
-		ConfigUpdater configUpdater;
-		try {
-			configUpdater = ConfigUpdater.create(client, config);
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Could not initialize config updater", e);
-		}
-		try {
-			return new SidecarConnection(connection, client, config, configUpdater, meterRegistry);
-		} catch (Exception e) {
-			throw new SQLException("Could not create Sidecar connection", e);
-		}
+		return driver.connect(config.getDriver().getUrl(), info);
 	}
 
 	public static Config config(Properties info) throws IOException {
@@ -114,19 +120,22 @@ public class Driver implements java.sql.Driver {
 		return config.getKeyspace() + config.getKeySeparator() + config.getCacheName();
 	}
 
-	private AbstractRedisClient client(Redis redis) {
-		String redisURI = redis.getUri();
+	private AbstractRedisClient redisClient(Config config) {
+		String redisURI = config.getRedis().getUri();
 		if (redisClients.containsKey(redisURI)) {
 			return redisClients.get(redisURI);
 		}
-		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(redisURI)
+		AbstractRedisClient client = config.getRedis().isCluster() ? RedisModulesClusterClient.create(redisURI)
 				: RedisModulesClient.create(redisURI);
 		redisClients.put(redisURI, client);
 		return client;
 	}
 
 	public static MeterRegistry meterRegistry(Config config, AbstractRedisClient client) {
-		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+		if (meterRegistries.containsKey(config.getRedis().getUri())) {
+			return meterRegistries.get(config.getRedis().getUri());
+		}
+		MeterRegistry meterRegistry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
 
 			@Override
 			public String get(String key) {
@@ -154,6 +163,8 @@ public class Driver implements java.sql.Driver {
 			}
 
 		}, Clock.SYSTEM, client);
+		meterRegistries.put(config.getRedis().getUri(), meterRegistry);
+		return meterRegistry;
 	}
 
 	private boolean isEmpty(String string) {
@@ -195,6 +206,15 @@ public class Driver implements java.sql.Driver {
 	@Override
 	public Logger getParentLogger() {
 		return log;
+	}
+
+	public static void shutdown() {
+		configUpdaters.values().forEach(ConfigUpdater::close);
+		configUpdaters.clear();
+		meterRegistries.values().forEach(MeterRegistry::close);
+		meterRegistries.clear();
+		redisClients.values().forEach(AbstractRedisClient::shutdown);
+		redisClients.clear();
 	}
 
 }

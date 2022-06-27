@@ -18,8 +18,6 @@ import javax.sql.rowset.CachedRowSet;
 import com.redis.sidecar.core.Config;
 import com.redis.sidecar.core.Config.Rule;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -32,10 +30,10 @@ public class SidecarStatement implements Statement {
 
 	private static final String KEY_PREFIX = "cache";
 	private static final String QUERY_TIMER_ID = "metrics.database.calls";
-	private static final String TAG_TABLES = "tables";
 
 	private final SidecarConnection connection;
 	private final Statement statement;
+	private final Timer queryTimer;
 
 	protected String sql;
 	private long ttl = Config.TTL_NO_CACHE;
@@ -45,6 +43,7 @@ public class SidecarStatement implements Statement {
 	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
+		this.queryTimer = Timer.builder(QUERY_TIMER_ID).register(connection.getMeterRegistry());
 	}
 
 	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
@@ -78,21 +77,13 @@ public class SidecarStatement implements Statement {
 			return true;
 		}
 		try {
-			return Timer.builder(QUERY_TIMER_ID).tags(tableTags()).register(connection.getMeterRegistry())
-					.recordCallable(executable::execute);
+			return queryTimer.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			// Should not happen but rethrow anyway
 			throw new SQLException(e);
 		}
-	}
-
-	private Iterable<Tag> tableTags() {
-		if (tables.isEmpty()) {
-			return Tags.empty();
-		}
-		return Tags.of(TAG_TABLES, String.join(",", tables));
 	}
 
 	private void checkClosed() throws SQLException {
@@ -114,8 +105,7 @@ public class SidecarStatement implements Statement {
 		}
 		ResultSet resultSet;
 		try {
-			resultSet = Timer.builder(QUERY_TIMER_ID).tags(tableTags()).register(connection.getMeterRegistry())
-					.recordCallable(executable::execute);
+			resultSet = queryTimer.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
