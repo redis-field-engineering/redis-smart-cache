@@ -22,6 +22,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
+import com.redis.sidecar.SidecarDriver;
 import com.redis.sidecar.core.AbstractSidecarTests;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.zaxxer.hikari.HikariConfig;
@@ -66,7 +67,7 @@ class MetricsTests extends AbstractSidecarTests {
 		int redisPort = intProperty("redis.port", REDISMOD.getFirstMappedPort());
 		String redisHost = property("redis.host", REDISMOD.getHost());
 		config.setJdbcUrl("jdbc:redis://" + redisHost + ":" + redisPort);
-		config.setDriverClassName("com.redis.sidecar.Driver");
+		config.setDriverClassName(SidecarDriver.class.getName());
 		System.setProperty("sidecar.driver.url", POSTGRESQL.getJdbcUrl());
 		System.setProperty("sidecar.driver.class-name", POSTGRESQL.getDriverClassName());
 		System.setProperty("sidecar.metrics.publish-interval", "1");
