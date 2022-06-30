@@ -72,10 +72,11 @@ class MetricsTests extends AbstractSidecarTests {
 		config.setPassword(POSTGRESQL.getPassword());
 		HikariDataSource ds = new HikariDataSource(config);
 		populateDatabase();
-		int nThreads = intProperty("threads", 8);
-		ExecutorService executor = Executors.newFixedThreadPool(nThreads);
+		int threads = intProperty("threads", 8);
+		ExecutorService executor = Executors.newFixedThreadPool(threads);
 		List<Future<Integer>> futures = new ArrayList<>();
-		for (int index = 0; index < nThreads; index++) {
+		log.info(String.format("Starting %s query threads", threads));
+		for (int index = 0; index < threads; index++) {
 			futures.add(executor.submit(new QueryRunnable(ds)));
 		}
 		for (Future<Integer> future : futures) {
@@ -97,6 +98,7 @@ class MetricsTests extends AbstractSidecarTests {
 		@Override
 		public Integer call() throws Exception {
 			Random random = new Random();
+			log.info(String.format("Running %s query iterations", iterations));
 			for (int index = 0; index < iterations; index++) {
 				try (Connection connection = ds.getConnection()) {
 					PreparedStatement statement = connection.prepareStatement(
@@ -174,7 +176,7 @@ class MetricsTests extends AbstractSidecarTests {
 		try (Statement countStatement = connection.createStatement()) {
 			ResultSet countResultSet = countStatement.executeQuery("SELECT COUNT(*) FROM orders");
 			countResultSet.next();
-			log.info("#Orders: " + countResultSet.getInt(1));
+			log.info("#Rows: " + countResultSet.getInt(1));
 		}
 
 	}
