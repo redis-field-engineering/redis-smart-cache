@@ -134,21 +134,26 @@ class MetricsTests extends AbstractSidecarTests {
 	}
 
 	private static String property(String property, String defaultValue) {
-		return System.getProperty(PROPERTY_PREFIX + property, defaultValue);
+		String name = PROPERTY_PREFIX + property;
+		String value = System.getenv(name.toUpperCase().replace('.', '_'));
+		if (value == null) {
+			return System.getProperty(name, defaultValue);
+		}
+		return value;
 	}
 
 	private void populateDatabase() throws SQLException {
 		Random random = new Random();
 		Connection connection = connection(POSTGRESQL);
-		int orderCount = intProperty("rows", 100);
+		int rowCount = intProperty("rows", 100);
 		int maxQty = intProperty("max-quantity", 1000);
 		int batchSize = intProperty("batch", 10000);
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		PreparedStatement insertOrderStatement = connection.prepareStatement(insertOrderSQL);
 		PreparedStatement insertOrderDetailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
-		log.info("Populating database with " + orderCount + " rows");
-		for (int index = 0; index < orderCount; index++) {
+		log.info("Populating database with " + rowCount + " rows");
+		for (int index = 0; index < rowCount; index++) {
 			int orderId = 20000 + index;
 			String customerId = CUSTOMER_IDS.get(random.nextInt(CUSTOMER_IDS.size()));
 			int employeeId = 1 + random.nextInt(9);
