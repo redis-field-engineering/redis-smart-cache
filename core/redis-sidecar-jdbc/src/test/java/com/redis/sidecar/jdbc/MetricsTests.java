@@ -52,6 +52,8 @@ class MetricsTests extends AbstractSidecarTests {
 
 	private static final String PROPERTY_PREFIX = "sidecar.test.";
 
+	private static final int ORDER_ID_START = 20000;
+
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
@@ -87,8 +89,7 @@ class MetricsTests extends AbstractSidecarTests {
 	private static class QueryRunnable implements Callable<Integer> {
 
 		private final HikariDataSource ds;
-		private final int minQty = intProperty("query.min.quantity", 10);
-		private final int maxQty = intProperty("query.max.quantity", 20);
+		private final int orders = intProperty("orders", 1000);
 		private final int iterations = intProperty("iterations", 100);
 
 		public QueryRunnable(HikariDataSource ds) {
@@ -108,10 +109,10 @@ class MetricsTests extends AbstractSidecarTests {
 									+ "                     INNER JOIN employees e ON e.employee_id = o.employee_id"
 									+ "                     INNER JOIN employee_territories t ON t.employee_id = e.employee_id"
 									+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
-									+ "     WHERE d.quantity BETWEEN ? AND ?");
-					int start = minQty + random.nextInt(maxQty - minQty);
+									+ "     WHERE o.order_id BETWEEN ? AND ?");
+					int start = ORDER_ID_START + random.nextInt(orders);
 					statement.setInt(1, start);
-					statement.setInt(2, start + random.nextInt(maxQty - minQty));
+					statement.setInt(2, start + random.nextInt(orders));
 					ResultSet resultSet = statement.executeQuery();
 					int rowCount = 0;
 					while (resultSet.next()) {
@@ -156,7 +157,7 @@ class MetricsTests extends AbstractSidecarTests {
 		PreparedStatement insertOrderDetailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
 		log.info(String.format("Populating database with %,d rows", rowCount));
 		for (int index = 0; index < rowCount; index++) {
-			int orderId = 20000 + index;
+			int orderId = ORDER_ID_START + index;
 			String customerId = CUSTOMER_IDS.get(random.nextInt(CUSTOMER_IDS.size()));
 			int employeeId = 1 + random.nextInt(9);
 			int productId = 1 + random.nextInt(77);
