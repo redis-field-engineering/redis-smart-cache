@@ -120,6 +120,9 @@ class MetricsTests extends AbstractSidecarTests {
 						}
 					}
 				}
+				if (index % 100 == 0) {
+					log.info(String.format("Ran %s queries", index));
+				}
 			}
 			return iterations;
 		}
