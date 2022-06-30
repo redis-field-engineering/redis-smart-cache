@@ -92,7 +92,7 @@ class MetricsTests extends AbstractSidecarTests {
 		private final HikariDataSource ds;
 		private final int start = intProperty("start", 10);
 		private final int spread = intProperty("spread", 1000);
-		private final int iterations = intProperty("iterations", 1000000);
+		private final int iterations = intProperty("iterations", 100);
 
 		public QueryRunnable(HikariDataSource ds) {
 			this.ds = ds;
@@ -150,7 +150,7 @@ class MetricsTests extends AbstractSidecarTests {
 	private void populateDatabase() throws SQLException {
 		Random random = new Random();
 		Connection connection = connection(POSTGRESQL);
-		int rowCount = intProperty("rows", 100000);
+		int rowCount = intProperty("rows", 100);
 		int maxQty = intProperty("max.quantity", 1000);
 		int batchSize = intProperty("batch", 10000);
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
