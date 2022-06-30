@@ -89,7 +89,8 @@ class MetricsTests extends AbstractSidecarTests {
 	private static class QueryRunnable implements Callable<Integer> {
 
 		private final HikariDataSource ds;
-		private final int orders = intProperty("orders", 1000);
+		private final int start = intProperty("start", 10);
+		private final int spread = intProperty("spread", 1000);
 		private final int iterations = intProperty("iterations", 100);
 
 		public QueryRunnable(HikariDataSource ds) {
@@ -110,9 +111,9 @@ class MetricsTests extends AbstractSidecarTests {
 									+ "                     INNER JOIN employee_territories t ON t.employee_id = e.employee_id"
 									+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
 									+ "     WHERE o.order_id BETWEEN ? AND ?");
-					int start = ORDER_ID_START + random.nextInt(orders);
-					statement.setInt(1, start);
-					statement.setInt(2, start + random.nextInt(orders));
+					int startOrder = ORDER_ID_START + random.nextInt(start);
+					statement.setInt(1, startOrder);
+					statement.setInt(2, startOrder + random.nextInt(spread));
 					ResultSet resultSet = statement.executeQuery();
 					int rowCount = 0;
 					while (resultSet.next()) {
