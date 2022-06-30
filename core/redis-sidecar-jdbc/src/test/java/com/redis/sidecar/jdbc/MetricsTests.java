@@ -113,15 +113,17 @@ class MetricsTests extends AbstractSidecarTests {
 					statement.setInt(1, start);
 					statement.setInt(2, start + random.nextInt(maxQty - minQty));
 					ResultSet resultSet = statement.executeQuery();
+					int rowCount = 0;
 					while (resultSet.next()) {
 						for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
 								.getColumnCount(); columnIndex++) {
 							resultSet.getObject(columnIndex);
 						}
+						rowCount++;
 					}
-				}
-				if (index % 100 == 0) {
-					log.info(String.format("Ran %s queries", index));
+					if (index % 100 == 0) {
+						log.info(String.format("Ran %s queries; rowcount=%,d", index, rowCount));
+					}
 				}
 			}
 			return iterations;
