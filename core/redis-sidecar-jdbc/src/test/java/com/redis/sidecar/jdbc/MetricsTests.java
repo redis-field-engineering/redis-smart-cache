@@ -87,8 +87,8 @@ class MetricsTests extends AbstractSidecarTests {
 	private static class QueryRunnable implements Callable<Integer> {
 
 		private final HikariDataSource ds;
-		private final int minQty = intProperty("query-min-quantity", 10);
-		private final int maxQty = intProperty("query-max-quantity", 20);
+		private final int minQty = intProperty("query.min.quantity", 10);
+		private final int maxQty = intProperty("query.max.quantity", 20);
 		private final int iterations = intProperty("iterations", 100);
 
 		public QueryRunnable(HikariDataSource ds) {
@@ -146,7 +146,7 @@ class MetricsTests extends AbstractSidecarTests {
 		Random random = new Random();
 		Connection connection = connection(POSTGRESQL);
 		int rowCount = intProperty("rows", 100);
-		int maxQty = intProperty("max-quantity", 1000);
+		int maxQty = intProperty("max.quantity", 1000);
 		int batchSize = intProperty("batch", 10000);
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
