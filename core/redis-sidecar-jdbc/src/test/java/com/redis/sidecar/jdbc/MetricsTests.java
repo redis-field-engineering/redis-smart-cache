@@ -22,8 +22,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
-import com.redis.sidecar.Driver;
 import com.redis.sidecar.core.AbstractSidecarTests;
+import com.redis.testcontainers.RedisModulesContainer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -36,6 +36,9 @@ class MetricsTests extends AbstractSidecarTests {
 
 	@Container
 	private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>(POSTGRE_DOCKER_IMAGE_NAME);
+	@Container
+	private static final RedisModulesContainer REDISMOD = new RedisModulesContainer(
+			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 
 	private static final List<String> CUSTOMER_IDS = Arrays.asList("ALFKI", "ANATR", "ANTON", "AROUT", "BERGS", "BLAUS",
 			"BLONP", "BOLID", "BONAP", "BOTTM", "BSBEV", "CACTU", "CENTC", "CHOPS", "COMMI", "CONSH", "DRACD", "DUMON",
@@ -58,7 +61,9 @@ class MetricsTests extends AbstractSidecarTests {
 	@Test
 	void testPreparedStatement() throws Exception {
 		HikariConfig config = new HikariConfig();
-		config.setJdbcUrl("jdbc:redis://localhost:6379");
+		int redisPort = intProperty("redis.port", REDISMOD.getFirstMappedPort());
+		String redisHost = property("redis.host", REDISMOD.getHost());
+		config.setJdbcUrl("jdbc:redis://" + redisHost + ":" + redisPort);
 		config.setDriverClassName("com.redis.sidecar.Driver");
 		System.setProperty("sidecar.driver.url", POSTGRESQL.getJdbcUrl());
 		System.setProperty("sidecar.driver.class-name", POSTGRESQL.getDriverClassName());
@@ -137,6 +142,7 @@ class MetricsTests extends AbstractSidecarTests {
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		PreparedStatement insertOrderStatement = connection.prepareStatement(insertOrderSQL);
 		PreparedStatement insertOrderDetailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
+		log.info("Populating database with " + orderCount + " rows");
 		for (int index = 0; index < orderCount; index++) {
 			int orderId = 20000 + index;
 			String customerId = CUSTOMER_IDS.get(random.nextInt(CUSTOMER_IDS.size()));
