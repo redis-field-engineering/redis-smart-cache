@@ -98,7 +98,7 @@ class MetricsTests extends AbstractSidecarTests {
 		@Override
 		public Integer call() throws Exception {
 			Random random = new Random();
-			log.info(String.format("Running %s query iterations", iterations));
+			log.info(String.format("Running %,d query iterations", iterations));
 			for (int index = 0; index < iterations; index++) {
 				try (Connection connection = ds.getConnection()) {
 					PreparedStatement statement = connection.prepareStatement(
@@ -152,7 +152,7 @@ class MetricsTests extends AbstractSidecarTests {
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		PreparedStatement insertOrderStatement = connection.prepareStatement(insertOrderSQL);
 		PreparedStatement insertOrderDetailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
-		log.info("Populating database with " + rowCount + " rows");
+		log.info(String.format("Populating database with %,d rows", rowCount));
 		for (int index = 0; index < rowCount; index++) {
 			int orderId = 20000 + index;
 			String customerId = CUSTOMER_IDS.get(random.nextInt(CUSTOMER_IDS.size()));
