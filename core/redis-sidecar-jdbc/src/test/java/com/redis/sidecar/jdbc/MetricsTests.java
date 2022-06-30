@@ -47,6 +47,8 @@ class MetricsTests extends AbstractSidecarTests {
 			"TOMSP", "TORTU", "TRADH", "TRAIH", "VAFFE", "VICTE", "VINET", "WANDK", "WARTH", "WELLI", "WHITC", "WILMK",
 			"WOLZA");
 
+	private static final String PROPERTY_PREFIX = "sidecar.test.";
+
 	@BeforeAll
 	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
@@ -65,7 +67,7 @@ class MetricsTests extends AbstractSidecarTests {
 		config.setPassword(POSTGRESQL.getPassword());
 		HikariDataSource ds = new HikariDataSource(config);
 		populateDatabase();
-		int nThreads = 64;
+		int nThreads = intProperty("threads", 8);
 		ExecutorService executor = Executors.newFixedThreadPool(nThreads);
 		List<Future<Integer>> futures = new ArrayList<>();
 		for (int index = 0; index < nThreads; index++) {
@@ -79,6 +81,9 @@ class MetricsTests extends AbstractSidecarTests {
 	private static class QueryRunnable implements Callable<Integer> {
 
 		private final HikariDataSource ds;
+		private final int minQty = intProperty("query-min-quantity", 10);
+		private final int maxQty = intProperty("query-max-quantity", 20);
+		private final int iterations = intProperty("iterations", 100);
 
 		public QueryRunnable(HikariDataSource ds) {
 			this.ds = ds;
@@ -86,9 +91,8 @@ class MetricsTests extends AbstractSidecarTests {
 
 		@Override
 		public Integer call() throws Exception {
-			int count = Integer.parseInt(System.getProperty(Driver.PROPERTY_PREFIX + ".test-iterations", "100"));
 			Random random = new Random();
-			for (int index = 0; index < count; index++) {
+			for (int index = 0; index < iterations; index++) {
 				try (Connection connection = ds.getConnection()) {
 					PreparedStatement statement = connection.prepareStatement(
 							"SELECT * FROM orders o INNER JOIN order_details d ON o.order_id = d.order_id"
@@ -98,8 +102,9 @@ class MetricsTests extends AbstractSidecarTests {
 									+ "                     INNER JOIN employee_territories t ON t.employee_id = e.employee_id"
 									+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
 									+ "     WHERE d.quantity BETWEEN ? AND ?");
-					statement.setInt(1, random.nextInt(10));
-					statement.setInt(2, 10 + random.nextInt(10));
+					int start = minQty + random.nextInt(maxQty - minQty);
+					statement.setInt(1, start);
+					statement.setInt(2, start + random.nextInt(maxQty - minQty));
 					ResultSet resultSet = statement.executeQuery();
 					while (resultSet.next()) {
 						for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
@@ -109,15 +114,25 @@ class MetricsTests extends AbstractSidecarTests {
 					}
 				}
 			}
-			return count;
+			return iterations;
 		}
 
+	}
+
+	private static int intProperty(String property, int defaultValue) {
+		return Integer.parseInt(property(property, String.valueOf(defaultValue)));
+	}
+
+	private static String property(String property, String defaultValue) {
+		return System.getProperty(PROPERTY_PREFIX + property, defaultValue);
 	}
 
 	private void populateDatabase() throws SQLException {
 		Random random = new Random();
 		Connection connection = connection(POSTGRESQL);
-		int orderCount = 300000;
+		int orderCount = intProperty("rows", 100);
+		int maxQty = intProperty("max-quantity", 1000);
+		int batchSize = intProperty("batch", 10000);
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		PreparedStatement insertOrderStatement = connection.prepareStatement(insertOrderSQL);
@@ -128,7 +143,7 @@ class MetricsTests extends AbstractSidecarTests {
 			int employeeId = 1 + random.nextInt(9);
 			int productId = 1 + random.nextInt(77);
 			double price = random.nextDouble();
-			int quantity = random.nextInt(10000);
+			int quantity = random.nextInt(maxQty);
 
 			insertOrderStatement.setInt(1, orderId);
 			insertOrderStatement.setString(2, customerId);
@@ -141,7 +156,7 @@ class MetricsTests extends AbstractSidecarTests {
 			insertOrderDetailsStatement.setInt(4, quantity);
 			insertOrderDetailsStatement.addBatch();
 
-			if (index % 10000 == 0) {
+			if (index % batchSize == 0) {
 				insertOrderStatement.executeBatch();
 				insertOrderStatement.close();
 				insertOrderStatement = connection.prepareStatement(insertOrderSQL);
