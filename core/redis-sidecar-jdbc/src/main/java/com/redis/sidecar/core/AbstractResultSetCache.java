@@ -13,16 +13,20 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 
 	private static final Logger log = Logger.getLogger(AbstractResultSetCache.class.getName());
 
+	private static final String METER_PREFIX = "metrics.cache.";
+	private static final String METER_GETS = METER_PREFIX + "gets";
+	private static final String METER_PUTS = METER_PREFIX + "puts";
+
 	private final Timer getTimer;
 	private final Timer putTimer;
 	private final Counter missCounter;
 	private final Counter hitCounter;
 
 	protected AbstractResultSetCache(MeterRegistry meterRegistry) {
-		this.getTimer = Timer.builder("metrics.cache.gets").register(meterRegistry);
-		this.putTimer = Timer.builder("metrics.cache.puts").register(meterRegistry);
-		this.missCounter = Counter.builder("metrics.cache.gets").tag("result", "miss").register(meterRegistry);
-		this.hitCounter = Counter.builder("metrics.cache.gets").tag("result", "hit").register(meterRegistry);
+		this.getTimer = Timer.builder(METER_GETS).register(meterRegistry);
+		this.putTimer = Timer.builder(METER_PUTS).register(meterRegistry);
+		this.missCounter = Counter.builder(METER_GETS).tag("result", "miss").register(meterRegistry);
+		this.hitCounter = Counter.builder(METER_GETS).tag("result", "hit").register(meterRegistry);
 	}
 
 	@Override
@@ -31,7 +35,7 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		try {
 			resultSet = getTimer.recordCallable(() -> doGet(key));
 		} catch (Exception e) {
-			log.log(Level.SEVERE, "Could not retrieve key " + key, e);
+			log.log(Level.SEVERE, String.format("Could not retrieve key %s", key), e);
 			return Optional.empty();
 		}
 		if (resultSet == null) {
@@ -52,7 +56,7 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		try {
 			putTimer.recordCallable(() -> doPut(key, ttl, resultSet));
 		} catch (Exception e) {
-			log.log(Level.SEVERE, "Could not store key " + key, e);
+			log.log(Level.SEVERE, String.format("Could not store key %s", key), e);
 		}
 	}
 
