@@ -18,7 +18,7 @@ apply plugin: 'org.kordamp.gradle.kordamp-parentbuild'
 rootProject.name = 'redis-sidecar'
 
 projects {
-    directories = ['core', 'demos']
+    directories = ['core']
 
     plugins {
         all {
@@ -33,10 +33,6 @@ projects {
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
             id 'com.github.johnrengelman.shadow'
-        }
-        dirs(['demos']) {
-            id 'org.springframework.boot'
-            id 'io.spring.dependency-management'
         }
     }
 }

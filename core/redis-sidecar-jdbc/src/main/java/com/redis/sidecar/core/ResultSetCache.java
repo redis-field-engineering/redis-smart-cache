@@ -19,7 +19,7 @@ public interface ResultSetCache extends AutoCloseable {
 	 * Adds a ResultSet to the cache.
 	 *
 	 * @param key       the key to store the ResultSet under.
-	 * @param seconds   key expiration in seconds.
+	 * @param ttl       the key TTL in seconds.
 	 * @param resultSet the ResultSet to store under the key.
 	 * @throws SQLException if an error occurred while storing the ResultSet
 	 */
