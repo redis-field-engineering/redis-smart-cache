@@ -53,7 +53,7 @@ class MetricsTests extends AbstractSidecarTests {
 		runScript(backendConnection, "postgres/northwind.sql");
 	}
 
-//	@Test
+	@Test
 	void testPreparedStatement() throws Exception {
 		HikariConfig config = new HikariConfig();
 		config.setJdbcUrl("jdbc:redis://localhost:6379");

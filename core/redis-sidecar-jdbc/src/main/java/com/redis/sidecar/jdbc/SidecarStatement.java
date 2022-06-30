@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -21,7 +20,6 @@ import com.redis.sidecar.core.Config.Rule;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
-import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.util.TablesNamesFinder;
 
 public class SidecarStatement implements Statement {
@@ -38,7 +36,6 @@ public class SidecarStatement implements Statement {
 	protected String sql;
 	private long ttl = Config.TTL_NO_CACHE;
 	private Optional<ResultSet> resultSet = Optional.empty();
-	private List<String> tables = Collections.emptyList();
 
 	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
@@ -72,8 +69,7 @@ public class SidecarStatement implements Statement {
 
 	protected boolean execute(Executable executable) throws SQLException {
 		checkClosed();
-		parseSQL();
-		if (resultSet.isPresent()) {
+		if (get().isPresent()) {
 			return true;
 		}
 		try {
@@ -99,13 +95,13 @@ public class SidecarStatement implements Statement {
 
 	protected ResultSet executeQuery(QueryExecutable executable) throws SQLException {
 		checkClosed();
-		parseSQL();
-		if (resultSet.isPresent()) {
-			return resultSet.get();
+		Optional<ResultSet> cachedResultSet = get();
+		if (cachedResultSet.isPresent()) {
+			return cachedResultSet.get();
 		}
-		ResultSet resultSet;
+		ResultSet backendResultSet;
 		try {
-			resultSet = queryTimer.recordCallable(executable::execute);
+			backendResultSet = queryTimer.recordCallable(executable::execute);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
@@ -113,9 +109,9 @@ public class SidecarStatement implements Statement {
 			throw new SQLException(e);
 		}
 		if (isCachingEnabled()) {
-			return cache(resultSet);
+			return cache(backendResultSet);
 		}
-		return resultSet;
+		return backendResultSet;
 
 	}
 
@@ -141,26 +137,30 @@ public class SidecarStatement implements Statement {
 		return ttl != Config.TTL_NO_CACHE;
 	}
 
-	protected void parseSQL() {
+	protected Optional<ResultSet> get() {
 		String key = key(sql);
-		net.sf.jsqlparser.statement.Statement statement;
+		List<String> tables;
 		try {
-			statement = CCJSqlParserUtil.parse(sql);
-			if (statement instanceof Select) {
-				TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
-				tables = tablesNamesFinder.getTableList((Select) statement);
-				for (Rule rule : connection.getConfig().getRules()) {
-					if (rule.getTable() == null || tables.contains(rule.getTable())) {
-						ttl = rule.getTtl();
-					}
-				}
-				if (isCachingEnabled()) {
-					resultSet = connection.getCache().get(key);
-				}
-			}
+			net.sf.jsqlparser.statement.Statement statement = CCJSqlParserUtil.parse(sql);
+			TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
+			tables = tablesNamesFinder.getTableList(statement);
 		} catch (JSQLParserException e) {
-			log.log(Level.FINE, "Could not parse SQL: " + sql, e);
+			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
+			return Optional.empty();
 		}
+		if (tables.isEmpty()) {
+			return Optional.empty();
+		}
+		for (Rule rule : connection.getConfig().getRules()) {
+			if (rule.getTable() == null || tables.contains(rule.getTable())) {
+				ttl = rule.getTtl();
+			}
+		}
+		if (isCachingEnabled()) {
+			resultSet = connection.getCache().get(key);
+			return resultSet;
+		}
+		return Optional.empty();
 	}
 
 	@Override
@@ -238,11 +238,11 @@ public class SidecarStatement implements Statement {
 		if (resultSet.isPresent()) {
 			return resultSet.get();
 		}
-		ResultSet resultSet = statement.getResultSet();
+		ResultSet backendResultSet = statement.getResultSet();
 		if (isCachingEnabled()) {
-			return cache(resultSet);
+			return cache(backendResultSet);
 		}
-		return resultSet;
+		return backendResultSet;
 	}
 
 	@Override
