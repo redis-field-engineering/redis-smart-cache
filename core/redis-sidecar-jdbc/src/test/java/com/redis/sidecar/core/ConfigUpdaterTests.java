@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.redis.lettucemod.json.SetMode;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -20,8 +22,11 @@ class ConfigUpdaterTests extends AbstractSidecarTests {
 		config.setRefreshRate(1);
 		config.getRedis().setCluster(redis.isCluster());
 		String key = config.key("config");
-		try (ConfigUpdater updater = new ConfigUpdater(redis.getConnection(),
-				new ObjectMapper().readerForUpdating(config), config)) {
+		ObjectMapper mapper = new ObjectMapper();
+		ObjectWriter writer = mapper.writerFor(config.getClass());
+		redis.sync().jsonSet(key, "$", writer.writeValueAsString(config), SetMode.NX);
+		try (ConfigUpdater updater = new ConfigUpdater(redis.getConnection(), mapper.readerForUpdating(config),
+				config)) {
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
