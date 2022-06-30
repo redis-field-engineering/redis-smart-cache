@@ -12,12 +12,12 @@ import com.redis.sidecar.core.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-class DriverTests extends AbstractSidecarTests {
+class SidecarDriverTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException {
-		Class.forName(Driver.class.getName());
+		Class.forName(SidecarDriver.class.getName());
 		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());
 		Assert.assertNotNull(driver);
 		Assert.assertTrue(driver.getMajorVersion() >= 0);

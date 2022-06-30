@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
 
+import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 public class Config {
@@ -18,8 +19,8 @@ public class Config {
 	public static final int DEFAULT_POOL_MAX_IDLE = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
 	public static final int DEFAULT_POOL_MIN_IDLE = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
 	public static final int DEFAULT_POOL_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
-	public static final Duration DEFAULT_POOL_MAX_WAIT = GenericObjectPoolConfig.DEFAULT_MAX_WAIT;
-	public static final Duration DEFAULT_POOL_TIME_BETWEEN_EVICTION_RUNS = GenericObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
+	public static final Duration DEFAULT_POOL_MAX_WAIT = BaseObjectPoolConfig.DEFAULT_MAX_WAIT;
+	public static final Duration DEFAULT_POOL_TIME_BETWEEN_EVICTION_RUNS = BaseObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
 	public static final Duration DEFAULT_TTL = Duration.ofHours(1);
 	public static final long TTL_NO_CACHE = 0;
 	public static final long TTL_NO_EXPIRATION = -1;
@@ -223,17 +224,8 @@ public class Config {
 
 	public static class Redis {
 
-		private String uri;
 		private boolean cluster;
 		private Pool pool = new Pool();
-
-		public String getUri() {
-			return uri;
-		}
-
-		public void setUri(String uri) {
-			this.uri = uri;
-		}
 
 		public boolean isCluster() {
 			return cluster;

@@ -19,7 +19,7 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
-import com.redis.sidecar.Driver;
+import com.redis.sidecar.SidecarDriver;
 import com.redis.sidecar.core.Config.ByteSize;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
@@ -40,7 +40,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	@AfterEach
 	protected void shutdownDriver() {
-		Driver.shutdown();
+		SidecarDriver.shutdown();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -62,7 +62,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis) throws SQLException {
-		Driver driver = new Driver();
+		SidecarDriver driver = new SidecarDriver();
 		Properties info = new Properties();
 		info.put("sidecar.buffer-size", String.valueOf(BUFFER_SIZE));
 		info.put("sidecar.metrics.publish-interval", "1");

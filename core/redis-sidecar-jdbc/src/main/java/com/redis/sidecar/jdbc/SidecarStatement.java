@@ -69,7 +69,7 @@ public class SidecarStatement implements Statement {
 
 	protected boolean execute(Executable executable) throws SQLException {
 		checkClosed();
-		if (get().isPresent()) {
+		if (getCachedResultSet().isPresent()) {
 			return true;
 		}
 		try {
@@ -95,7 +95,7 @@ public class SidecarStatement implements Statement {
 
 	protected ResultSet executeQuery(QueryExecutable executable) throws SQLException {
 		checkClosed();
-		Optional<ResultSet> cachedResultSet = get();
+		Optional<ResultSet> cachedResultSet = getCachedResultSet();
 		if (cachedResultSet.isPresent()) {
 			return cachedResultSet.get();
 		}
@@ -137,13 +137,13 @@ public class SidecarStatement implements Statement {
 		return ttl != Config.TTL_NO_CACHE;
 	}
 
-	protected Optional<ResultSet> get() {
+	private Optional<ResultSet> getCachedResultSet() {
 		String key = key(sql);
 		List<String> tables;
 		try {
-			net.sf.jsqlparser.statement.Statement statement = CCJSqlParserUtil.parse(sql);
+			net.sf.jsqlparser.statement.Statement parsedStatement = CCJSqlParserUtil.parse(sql);
 			TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
-			tables = tablesNamesFinder.getTableList(statement);
+			tables = tablesNamesFinder.getTableList(parsedStatement);
 		} catch (JSQLParserException e) {
 			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
 			return Optional.empty();

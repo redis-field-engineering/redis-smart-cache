@@ -2,6 +2,7 @@ package com.redis.sidecar;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
@@ -16,12 +17,15 @@ import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.lettucemod.json.SetMode;
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 import com.redis.sidecar.core.Config;
@@ -32,9 +36,9 @@ import io.lettuce.core.AbstractRedisClient;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class Driver implements java.sql.Driver {
+public class SidecarDriver implements Driver {
 
-	private static final Logger log = Logger.getLogger(Driver.class.getName());
+	private static final Logger log = Logger.getLogger(SidecarDriver.class.getName());
 
 	public static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
@@ -42,7 +46,7 @@ public class Driver implements java.sql.Driver {
 
 	static {
 		try {
-			DriverManager.registerDriver(new Driver());
+			DriverManager.registerDriver(new SidecarDriver());
 		} catch (SQLException e) {
 			log.log(Level.SEVERE, e.getMessage(), e);
 		}
@@ -52,46 +56,52 @@ public class Driver implements java.sql.Driver {
 	private static final Map<String, MeterRegistry> meterRegistries = new HashMap<>();
 	private static final Map<String, ConfigUpdater> configUpdaters = new HashMap<>();
 
+	private final ObjectMapper mapper = new ObjectMapper();
+
 	@Override
 	public Connection connect(String url, Properties info) throws SQLException {
-		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
-		if (!matcher.find()) {
-			throw new SQLException("Invalid connection URL: " + url);
-		}
 		Config config;
 		try {
 			config = config(info);
 		} catch (IOException e) {
 			throw new SQLException("Could not load configuration", e);
 		}
-		config.getRedis().setUri(matcher.group(1));
 		if (isEmpty(config.getDriver().getClassName())) {
 			throw new SQLException("No backend driver class specified");
 		}
 		if (isEmpty(config.getDriver().getUrl())) {
 			throw new SQLException("No backend URL specified");
 		}
-		AbstractRedisClient client = redisClient(config);
-		try {
-			configUpdater(config, client);
-		} catch (JsonProcessingException e) {
-			throw new SQLException("Could not initialize config updater", e);
+		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
+		if (!matcher.find()) {
+			throw new SQLException("Invalid connection URL: " + url);
 		}
-		return new SidecarConnection(databaseConnection(config, info), client, config, meterRegistry(config, client));
-	}
-
-	public static ConfigUpdater configUpdater(Config config, AbstractRedisClient client)
-			throws JsonProcessingException {
-		String key = config.getRedis().getUri() + ":" + config.configKey();
-		if (configUpdaters.containsKey(key)) {
-			return configUpdaters.get(key);
+		String redisURI = matcher.group(1);
+		AbstractRedisClient client;
+		if (redisClients.containsKey(redisURI)) {
+			client = redisClients.get(redisURI);
+		} else {
+			client = config.getRedis().isCluster() ? RedisModulesClusterClient.create(redisURI)
+					: RedisModulesClient.create(redisURI);
+			redisClients.put(redisURI, client);
 		}
-		StatefulRedisModulesConnection<String, String> connection = client instanceof RedisModulesClusterClient
-				? ((RedisModulesClusterClient) client).connect()
-				: ((RedisModulesClient) client).connect();
-		ConfigUpdater configUpdater = new ConfigUpdater(connection, config);
-		configUpdaters.put(key, configUpdater);
-		return configUpdater;
+		String configId = redisURI + ":" + config.getCacheName();
+		if (configUpdaters.containsKey(configId)) {
+			config = configUpdaters.get(configId).getConfig();
+		} else {
+			try {
+				ObjectWriter writer = mapper.writerFor(config.getClass());
+				StatefulRedisModulesConnection<String, String> connection = client instanceof RedisModulesClusterClient
+						? ((RedisModulesClusterClient) client).connect()
+						: ((RedisModulesClient) client).connect();
+				connection.sync().jsonSet(config.configKey(), "$", writer.writeValueAsString(config), SetMode.NX);
+				configUpdaters.put(configId, new ConfigUpdater(connection, mapper.readerForUpdating(config), config));
+			} catch (JsonProcessingException e) {
+				throw new SQLException("Could not initialize config updater", e);
+			}
+		}
+		return new SidecarConnection(databaseConnection(config, info), client, config,
+				meterRegistry(redisURI, config, client));
 	}
 
 	private Connection databaseConnection(Config config, Properties info) throws SQLException {
@@ -116,24 +126,9 @@ public class Driver implements java.sql.Driver {
 		return propsMapper.readPropertiesAs(properties, propsSchema, Config.class);
 	}
 
-	public static String keyspace(Config config) {
-		return config.getKeyspace() + config.getKeySeparator() + config.getCacheName();
-	}
-
-	private AbstractRedisClient redisClient(Config config) {
-		String redisURI = config.getRedis().getUri();
-		if (redisClients.containsKey(redisURI)) {
-			return redisClients.get(redisURI);
-		}
-		AbstractRedisClient client = config.getRedis().isCluster() ? RedisModulesClusterClient.create(redisURI)
-				: RedisModulesClient.create(redisURI);
-		redisClients.put(redisURI, client);
-		return client;
-	}
-
-	public static MeterRegistry meterRegistry(Config config, AbstractRedisClient client) {
-		if (meterRegistries.containsKey(config.getRedis().getUri())) {
-			return meterRegistries.get(config.getRedis().getUri());
+	private MeterRegistry meterRegistry(String redisURI, Config config, AbstractRedisClient client) {
+		if (meterRegistries.containsKey(redisURI)) {
+			return meterRegistries.get(redisURI);
 		}
 		MeterRegistry meterRegistry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
 
@@ -144,7 +139,7 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String uri() {
-				return config.getRedis().getUri();
+				return redisURI;
 			}
 
 			@Override
@@ -154,7 +149,7 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String keyspace() {
-				return Driver.keyspace(config);
+				return config.key();
 			}
 
 			@Override
@@ -163,7 +158,7 @@ public class Driver implements java.sql.Driver {
 			}
 
 		}, Clock.SYSTEM, client);
-		meterRegistries.put(config.getRedis().getUri(), meterRegistry);
+		meterRegistries.put(redisURI, meterRegistry);
 		return meterRegistry;
 	}
 
