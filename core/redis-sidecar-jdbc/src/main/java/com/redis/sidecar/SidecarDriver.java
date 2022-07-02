@@ -58,12 +58,12 @@ public class SidecarDriver implements Driver {
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 
-	public static final String PROPERTY_PREFIX = "sidecar";
+	private static final String PROPERTY_PREFIX = "sidecar";
+	private static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
+
 	public static final String PROPERTY_KEYSPACE = PROPERTY_PREFIX + ".keyspace";
 	public static final String PROPERTY_CACHE_NAME = PROPERTY_PREFIX + ".cache-name";
-	public static final String PROPERTY_METRICS = PROPERTY_PREFIX + ".metrics";
-	public static final String PROPERTY_METRICS_STEP = PROPERTY_METRICS + ".step";
-	public static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
+	public static final String PROPERTY_METRICS_STEP = PROPERTY_PREFIX + ".metrics.step";
 	public static final String PROPERTY_DRIVER_CLASSNAME = PROPERTY_DRIVER_PREFIX + ".class-name";
 	public static final String PROPERTY_DRIVER_URL = PROPERTY_DRIVER_PREFIX + ".url";
 	public static final String PROPERTY_CLUSTER = PROPERTY_PREFIX + ".cluster";

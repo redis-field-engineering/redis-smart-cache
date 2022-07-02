@@ -13,4 +13,68 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-Redis Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis. Repeated identical queries are answered from Redis, bypassing the database.
+Redis Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis.
+Repeated identical queries are answered from Redis, bypassing the database.
+
+Redis Sidecar is implemented as a JDBC driver and acts as a wrapper around any backend JDBC driver.
+
+== Getting Started
+
+=== Add the driver to your application dependencies
+
+.Maven
+[source,xml,subs="verbatim,attributes"]
+----
+<dependency>
+    <groupId>{project-group}</groupId>
+    <artifactId>{artifact-id}</artifactId>
+    <version>{project-version}</version>
+</dependency>
+----
+
+.Gradle
+[source,groovy,subs="verbatim,attributes"]
+----
+dependencies {
+    implementation '{project-group}:{artifact-id}:{project-version}'
+}
+----
+
+=== Bootstrap Configuration
+
+When the Sidecar driver is initialized by your application it needs to know at the very least how to connect to the backend database and to the Redis database.
+This is called bootstrap configuration and can be achieved with the following parameters in your application.
+
+==== Driver class name
+
+`com.redis.sidecar.SidecarDriver`
+
+==== JDBC URL
+
+`jdbc:redis://...`
+
+See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for details on the Redis URI syntax.
+
+==== JDBC Properties
+
+* `sidecar.cluster`: Set to `true` for Redis Cluster connections
+
+* `sidecar.driver.class-name`: Class name of the backend database JDBC driver
+
+* `sidecar.driver.url`: JDBC URL for the backend database
+
+* Any properties your backend JDBC driver requires (e.g. `username` or `password`)
+
+The following JDBC properties are optional:
+
+* `sidecar.cache-name`: Namespace for the Sidecar cache (default: `default`).
+Useful for multiple cache configurations in a given application.
+
+* `sidecar.keyspace`: Prefix for cache, config, and metric keys (default: `sidecar`). The combination of keyspace and cache name make these keys unique.
+
+
+
+
+
+
+
