@@ -29,10 +29,9 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 	private final PreparedStatement statement;
 
-	public SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql) {
-		super(connection, statement);
+	protected SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql) {
+		super(connection, statement, sql);
 		this.statement = statement;
-		this.sql = sql;
 	}
 
 	@Override
@@ -56,8 +55,8 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 	}
 
 	@Override
-	protected String key(String sql) {
-		return appendParameters(new StringBuilder(super.key(sql))).toString();
+	protected String key() {
+		return appendParameters(new StringBuilder(super.key())).toString();
 	}
 
 	protected StringBuilder appendParameters(StringBuilder stringBuilder) {

@@ -1,6 +1,5 @@
 package com.redis.sidecar.jdbc;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -10,13 +9,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.CRC32;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.core.Config;
-import com.redis.sidecar.core.Config.Rule;
+import com.redis.sidecar.SidecarDriver;
+import com.redis.sidecar.config.Config;
+import com.redis.sidecar.config.Rule;
 
+import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -26,25 +26,29 @@ public class SidecarStatement implements Statement {
 
 	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
 
-	private static final String KEY_PREFIX = "cache";
-	private static final String QUERY_TIMER_ID = "metrics.database.calls";
+	private static final String QUERY_TIMER_ID = "database.calls";
 
 	private final SidecarConnection connection;
 	private final Statement statement;
 	private final Timer queryTimer;
 
-	protected String sql;
+	private String sql;
 	private long ttl = Config.TTL_NO_CACHE;
 	private Optional<ResultSet> resultSet = Optional.empty();
 
 	public SidecarStatement(SidecarConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
-		this.queryTimer = Timer.builder(QUERY_TIMER_ID).register(connection.getMeterRegistry());
+		this.queryTimer = Metrics.timer(QUERY_TIMER_ID);
+	}
+
+	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) {
+		this(connection, statement);
+		this.sql = sql;
 	}
 
 	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
-		return stringBuilder.append(connection.getConfig().getKeySeparator()).append(parameter);
+		return stringBuilder.append(SidecarDriver.KEY_SEPARATOR).append(parameter);
 	}
 
 	@Override
@@ -115,20 +119,10 @@ public class SidecarStatement implements Statement {
 
 	}
 
-	protected String key(String sql) {
-		return connection.getConfig().key(KEY_PREFIX, crc(sql));
-	}
-
-	private final String crc(String string) {
-		CRC32 crc = new CRC32();
-		crc.update(string.getBytes(StandardCharsets.UTF_8));
-		return String.valueOf(crc.getValue());
-	}
-
 	private CachedRowSet cache(ResultSet resultSet) throws SQLException {
 		CachedRowSet rowSet = connection.createCachedRowSet();
 		rowSet.populate(resultSet);
-		connection.getCache().put(key(sql), ttl, rowSet);
+		connection.getCache().put(key(), ttl, rowSet);
 		rowSet.beforeFirst();
 		return rowSet;
 	}
@@ -137,8 +131,12 @@ public class SidecarStatement implements Statement {
 		return ttl != Config.TTL_NO_CACHE;
 	}
 
+	protected String key() {
+		return sql;
+	}
+
 	private Optional<ResultSet> getCachedResultSet() {
-		String key = key(sql);
+		String key = key();
 		List<String> tables;
 		try {
 			net.sf.jsqlparser.statement.Statement parsedStatement = CCJSqlParserUtil.parse(sql);

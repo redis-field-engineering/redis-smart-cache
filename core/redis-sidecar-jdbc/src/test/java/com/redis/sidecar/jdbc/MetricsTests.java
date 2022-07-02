@@ -68,9 +68,8 @@ class MetricsTests extends AbstractSidecarTests {
 		String redisHost = property("redis.host", REDISMOD.getHost());
 		config.setJdbcUrl("jdbc:redis://" + redisHost + ":" + redisPort);
 		config.setDriverClassName(SidecarDriver.class.getName());
-		System.setProperty("sidecar.driver.url", POSTGRESQL.getJdbcUrl());
-		System.setProperty("sidecar.driver.class-name", POSTGRESQL.getDriverClassName());
-		System.setProperty("sidecar.metrics.publish-interval", "1");
+		config.addDataSourceProperty("sidecar.driver.url", POSTGRESQL.getJdbcUrl());
+		config.addDataSourceProperty("sidecar.driver.class-name", POSTGRESQL.getDriverClassName());
 		config.setUsername(POSTGRESQL.getUsername());
 		config.setPassword(POSTGRESQL.getPassword());
 		HikariDataSource ds = new HikariDataSource(config);

@@ -8,7 +8,6 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.NClob;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -16,35 +15,18 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
 
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
-import com.redis.sidecar.core.ByteArrayResultSetCodec;
-import com.redis.sidecar.core.Config;
-import com.redis.sidecar.core.Config.Redis.Pool;
+import com.redis.sidecar.SidecarDriver;
+import com.redis.sidecar.config.Config;
 import com.redis.sidecar.core.ResultSetCache;
-import com.redis.sidecar.core.StringResultSetCache;
 
-import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.api.StatefulConnection;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisStringCommands;
-import io.lettuce.core.cluster.RedisClusterClient;
-import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.internal.LettuceAssert;
-import io.lettuce.core.support.ConnectionPoolSupport;
-import io.micrometer.core.instrument.MeterRegistry;
 
 public class SidecarConnection implements Connection {
 
@@ -52,44 +34,21 @@ public class SidecarConnection implements Connection {
 	private final Config config;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
-	private final MeterRegistry meterRegistry;
+	private final String keyspace;
 
-	public SidecarConnection(Connection connection, AbstractRedisClient redisClient, Config config,
-			MeterRegistry meterRegistry) throws SQLException {
+	public SidecarConnection(Connection connection, String keyspace, Config config, ResultSetCache cache,
+			RowSetFactory rowSetFactory) {
 		LettuceAssert.notNull(connection, "Connection is required");
-		LettuceAssert.notNull(redisClient, "Redis client is required");
 		LettuceAssert.notNull(config, "Config is required");
 		this.connection = connection;
+		this.keyspace = keyspace;
 		this.config = config;
-		this.meterRegistry = meterRegistry;
-		this.rowSetFactory = RowSetProvider.newFactory();
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, config.getBufferSize(),
-				meterRegistry);
-		Supplier<StatefulConnection<String, ResultSet>> connectionSupplier = redisClient instanceof RedisClusterClient
-				? () -> ((RedisClusterClient) redisClient).connect(codec)
-				: () -> ((RedisClient) redisClient).connect(codec);
-		this.cache = new StringResultSetCache(meterRegistry,
-				ConnectionPoolSupport.createGenericObjectPool(connectionSupplier, poolConfig(config)),
-				sync(redisClient));
+		this.rowSetFactory = rowSetFactory;
+		this.cache = cache;
 	}
 
-	private static <T> GenericObjectPoolConfig<T> poolConfig(Config config) {
-		Pool pool = config.getRedis().getPool();
-		GenericObjectPoolConfig<T> poolConfig = new GenericObjectPoolConfig<>();
-		poolConfig.setMaxTotal(pool.getMaxActive());
-		poolConfig.setMaxIdle(pool.getMaxIdle());
-		poolConfig.setMinIdle(pool.getMinIdle());
-		poolConfig.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
-		poolConfig.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
-		return poolConfig;
-	}
-
-	private Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync(
-			AbstractRedisClient client) {
-		if (client instanceof RedisClusterClient) {
-			return c -> ((StatefulRedisClusterConnection<String, ResultSet>) c).sync();
-		}
-		return c -> ((StatefulRedisConnection<String, ResultSet>) c).sync();
+	public String key(String id) {
+		return SidecarDriver.key(keyspace, id);
 	}
 
 	public Config getConfig() {
@@ -395,10 +354,6 @@ public class SidecarConnection implements Connection {
 
 	public CachedRowSet createCachedRowSet() throws SQLException {
 		return rowSetFactory.createCachedRowSet();
-	}
-
-	public MeterRegistry getMeterRegistry() {
-		return meterRegistry;
 	}
 
 }

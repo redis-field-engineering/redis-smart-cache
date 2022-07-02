@@ -14,8 +14,6 @@ import javax.sql.rowset.RowSetProvider;
 
 import org.junit.jupiter.api.Test;
 
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-
 class CodecTests {
 
 	private static final int LEFT_LIMIT = 48; // numeral '0'
@@ -89,8 +87,7 @@ class CodecTests {
 		CachedRowSet input = rowSetFactory.createCachedRowSet();
 		input.populate(rowSet);
 		rowSet.beforeFirst();
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY,
-				new SimpleMeterRegistry());
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
 		RowSet actual = codec.decodeValue(codec.encodeValue(input));
 		actual.beforeFirst();
 		TestUtils.assertEquals(rowSet, actual);

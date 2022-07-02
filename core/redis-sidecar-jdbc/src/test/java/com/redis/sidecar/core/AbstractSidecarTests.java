@@ -14,13 +14,14 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.sidecar.SidecarDriver;
-import com.redis.sidecar.core.Config.ByteSize;
+import com.redis.sidecar.config.ByteSize;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -38,8 +39,8 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		return Arrays.asList(redis);
 	}
 
-	@AfterEach
-	protected void shutdownDriver() {
+	@AfterAll
+	protected static void shutdownDriver() throws InterruptedException, ExecutionException {
 		SidecarDriver.shutdown();
 	}
 

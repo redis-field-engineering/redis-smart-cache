@@ -13,7 +13,7 @@ public interface ResultSetCache extends AutoCloseable {
 	 *         optional if none found.
 	 * @throws SQLException if the ResultSet could not be retrieved
 	 */
-	Optional<ResultSet> get(String key);
+	Optional<ResultSet> get(String sql);
 
 	/**
 	 * Adds a ResultSet to the cache.
@@ -23,6 +23,6 @@ public interface ResultSetCache extends AutoCloseable {
 	 * @param resultSet the ResultSet to store under the key.
 	 * @throws SQLException if an error occurred while storing the ResultSet
 	 */
-	void put(String key, long ttl, ResultSet resultSet);
+	void put(String sql, long ttl, ResultSet resultSet);
 
 }
