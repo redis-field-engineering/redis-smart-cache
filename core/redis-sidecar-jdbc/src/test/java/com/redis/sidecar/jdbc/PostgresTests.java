@@ -39,13 +39,13 @@ class PostgresTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
-		List<String> keys = redis.sync().keys("sidecar:default:cache:*");
+		List<String> keys = redis.sync().keys("sidecar:cache:*");
 		Assertions.assertEquals(1, keys.size());
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM employees");
-		keys = redis.sync().keys("sidecar:default:cache:*");
+		keys = redis.sync().keys("sidecar:cache:*");
 		Assertions.assertEquals(2, keys.size());
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM products");
-		keys = redis.sync().keys("sidecar:default:cache:*");
+		keys = redis.sync().keys("sidecar:cache:*");
 		Assertions.assertEquals(3, keys.size());
 	}
 

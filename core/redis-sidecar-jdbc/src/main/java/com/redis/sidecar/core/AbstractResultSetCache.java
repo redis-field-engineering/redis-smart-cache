@@ -7,12 +7,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
-import com.redis.sidecar.SidecarDriver;
 import com.redis.sidecar.config.Config;
+import com.redis.sidecar.config.Rule;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
 abstract class AbstractResultSetCache implements ResultSetCache {
@@ -23,15 +23,21 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 	private static final String METER_GETS = METER_PREFIX + "gets";
 	private static final String METER_PUTS = METER_PREFIX + "puts";
 
-	private final Timer getTimer = Metrics.timer(METER_GETS);
-	private final Timer putTimer = Metrics.timer(METER_PUTS);
-	private final Counter missCounter = Metrics.counter(METER_GETS, "result", "miss");
-	private final Counter hitCounter = Metrics.counter(METER_GETS, "result", "hit");
+	private final Timer getTimer;
+	private final Timer putTimer;
+	private final Counter missCounter;
+	private final Counter hitCounter;
+	private final Config config;
 	private final String keyspace;
 
-	protected AbstractResultSetCache(String keyspace) {
-		LettuceAssert.notNull(keyspace, "Keyspace must not be null");
-		this.keyspace = keyspace;
+	protected AbstractResultSetCache(Config config, MeterRegistry meterRegistry) {
+		LettuceAssert.notNull(config, "Config must not be null");
+		this.getTimer = meterRegistry.timer(METER_GETS);
+		this.putTimer = meterRegistry.timer(METER_PUTS);
+		this.missCounter = meterRegistry.counter(METER_GETS, "result", "miss");
+		this.hitCounter = meterRegistry.counter(METER_GETS, "result", "hit");
+		this.config = config;
+		this.keyspace = config.getRedis().key("cache");
 	}
 
 	@Override
@@ -53,7 +59,7 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 	}
 
 	protected String key(String sql) {
-		return SidecarDriver.key(keyspace, crc(sql));
+		return config.getRedis().key(keyspace, crc(sql));
 	}
 
 	private final String crc(String string) {
@@ -66,7 +72,7 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 
 	@Override
 	public void put(String sql, long ttl, ResultSet resultSet) {
-		if (ttl == Config.TTL_NO_CACHE) {
+		if (ttl == Rule.TTL_NO_CACHE) {
 			return;
 		}
 		String key = key(sql);

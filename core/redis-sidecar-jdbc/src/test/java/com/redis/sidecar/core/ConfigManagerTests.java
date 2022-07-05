@@ -12,15 +12,15 @@ import com.redis.sidecar.config.Config;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-class ConfigUpdaterTests extends AbstractSidecarTests {
+class ConfigManagerTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException, JsonProcessingException {
 		Config config = new Config();
 		String key = "myconfig";
-		try (ConfigUpdater updater = new ConfigUpdater(redis.getConnection())) {
-			updater.create(key, config, Duration.ofMillis(100));
+		try (ConfigManager updater = new ConfigManager()) {
+			updater.create(redis.getClient(), key, config, Duration.ofMillis(100));
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));

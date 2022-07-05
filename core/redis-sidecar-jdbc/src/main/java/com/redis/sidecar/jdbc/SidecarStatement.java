@@ -12,11 +12,9 @@ import java.util.logging.Logger;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.SidecarDriver;
-import com.redis.sidecar.config.Config;
 import com.redis.sidecar.config.Rule;
 
-import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -25,30 +23,31 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 public class SidecarStatement implements Statement {
 
 	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
-
 	private static final String QUERY_TIMER_ID = "database.calls";
+	private static final String PARAMETER_SEPARATOR = ":";
 
 	private final SidecarConnection connection;
 	private final Statement statement;
 	private final Timer queryTimer;
 
 	private String sql;
-	private long ttl = Config.TTL_NO_CACHE;
+	private long ttl = Rule.TTL_NO_CACHE;
 	private Optional<ResultSet> resultSet = Optional.empty();
 
-	public SidecarStatement(SidecarConnection connection, Statement statement) {
+	public SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry) {
 		this.connection = connection;
 		this.statement = statement;
-		this.queryTimer = Metrics.timer(QUERY_TIMER_ID);
+		this.queryTimer = meterRegistry.timer(QUERY_TIMER_ID);
 	}
 
-	protected SidecarStatement(SidecarConnection connection, Statement statement, String sql) {
-		this(connection, statement);
+	protected SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry,
+			String sql) {
+		this(connection, statement, meterRegistry);
 		this.sql = sql;
 	}
 
 	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
-		return stringBuilder.append(SidecarDriver.KEY_SEPARATOR).append(parameter);
+		return stringBuilder.append(PARAMETER_SEPARATOR).append(parameter);
 	}
 
 	@Override
@@ -128,7 +127,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	private boolean isCachingEnabled() {
-		return ttl != Config.TTL_NO_CACHE;
+		return ttl != Rule.TTL_NO_CACHE;
 	}
 
 	protected String key() {

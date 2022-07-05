@@ -21,13 +21,16 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 public class SidecarCallableStatement extends SidecarPreparedStatement implements CallableStatement {
 
 	private final SortedMap<String, String> parameters = new TreeMap<>();
 	private final CallableStatement statement;
 
-	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement, String sql) {
-		super(connection, statement, sql);
+	public SidecarCallableStatement(SidecarConnection connection, CallableStatement statement,
+			MeterRegistry meterRegistry, String sql) {
+		super(connection, statement, meterRegistry, sql);
 		this.statement = statement;
 	}
 

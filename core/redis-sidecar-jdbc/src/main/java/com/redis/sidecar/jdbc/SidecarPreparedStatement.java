@@ -23,14 +23,17 @@ import java.util.Calendar;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 public class SidecarPreparedStatement extends SidecarStatement implements PreparedStatement {
 
 	private static final String METHOD_CANNOT_BE_USED = "Query methods that take a query string cannot be used on a PreparedStatement";
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 	private final PreparedStatement statement;
 
-	protected SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement, String sql) {
-		super(connection, statement, sql);
+	protected SidecarPreparedStatement(SidecarConnection connection, PreparedStatement statement,
+			MeterRegistry meterRegistry, String sql) {
+		super(connection, statement, meterRegistry, sql);
 		this.statement = statement;
 	}
 

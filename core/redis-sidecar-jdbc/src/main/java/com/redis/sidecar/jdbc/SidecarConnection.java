@@ -22,11 +22,11 @@ import java.util.concurrent.Executor;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
-import com.redis.sidecar.SidecarDriver;
 import com.redis.sidecar.config.Config;
 import com.redis.sidecar.core.ResultSetCache;
 
 import io.lettuce.core.internal.LettuceAssert;
+import io.micrometer.core.instrument.MeterRegistry;
 
 public class SidecarConnection implements Connection {
 
@@ -34,21 +34,17 @@ public class SidecarConnection implements Connection {
 	private final Config config;
 	private final ResultSetCache cache;
 	private final RowSetFactory rowSetFactory;
-	private final String keyspace;
+	private final MeterRegistry meterRegistry;
 
-	public SidecarConnection(Connection connection, String keyspace, Config config, ResultSetCache cache,
-			RowSetFactory rowSetFactory) {
+	public SidecarConnection(Connection connection, Config config, ResultSetCache cache, RowSetFactory rowSetFactory,
+			MeterRegistry meterRegistry) {
 		LettuceAssert.notNull(connection, "Connection is required");
 		LettuceAssert.notNull(config, "Config is required");
 		this.connection = connection;
-		this.keyspace = keyspace;
 		this.config = config;
 		this.rowSetFactory = rowSetFactory;
 		this.cache = cache;
-	}
-
-	public String key(String id) {
-		return SidecarDriver.key(keyspace, id);
+		this.meterRegistry = meterRegistry;
 	}
 
 	public Config getConfig() {
@@ -58,11 +54,6 @@ public class SidecarConnection implements Connection {
 	@Override
 	public void close() throws SQLException {
 		connection.close();
-		try {
-			cache.close();
-		} catch (Exception e) {
-			throw new SQLException("Could not close ResultSetCache", e);
-		}
 	}
 
 	@Override
@@ -78,19 +69,19 @@ public class SidecarConnection implements Connection {
 	@Override
 	public Statement createStatement() throws SQLException {
 		Statement statement = connection.createStatement();
-		return new SidecarStatement(this, statement);
+		return new SidecarStatement(this, statement, meterRegistry);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql) throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
 	public CallableStatement prepareCall(String sql) throws SQLException {
 		CallableStatement statement = connection.prepareCall(sql);
-		return new SidecarCallableStatement(this, statement, sql);
+		return new SidecarCallableStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
@@ -171,20 +162,20 @@ public class SidecarConnection implements Connection {
 	@Override
 	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
 		Statement statement = connection.createStatement(resultSetType, resultSetConcurrency);
-		return new SidecarStatement(this, statement);
+		return new SidecarStatement(this, statement, meterRegistry);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
 			throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql, resultSetType, resultSetConcurrency);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
 	public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
 		CallableStatement statement = connection.prepareCall(sql, resultSetType, resultSetConcurrency);
-		return new SidecarCallableStatement(this, statement, sql);
+		return new SidecarCallableStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
@@ -231,7 +222,7 @@ public class SidecarConnection implements Connection {
 	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
 			throws SQLException {
 		Statement statement = connection.createStatement(resultSetType, resultSetConcurrency, resultSetHoldability);
-		return new SidecarStatement(this, statement);
+		return new SidecarStatement(this, statement, meterRegistry);
 	}
 
 	@Override
@@ -239,7 +230,7 @@ public class SidecarConnection implements Connection {
 			int resultSetHoldability) throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql, resultSetType, resultSetConcurrency,
 				resultSetHoldability);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
@@ -247,25 +238,25 @@ public class SidecarConnection implements Connection {
 			int resultSetHoldability) throws SQLException {
 		CallableStatement statement = connection.prepareCall(sql, resultSetType, resultSetConcurrency,
 				resultSetHoldability);
-		return new SidecarCallableStatement(this, statement, sql);
+		return new SidecarCallableStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql, autoGeneratedKeys);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql, columnIndexes);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
 		PreparedStatement statement = connection.prepareStatement(sql, columnNames);
-		return new SidecarPreparedStatement(this, statement, sql);
+		return new SidecarPreparedStatement(this, statement, meterRegistry, sql);
 	}
 
 	@Override

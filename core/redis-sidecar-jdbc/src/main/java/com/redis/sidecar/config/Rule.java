@@ -6,6 +6,8 @@ import io.lettuce.core.internal.LettuceAssert;
 
 public class Rule {
 
+	public static final long TTL_NO_CACHE = 0;
+	public static final long TTL_NO_EXPIRATION = -1;
 	public static final Duration DEFAULT_TTL = Duration.ofHours(1);
 
 	private String table;

@@ -14,10 +14,9 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.sidecar.SidecarDriver;
@@ -37,11 +36,6 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis);
-	}
-
-	@AfterAll
-	protected static void shutdownDriver() throws InterruptedException, ExecutionException {
-		SidecarDriver.shutdown();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -137,6 +131,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 				resultSet = executor.execute(connection);
 			}
 			TestUtils.assertEquals(executor.execute(databaseConnection), resultSet);
+			Assertions.assertFalse(redis.sync().keys("sidecar:cache:*").isEmpty());
 		}
 	}
 

@@ -6,19 +6,26 @@ import java.util.List;
 public class Config {
 
 	public static final ByteSize DEFAULT_BUFFER_SIZE = ByteSize.ofMB(100);
-	public static final long TTL_NO_CACHE = 0;
-	public static final long TTL_NO_EXPIRATION = -1;
 
+	private Driver driver = new Driver();
+	private Redis redis = new Redis();
 	private int bufferSize = DEFAULT_BUFFER_SIZE.toBytes();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
-	private Pool pool = new Pool();
 
-	public Pool getPool() {
-		return pool;
+	public Driver getDriver() {
+		return driver;
 	}
 
-	public void setPool(Pool pool) {
-		this.pool = pool;
+	public void setDriver(Driver driver) {
+		this.driver = driver;
+	}
+
+	public Redis getRedis() {
+		return redis;
+	}
+
+	public void setRedis(Redis redis) {
+		this.redis = redis;
 	}
 
 	public int getBufferSize() {

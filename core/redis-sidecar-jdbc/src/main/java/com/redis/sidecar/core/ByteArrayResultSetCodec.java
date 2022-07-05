@@ -26,7 +26,7 @@ import javax.sql.rowset.RowSetMetaDataImpl;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
-import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -38,14 +38,17 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 
-	private final Timer encodeTimer = Metrics.timer("encoding", "codec", "ByteArrayResultSetCodec");
-	private final Timer decodeTimer = Metrics.timer("decoding", "codec", "ByteArrayResultSetCodec");
+	private final Timer encodeTimer;
+	private final Timer decodeTimer;
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
+	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity,
+			MeterRegistry meterRegistry) {
 		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
+		this.encodeTimer = meterRegistry.timer("encoding", "codec", "ByteArrayResultSetCodec");
+		this.decodeTimer = meterRegistry.timer("decoding", "codec", "ByteArrayResultSetCodec");
 	}
 
 	@Override
