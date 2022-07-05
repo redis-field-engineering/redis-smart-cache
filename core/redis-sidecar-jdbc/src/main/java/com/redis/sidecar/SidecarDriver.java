@@ -24,13 +24,13 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.redis.sidecar.config.Config;
 import com.redis.sidecar.core.ByteArrayResultSetCodec;
 import com.redis.sidecar.core.ConfigManager;
 import com.redis.sidecar.core.MeterRegistryManager;
 import com.redis.sidecar.core.RedisManager;
 import com.redis.sidecar.core.ResultSetCache;
 import com.redis.sidecar.core.StringResultSetCache;
+import com.redis.sidecar.core.config.Config;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.AbstractRedisClient;

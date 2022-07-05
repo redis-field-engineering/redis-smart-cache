@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.sidecar.SidecarDriver;
-import com.redis.sidecar.config.ByteSize;
+import com.redis.sidecar.core.config.ByteSize;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;

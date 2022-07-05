@@ -7,8 +7,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
-import com.redis.sidecar.config.Config;
-import com.redis.sidecar.config.Rule;
+import com.redis.sidecar.core.config.Config;
+import com.redis.sidecar.core.config.Rule;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.Counter;

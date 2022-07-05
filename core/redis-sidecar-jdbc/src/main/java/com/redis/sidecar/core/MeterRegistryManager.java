@@ -6,7 +6,7 @@ import java.util.Map;
 
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
-import com.redis.sidecar.config.Config;
+import com.redis.sidecar.core.config.Config;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.micrometer.core.instrument.Clock;

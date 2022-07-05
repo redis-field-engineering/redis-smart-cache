@@ -1,4 +1,4 @@
-package com.redis.sidecar.config;
+package com.redis.sidecar.core.config;
 
 public class Driver {
 
