@@ -85,8 +85,8 @@ public class SidecarDriver implements Driver {
 			throw new SQLException("Could not initialize config object", e);
 		}
 		MeterRegistry meterRegistry = meterRegistryManager.getRegistry(redisClient, config);
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(), config.getBufferSize(),
-				meterRegistry);
+		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(),
+				config.getRedis().getBufferSize(), meterRegistry);
 		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);

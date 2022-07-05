@@ -66,7 +66,7 @@ public class Rule {
 
 		public Builder ttl(Duration ttl) {
 			LettuceAssert.notNull(ttl, "TTL must not be null");
-			LettuceAssert.isTrue(!ttl.isNegative(), "TTL must be positive");
+			LettuceAssert.isTrue(!ttl.isNegative(), "TTL must be zero or greater");
 			this.ttl = ttl;
 			return this;
 		}

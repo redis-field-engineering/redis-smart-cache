@@ -17,10 +17,13 @@ import java.util.Properties;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
+import org.springframework.util.unit.DataSize;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.enterprise.Database;
+import com.redis.enterprise.RedisModule;
 import com.redis.sidecar.SidecarDriver;
-import com.redis.sidecar.core.config.ByteSize;
+import com.redis.testcontainers.RedisEnterpriseContainer;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -28,14 +31,18 @@ import com.redis.testcontainers.junit.RedisTestContext;
 
 public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
-	private static final int BUFFER_SIZE = ByteSize.ofMB(300).toBytes();
+	private static final int BUFFER_SIZE = 300;
 
 	private final RedisModulesContainer redis = new RedisModulesContainer(
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
+	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
+			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag(RedisEnterpriseContainer.DEFAULT_TAG))
+			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(300)).ossCluster(true)
+					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
-		return Arrays.asList(redis);
+		return Arrays.asList(redis, redisEnterprise);
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {

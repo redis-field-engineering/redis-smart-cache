@@ -37,16 +37,16 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	private static final byte[] EMPTY = new byte[0];
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
+	private static final int MEGA = 1000000;
 
 	private final Timer encodeTimer;
 	private final Timer decodeTimer;
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity,
-			MeterRegistry meterRegistry) {
+	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacityMB, MeterRegistry meterRegistry) {
 		this.rowSetFactory = rowSetFactory;
-		this.maxByteBufferCapacity = maxByteBufferCapacity;
+		this.maxByteBufferCapacity = maxBufferCapacityMB * MEGA;
 		this.encodeTimer = meterRegistry.timer("encoding", "codec", "ByteArrayResultSetCodec");
 		this.decodeTimer = meterRegistry.timer("decoding", "codec", "ByteArrayResultSetCodec");
 	}

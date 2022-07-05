@@ -149,7 +149,7 @@ public class SidecarStatement implements Statement {
 			return Optional.empty();
 		}
 		for (Rule rule : connection.getConfig().getRules()) {
-			if (rule.getTable() == null || tables.contains(rule.getTable())) {
+			if (rule.getTable() == null || rule.getTable().isEmpty() || tables.contains(rule.getTable())) {
 				ttl = rule.getTtl();
 			}
 		}

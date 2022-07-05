@@ -5,12 +5,26 @@ public class Redis {
 	public static final String DEFAULT_URI = "redis://localhost:6379";
 	public static final String DEFAULT_KEYSPACE = "sidecar";
 	public static final String DEFAULT_KEY_SEPARATOR = ":";
+	public static final int DEFAULT_BUFFER_SIZE = 100; // MB
 
 	private String uri = DEFAULT_URI;
 	private boolean cluster;
 	private String keyspace = DEFAULT_KEYSPACE;
 	private String keySeparator = DEFAULT_KEY_SEPARATOR;
+	private int bufferSize = DEFAULT_BUFFER_SIZE;
 	private Pool pool = new Pool();
+
+	/**
+	 * 
+	 * @return max byte buffer capacity in megabytes
+	 */
+	public int getBufferSize() {
+		return bufferSize;
+	}
+
+	public void setBufferSize(int bufferSize) {
+		this.bufferSize = bufferSize;
+	}
 
 	public String key(String id) {
 		return key(keyspace, id);
