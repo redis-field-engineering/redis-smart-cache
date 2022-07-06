@@ -4,8 +4,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
-import io.lettuce.core.internal.LettuceAssert;
-
 public class Config {
 
 	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
@@ -19,11 +17,8 @@ public class Config {
 		return refreshRate;
 	}
 
-	public void setRefreshRate(Duration refreshRate) {
-		LettuceAssert.notNull(refreshRate, "Refresh rate must not be null");
-		LettuceAssert.isTrue(!refreshRate.isNegative() && !refreshRate.isZero(),
-				"Refresh rate must be strictly positive");
-		this.refreshRate = refreshRate.toMillis();
+	public void setRefreshRate(long refreshRate) {
+		this.refreshRate = refreshRate;
 	}
 
 	public Driver getDriver() {
