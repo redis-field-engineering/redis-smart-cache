@@ -64,7 +64,17 @@ These will be passed to the backend JDBC driver as is.
 ==== Redis
 The following properties can be used to configure Redis connections and storage:
 
+`sidecar.redis.uri`:: Redis URI. See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for syntax.
+
 `sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`)
+
+`sidecar.redis.tls`:: Establish a secure TLS connection.
+
+`sidecar.redis.insecure`:: Allow insecure TLS connection by skipping cert validation.
+
+`sidecar.redis.username`:: Used to send ACL style 'AUTH username pass'. Overrides username in Redis URI. Needs password.
+
+`sidecar.redis.password`:: Password to use when connecting to the server. Overrides password in Redis URI.
 
 `sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar like cache entries, configuration, and metrics (default: `sidecar`)
 
