@@ -12,7 +12,6 @@ dependencies {
     testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
     testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
-    testImplementation group: 'org.testcontainers', name: 'testcontainers', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'mssqlserver', version: testcontainersVersion
