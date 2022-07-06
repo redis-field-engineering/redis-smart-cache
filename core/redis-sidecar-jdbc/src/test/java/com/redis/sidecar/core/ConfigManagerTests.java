@@ -2,7 +2,6 @@ package com.redis.sidecar.core;
 
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 import org.awaitility.Awaitility;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,9 +22,8 @@ class ConfigManagerTests extends AbstractSidecarTests {
 			updater.create(redis.getClient(), key, config, Duration.ofMillis(100));
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
-			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
-			Awaitility.await().atMost(bufferSize * 2, TimeUnit.MILLISECONDS)
-					.until(() -> config.getRedis().getBufferSize() == bufferSize);
+			redis.sync().jsonSet(key, ".redis.bufferSize", String.valueOf(bufferSize));
+			Awaitility.await().until(() -> config.getRedis().getBufferSize() == bufferSize);
 		}
 	}
 
