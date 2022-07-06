@@ -56,4 +56,9 @@ public class MeterRegistryManager {
 		}, Clock.SYSTEM, redisClient);
 	}
 
+	public void clear() {
+		registries.forEach((k, v) -> v.close());
+		registries.clear();
+	}
+
 }

@@ -48,7 +48,6 @@ public class SidecarDriver implements Driver {
 
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
-
 	private static final String PROPERTY_PREFIX = "sidecar";
 	private static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
 
@@ -170,6 +169,12 @@ public class SidecarDriver implements Driver {
 	@Override
 	public Logger getParentLogger() {
 		return log;
+	}
+
+	public void clear() {
+		configManager.close();
+		meterRegistryManager.clear();
+		redisManager.clear();
 	}
 
 }

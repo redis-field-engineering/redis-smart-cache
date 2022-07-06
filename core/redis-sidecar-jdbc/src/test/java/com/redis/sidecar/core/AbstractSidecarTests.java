@@ -16,8 +16,9 @@ import java.util.Collection;
 import java.util.Properties;
 
 import org.junit.Assert;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.springframework.util.unit.DataSize;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.enterprise.Database;
@@ -37,12 +38,24 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
 			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag("latest"))
-			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(900)).ossCluster(true)
+			.withDatabase(Database.name("SidecarTests").ossCluster(true)
 					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
+
+	private SidecarDriver sidecarDriver;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
 		return Arrays.asList(redis, redisEnterprise);
+	}
+
+	@BeforeAll
+	private void setupSidecarDriver() {
+		sidecarDriver = new SidecarDriver();
+	}
+
+	@AfterAll
+	private void teardownSidecarDriver() {
+		sidecarDriver.clear();
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -64,7 +77,6 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis) throws SQLException {
-		SidecarDriver driver = new SidecarDriver();
 		Properties info = new Properties();
 		info.put("sidecar.buffer-size", String.valueOf(BUFFER_SIZE));
 		info.put("sidecar.metrics.publish-interval", "1");
@@ -73,7 +85,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		info.put("sidecar.driver.url", database.getJdbcUrl());
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());
-		return driver.connect("jdbc:" + redis.getRedisURI(), info);
+		return sidecarDriver.connect("jdbc:" + redis.getRedisURI(), info);
 	}
 
 	private static interface StatementExecutor {

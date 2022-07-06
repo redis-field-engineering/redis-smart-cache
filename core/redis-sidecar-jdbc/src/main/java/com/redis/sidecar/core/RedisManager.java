@@ -57,4 +57,15 @@ public class RedisManager {
 		return config;
 	}
 
+	public void clear() {
+		pools.forEach((k, v) -> v.close());
+		pools.clear();
+		clients.forEach((k, v) -> {
+			v.shutdown();
+			v.getResources().shutdown();
+		});
+		clients.clear();
+
+	}
+
 }

@@ -61,13 +61,10 @@ public class ConfigManager implements AutoCloseable {
 		reader.readValue(json);
 	}
 
-	public void stop() {
-		close();
-	}
-
 	@Override
 	public void close() {
 		futures.forEach((k, v) -> v.cancel(false));
+		futures.clear();
 	}
 
 }
