@@ -4,6 +4,7 @@
 :project-name:    redis-sidecar
 :project-group:   com.redis
 :project-version: 0.1.1
+:product-name:    Redis Sidecar
 :artifact-id:     redis-sidecar-jdbc
 :codecov-token:   y0NMn7uIJ0
 
@@ -13,14 +14,15 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-Redis Sidecar is a transparent cache for JDBC which stores results of SQL queries in Redis.
+== Overview
+{product-name} is a transparent cache for JDBC which stores results of SQL queries in Redis.
 Repeated identical queries are answered from Redis, bypassing the database.
 
-Redis Sidecar is implemented as a JDBC driver and acts as a wrapper around any backend JDBC driver.
+{product-name} is implemented as a JDBC driver and acts as a wrapper around any backend JDBC driver.
 
 == Getting Started
 
-=== Add the driver to your application dependencies
+=== Application Dependencies
 
 .Maven
 [source,xml,subs="verbatim,attributes"]
@@ -40,41 +42,56 @@ dependencies {
 }
 ----
 
-=== Bootstrap Configuration
+=== Configuration
+When the {product-name} driver is initialized by your application it needs to know at the very least how to connect to the Redis database.
+This is called bootstrap configuration and can be achieved with the following parameters in your application: 
 
-When the Sidecar driver is initialized by your application it needs to know at the very least how to connect to the backend database and to the Redis database.
-This is called bootstrap configuration and can be achieved with the following parameters in your application.
+Driver class name:: `com.redis.sidecar.SidecarDriver`
 
-==== Driver class name
+JDBC URL:: `jdbc:redis://...` - see https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for details on the Redis URI syntax.
 
-`com.redis.sidecar.SidecarDriver`
+Once connected, {product-name} read its configuration from the JSON document located under `sidecar:config`.
+If that document does not yet exist it is possible to populate it at startup with the following JDBC properties.
 
-==== JDBC URL
+==== Backend Database
+`sidecar.driver.class-name`:: Class name of the backend database JDBC driver
 
-`jdbc:redis://...`
+`sidecar.driver.url`:: JDBC URL for the backend database
 
-See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for details on the Redis URI syntax.
+You can also include any property your backend JDBC driver requires, like `username` or `password`.
+These will be passed to the backend JDBC driver as is.
 
-==== JDBC Properties
+==== Redis
+The following properties can be used to configure Redis connections and storage:
 
-* `sidecar.cluster`: Set to `true` for Redis Cluster connections
+`sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`)
 
-* `sidecar.driver.class-name`: Class name of the backend database JDBC driver
+`sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar like cache entries, configuration, and metrics (default: `sidecar`)
 
-* `sidecar.driver.url`: JDBC URL for the backend database
+`sidecar.redis.key-separator`:: Delimiter to use between key elements (default: `:`).
 
-* Any properties your backend JDBC driver requires (e.g. `username` or `password`)
+`sidecar.redis.pool.max-active`:: Maximum number of connections that can be allocated by the pool at a given time (default: `8`). Use a negative value for no limit.
 
-The following JDBC properties are optional:
+`sidecar.redis.pool.max-idle`:: Maximum number of "idle" connections in the pool (default: `8`). Use a negative value to indicate an unlimited number of idle connections.
 
-* `sidecar.cache-name`: Namespace for the Sidecar cache (default: `default`).
-Useful for multiple cache configurations in a given application.
+`sidecar.redis.pool.min-idle`:: Target for the minimum number of idle connections to maintain in the pool (default: `0`). This setting only has an effect if both it and time between eviction runs are positive.
 
-* `sidecar.keyspace`: Prefix for cache, config, and metric keys (default: `sidecar`). The combination of keyspace and cache name make these keys unique.
+`sidecar.redis.pool.max-wait`:: Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`). Use a negative value to block indefinitely.
 
+`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`). When positive, the idle object evictor thread starts, otherwise no idle object eviction is performed.
 
+`sidecar.redis.buffer-size`:: Maximum capacity in MB of the buffer used to encode a resultset (default: `100`).
 
+==== Rules
+{product-name} uses rules to determine how SQL queries are cached.
+Rules are processed in order and consist of *criteria* (conditions) and *actions* (results):
 
+* Criteria
 
+`table`:: matches if given name is present in the query tables (default: `null`). Use null (empty) value to match all tables. 
+
+* Action
+
+`ttl`:: Key expiration duration in seconds (default: `3600`). Use `0` for no caching, `-1` for no expiration.
 
 
