@@ -55,7 +55,9 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	@AfterAll
 	private void teardownSidecarDriver() {
-		sidecarDriver.clear();
+		if (sidecarDriver != null) {
+			sidecarDriver.clear();
+		}
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
