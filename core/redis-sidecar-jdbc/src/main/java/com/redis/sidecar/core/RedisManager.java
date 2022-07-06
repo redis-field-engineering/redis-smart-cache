@@ -10,50 +10,51 @@ import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
-import com.redis.sidecar.core.config.Config;
+import com.redis.sidecar.core.config.Pool;
+import com.redis.sidecar.core.config.Redis;
 
 import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.support.ConnectionPoolSupport;
 
 public class RedisManager {
 
-	private final Map<String, AbstractRedisClient> clients = new HashMap<>();
-	private final Map<String, GenericObjectPool<StatefulConnection<String, ResultSet>>> pools = new HashMap<>();
+	private final Map<RedisURI, AbstractRedisClient> clients = new HashMap<>();
+	private final Map<RedisURI, GenericObjectPool<StatefulConnection<String, ResultSet>>> pools = new HashMap<>();
 
-	public AbstractRedisClient getClient(Config config) {
-		String uri = config.getRedis().getUri();
+	public AbstractRedisClient getClient(Redis redis) {
+		RedisURI uri = redis.redisURI();
 		if (!clients.containsKey(uri)) {
-			boolean cluster = config.getRedis().isCluster();
-			clients.put(uri, cluster ? RedisModulesClusterClient.create(uri) : RedisModulesClient.create(uri));
+			clients.put(uri,
+					redis.isCluster() ? RedisModulesClusterClient.create(uri) : RedisModulesClient.create(uri));
 		}
 		return clients.get(uri);
 	}
 
-	public GenericObjectPool<StatefulConnection<String, ResultSet>> getConnectionPool(Config config,
+	public GenericObjectPool<StatefulConnection<String, ResultSet>> getConnectionPool(Redis redis,
 			RedisCodec<String, ResultSet> codec) {
-		String uri = config.getRedis().getUri();
+		RedisURI uri = redis.redisURI();
 		if (!pools.containsKey(uri)) {
-			pools.put(uri, pool(config, codec));
+			AbstractRedisClient client = getClient(redis);
+			boolean cluster = redis.isCluster();
+			GenericObjectPool<StatefulConnection<String, ResultSet>> pool = ConnectionPoolSupport
+					.createGenericObjectPool(() -> cluster ? ((RedisModulesClusterClient) client).connect(codec)
+							: ((RedisModulesClient) client).connect(codec), poolConfig(redis.getPool()));
+			pools.put(uri, pool);
 		}
 		return pools.get(uri);
 	}
 
-	private GenericObjectPool<StatefulConnection<String, ResultSet>> pool(Config config,
-			RedisCodec<String, ResultSet> codec) {
-		AbstractRedisClient client = getClient(config);
-		GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig = new GenericObjectPoolConfig<>();
-		poolConfig.setMaxTotal(config.getRedis().getPool().getMaxActive());
-		poolConfig.setMaxIdle(config.getRedis().getPool().getMaxIdle());
-		poolConfig.setMinIdle(config.getRedis().getPool().getMinIdle());
-		poolConfig.setTimeBetweenEvictionRuns(
-				Duration.ofMillis(config.getRedis().getPool().getTimeBetweenEvictionRuns()));
-		poolConfig.setMaxWait(Duration.ofMillis(config.getRedis().getPool().getMaxWait()));
-		boolean cluster = config.getRedis().isCluster();
-		return ConnectionPoolSupport
-				.createGenericObjectPool(() -> cluster ? ((RedisModulesClusterClient) client).connect(codec)
-						: ((RedisModulesClient) client).connect(codec), poolConfig);
+	private GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig(Pool pool) {
+		GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> config = new GenericObjectPoolConfig<>();
+		config.setMaxTotal(pool.getMaxActive());
+		config.setMaxIdle(pool.getMaxIdle());
+		config.setMinIdle(pool.getMinIdle());
+		config.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
+		config.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
+		return config;
 	}
 
 }

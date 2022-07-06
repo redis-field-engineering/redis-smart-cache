@@ -76,7 +76,7 @@ public class SidecarDriver implements Driver {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
 		config.getRedis().setUri(matcher.group(1));
-		AbstractRedisClient redisClient = redisManager.getClient(config);
+		AbstractRedisClient redisClient = redisManager.getClient(config.getRedis());
 		Connection backendConnection = backendConnection(config, info);
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		try {
@@ -87,7 +87,8 @@ public class SidecarDriver implements Driver {
 		MeterRegistry meterRegistry = meterRegistryManager.getRegistry(redisClient, config);
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(),
 				config.getRedis().getBufferSize(), meterRegistry);
-		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
+		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager
+				.getConnectionPool(config.getRedis(), codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);
 	}
