@@ -85,4 +85,12 @@ public class Pool {
 		this.timeBetweenEvictionRuns = timeBetweenEvictionRuns;
 	}
 
+	public Duration getTimeBetweenEvictionRunsDuration() {
+		return Duration.ofMillis(timeBetweenEvictionRuns);
+	}
+
+	public Duration getMaxWaitDuration() {
+		return Duration.ofMillis(maxWait);
+	}
+
 }

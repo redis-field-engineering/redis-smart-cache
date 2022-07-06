@@ -80,7 +80,8 @@ public class SidecarDriver implements Driver {
 		Connection backendConnection = backendConnection(config, info);
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		try {
-			configManager.create(redisClient, config.getRedis().key("config"), config);
+			configManager.register(redisClient, config.getRedis().key("config"), config,
+					config.getRefreshRateDuration());
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}

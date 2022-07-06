@@ -19,7 +19,7 @@ class ConfigManagerTests extends AbstractSidecarTests {
 		Config config = new Config();
 		String key = "myconfig";
 		try (ConfigManager updater = new ConfigManager()) {
-			updater.create(redis.getClient(), key, config, Duration.ofMillis(100));
+			updater.register(redis.getClient(), key, config, Duration.ofMillis(100));
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".redis.bufferSize", String.valueOf(bufferSize));

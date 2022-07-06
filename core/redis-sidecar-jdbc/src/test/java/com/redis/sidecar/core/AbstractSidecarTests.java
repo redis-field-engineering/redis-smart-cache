@@ -36,7 +36,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	private final RedisModulesContainer redis = new RedisModulesContainer(
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
 	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
-			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag(RedisEnterpriseContainer.DEFAULT_TAG))
+			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag("latest"))
 			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(900)).ossCluster(true)
 					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
 
