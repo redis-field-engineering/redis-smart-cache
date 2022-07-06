@@ -50,8 +50,4 @@ public class Config {
 		this.rules = rules;
 	}
 
-	public Duration getRefreshRateDuration() {
-		return Duration.ofMillis(refreshRate);
-	}
-
 }

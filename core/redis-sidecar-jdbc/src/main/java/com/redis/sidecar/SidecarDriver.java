@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -81,7 +82,7 @@ public class SidecarDriver implements Driver {
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		try {
 			configManager.register(redisClient, config.getRedis().key("config"), config,
-					config.getRefreshRateDuration());
+					Duration.ofMillis(config.getRefreshRate()));
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}

@@ -1,6 +1,7 @@
 package com.redis.sidecar.core;
 
 import java.sql.ResultSet;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,8 +52,8 @@ public class RedisManager {
 		config.setMaxTotal(pool.getMaxActive());
 		config.setMaxIdle(pool.getMaxIdle());
 		config.setMinIdle(pool.getMinIdle());
-		config.setTimeBetweenEvictionRuns(pool.getTimeBetweenEvictionRunsDuration());
-		config.setMaxWait(pool.getMaxWaitDuration());
+		config.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
+		config.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
 		return config;
 	}
 
