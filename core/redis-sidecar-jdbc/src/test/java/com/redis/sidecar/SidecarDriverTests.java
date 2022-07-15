@@ -8,7 +8,6 @@ import java.util.Properties;
 import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 
-import com.redis.sidecar.core.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 

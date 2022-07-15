@@ -9,7 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.Db2Container;
 import org.testcontainers.junit.jupiter.Container;
 
-import com.redis.sidecar.core.AbstractSidecarTests;
+import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 

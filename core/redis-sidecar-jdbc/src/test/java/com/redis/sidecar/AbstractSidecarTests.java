@@ -1,4 +1,4 @@
-package com.redis.sidecar.core;
+package com.redis.sidecar;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,7 +24,6 @@ import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.enterprise.Database;
 import com.redis.enterprise.RedisModule;
-import com.redis.sidecar.SidecarDriver;
 import com.redis.testcontainers.RedisEnterpriseContainer;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
@@ -33,7 +32,7 @@ import com.redis.testcontainers.junit.RedisTestContext;
 
 public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
-	private static final int BUFFER_SIZE = 300;
+	private static final int BUFFER_SIZE = 50;
 
 	private final RedisModulesContainer redis = new RedisModulesContainer(
 			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));

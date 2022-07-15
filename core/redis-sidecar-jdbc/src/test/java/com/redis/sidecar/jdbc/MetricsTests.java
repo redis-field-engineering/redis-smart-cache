@@ -22,8 +22,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
+import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.sidecar.SidecarDriver;
-import com.redis.sidecar.core.AbstractSidecarTests;
 import com.redis.testcontainers.RedisModulesContainer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
