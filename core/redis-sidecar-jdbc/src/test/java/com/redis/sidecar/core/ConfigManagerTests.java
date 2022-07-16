@@ -8,7 +8,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.sidecar.AbstractSidecarTests;
-import com.redis.sidecar.core.config.Config;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
