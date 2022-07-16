@@ -5,8 +5,6 @@ import java.util.function.Function;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
-import com.redis.sidecar.core.config.Config;
-
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.sync.RedisStringCommands;
 import io.lettuce.core.internal.LettuceAssert;

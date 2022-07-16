@@ -10,8 +10,8 @@ import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
-import com.redis.sidecar.core.config.Pool;
-import com.redis.sidecar.core.config.Redis;
+import com.redis.sidecar.core.Config.Pool;
+import com.redis.sidecar.core.Config.Redis;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisURI;

@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.core.config.Rule;
+import com.redis.sidecar.core.Config.Rule;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
