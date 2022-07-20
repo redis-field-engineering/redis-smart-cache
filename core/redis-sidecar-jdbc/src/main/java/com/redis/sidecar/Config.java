@@ -1,4 +1,4 @@
-package com.redis.sidecar.core;
+package com.redis.sidecar;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -13,8 +13,10 @@ import io.lettuce.core.internal.LettuceAssert;
 public class Config {
 
 	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
+	public static final Duration DEFAULT_METRICS_STEP = Duration.ofMinutes(1);
 
-	private long refreshRate = DEFAULT_REFRESH_RATE.toMillis();
+	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
+	private long metricsStep = DEFAULT_METRICS_STEP.toSeconds();
 	private Driver driver = new Driver();
 	private Redis redis = new Redis();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
@@ -25,6 +27,14 @@ public class Config {
 
 	public void setRefreshRate(long refreshRate) {
 		this.refreshRate = refreshRate;
+	}
+
+	public long getMetricsStep() {
+		return metricsStep;
+	}
+
+	public void setMetricsStep(long metricsStep) {
+		this.metricsStep = metricsStep;
 	}
 
 	public Driver getDriver() {

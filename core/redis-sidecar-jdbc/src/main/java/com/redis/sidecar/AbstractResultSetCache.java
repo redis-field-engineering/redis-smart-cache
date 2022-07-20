@@ -1,4 +1,4 @@
-package com.redis.sidecar.core;
+package com.redis.sidecar;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
@@ -7,7 +7,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
-import com.redis.sidecar.core.Config.Rule;
+import com.redis.sidecar.Config.Rule;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.Counter;

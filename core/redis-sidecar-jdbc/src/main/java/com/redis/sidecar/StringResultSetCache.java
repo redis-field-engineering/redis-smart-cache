@@ -1,4 +1,4 @@
-package com.redis.sidecar.core;
+package com.redis.sidecar;
 
 import java.sql.ResultSet;
 import java.util.function.Function;

@@ -1,4 +1,4 @@
-package com.redis.sidecar.core;
+package com.redis.sidecar;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -13,8 +13,6 @@ import javax.sql.rowset.RowSetMetaDataImpl;
 import javax.sql.rowset.RowSetProvider;
 
 import org.junit.jupiter.api.Test;
-
-import com.redis.sidecar.TestUtils;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 

@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.core.Config.Rule;
+import com.redis.sidecar.Config.Rule;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -23,7 +23,7 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 public class SidecarStatement implements Statement {
 
 	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
-	private static final String QUERY_TIMER_ID = "database.calls";
+	private static final String QUERY_TIMER_ID = "queries";
 	private static final String PARAMETER_SEPARATOR = ":";
 
 	private final SidecarConnection connection;
@@ -71,18 +71,22 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected boolean execute(Executable executable) throws SQLException {
-		checkClosed();
-		if (getCachedResultSet().isPresent()) {
-			return true;
-		}
 		try {
-			return queryTimer.recordCallable(executable::execute);
+			return queryTimer.recordCallable(() -> doExecute(executable));
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			// Should not happen but rethrow anyway
 			throw new SQLException(e);
 		}
+	}
+
+	private boolean doExecute(Executable executable) throws SQLException {
+		checkClosed();
+		if (getCachedResultSet().isPresent()) {
+			return true;
+		}
+		return executable.execute();
 	}
 
 	private void checkClosed() throws SQLException {
@@ -97,20 +101,23 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected ResultSet executeQuery(QueryExecutable executable) throws SQLException {
-		checkClosed();
-		Optional<ResultSet> cachedResultSet = getCachedResultSet();
-		if (cachedResultSet.isPresent()) {
-			return cachedResultSet.get();
-		}
-		ResultSet backendResultSet;
 		try {
-			backendResultSet = queryTimer.recordCallable(executable::execute);
+			return queryTimer.recordCallable(() -> doExecuteQuery(executable));
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			// Should not happen but rethrow anyway
 			throw new SQLException(e);
 		}
+	}
+
+	private ResultSet doExecuteQuery(QueryExecutable executable) throws SQLException {
+		checkClosed();
+		Optional<ResultSet> cachedResultSet = getCachedResultSet();
+		if (cachedResultSet.isPresent()) {
+			return cachedResultSet.get();
+		}
+		ResultSet backendResultSet = executable.execute();
 		if (isCachingEnabled()) {
 			return cache(backendResultSet);
 		}

@@ -22,8 +22,8 @@ import java.util.concurrent.Executor;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
-import com.redis.sidecar.core.Config;
-import com.redis.sidecar.core.ResultSetCache;
+import com.redis.sidecar.Config;
+import com.redis.sidecar.ResultSetCache;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.MeterRegistry;

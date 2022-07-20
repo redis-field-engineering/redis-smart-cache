@@ -198,7 +198,7 @@ public class SidecarPreparedStatement extends SidecarStatement implements Prepar
 
 	@Override
 	public boolean execute() throws SQLException {
-		return execute(statement::execute);
+		return super.execute(statement::execute);
 	}
 
 	@Override
