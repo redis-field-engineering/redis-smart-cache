@@ -1,0 +1,40 @@
+version: "2.2"
+
+services:
+  mysql:
+    image: mysql:latest
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_USER=sidecar
+      - MYSQL_PASSWORD=sidecar
+      - MYSQL_DATABASE=sidecar
+    volumes:
+      - "./conf.d:/etc/mysql/conf.d:ro"
+
+  postgres:
+    image: postgres:14.1
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_PASSWORD=sidecar
+      - POSTGRES_USER=sidecar
+      - POSTGRES_DB=sidecar
+
+  grafana:
+    image: grafana/grafana
+    hostname: grafana
+    container_name: grafana    
+    ports:
+      - 3000:3000
+    environment:
+      - GF_INSTALL_PLUGINS=redis-app
+
+  redis:
+    image: redis/redis-stack-server
+    hostname: redis
+    container_name: redis
+    ports:
+      - 6379:6379
