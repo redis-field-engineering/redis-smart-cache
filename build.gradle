@@ -73,7 +73,6 @@ subprojects {
     
     test {
         useJUnitPlatform()
-        maxHeapSize = "1024m"
     }
 
 	sourceCompatibility = 8
