@@ -7,40 +7,87 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "sidecar")
 public class Config {
 
-	private int rows;
-	private int maxQuantity;
-	private int batchSize;
-	private int orderSpread;
+	private Loader loader = new Loader();
+	private Query query = new Query();
 
-	public int getOrderSpread() {
-		return orderSpread;
+	public Query getQuery() {
+		return query;
 	}
 
-	public void setOrderSpread(int orderSpread) {
-		this.orderSpread = orderSpread;
+	public void setQuery(Query query) {
+		this.query = query;
 	}
 
-	public int getBatchSize() {
-		return batchSize;
+	public Loader getLoader() {
+		return loader;
 	}
 
-	public void setBatchSize(int batchSize) {
-		this.batchSize = batchSize;
+	public void setLoader(Loader loader) {
+		this.loader = loader;
 	}
 
-	public int getRows() {
-		return rows;
+	public static class Query {
+
+		private int cardinality;
+		private int results;
+		private int threads;
+
+		public int getThreads() {
+			return threads;
+		}
+
+		public void setThreads(int threads) {
+			this.threads = threads;
+		}
+
+		public int getCardinality() {
+			return cardinality;
+		}
+
+		public void setCardinality(int cardinality) {
+			this.cardinality = cardinality;
+		}
+
+		public int getResults() {
+			return results;
+		}
+
+		public void setResults(int results) {
+			this.results = results;
+		}
+
 	}
 
-	public void setRows(int rows) {
-		this.rows = rows;
+	public static class Loader {
+
+		private int batch;
+		private int rows;
+		private boolean drop;
+
+		public boolean isDrop() {
+			return drop;
+		}
+
+		public void setDrop(boolean drop) {
+			this.drop = drop;
+		}
+
+		public int getBatch() {
+			return batch;
+		}
+
+		public void setBatch(int batchSize) {
+			this.batch = batchSize;
+		}
+
+		public int getRows() {
+			return rows;
+		}
+
+		public void setRows(int rows) {
+			this.rows = rows;
+		}
+
 	}
 
-	public int getMaxQuantity() {
-		return maxQuantity;
-	}
-
-	public void setMaxQuantity(int maxQuantity) {
-		this.maxQuantity = maxQuantity;
-	}
 }

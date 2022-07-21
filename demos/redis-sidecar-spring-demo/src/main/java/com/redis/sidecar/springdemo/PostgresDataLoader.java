@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
+import com.redis.sidecar.springdemo.Config.Loader;
+
 @Component
 @ConditionalOnExpression(value = "#{ '${database}' matches 'postgres' }")
 public class PostgresDataLoader {
@@ -36,31 +38,32 @@ public class PostgresDataLoader {
 			"TOMSP", "TORTU", "TRADH", "TRAIH", "VAFFE", "VICTE", "VINET", "WANDK", "WARTH", "WELLI", "WHITC", "WILMK",
 			"WOLZA");
 
-	private static final int ORDER_ID_START = 20000;
-
 	private final Random random = new Random();
+	private final Loader config;
 	private final DataSource dataSource;
-	private final Config config;
 
-	public PostgresDataLoader(DataSource dataSource, Config config) {
+	public PostgresDataLoader(Config config, DataSource dataSource) {
+		this.config = config.getLoader();
 		this.dataSource = dataSource;
-		this.config = config;
 	}
 
 	@PostConstruct
 	public void execute() throws SQLException, IOException {
-		if (rowCount() == config.getRows()) {
-			log.info("Database already populated");
-			return;
-		}
 		String insertOrderSQL = "INSERT INTO orders VALUES (?, ?, ?, '1996-07-04', '1996-08-01', '1996-07-16', 3, 32.3800011, 'Vins et alcools Chevalier', '59 rue de l''Abbaye', 'Reims', NULL, '51100', 'France')";
 		String insertOrderDetailsSQL = "INSERT INTO order_details VALUES (?, ?, ?, ?, 0)";
 		try (Connection connection = dataSource.getConnection()) {
 			ScriptRunner scriptRunner = new ScriptRunner(connection);
 			scriptRunner.setAutoCommit(false);
 			scriptRunner.setStopOnError(true);
-			try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("db/postgres/drop.sql")) {
-				scriptRunner.runScript(new InputStreamReader(inputStream));
+			if (config.isDrop()) {
+				try (InputStream inputStream = getClass().getClassLoader()
+						.getResourceAsStream("db/postgres/drop.sql")) {
+					scriptRunner.runScript(new InputStreamReader(inputStream));
+				}
+			}
+			if (rowCount() == config.getRows()) {
+				log.info("Database already populated");
+				return;
 			}
 			try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("db/postgres/schema.sql")) {
 				scriptRunner.runScript(new InputStreamReader(inputStream));
@@ -72,31 +75,31 @@ public class PostgresDataLoader {
 			PreparedStatement detailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
 			log.info("Populating database with {} rows", config.getRows());
 			for (int index = 0; index < config.getRows(); index++) {
-				int orderId = ORDER_ID_START + index;
 				String customerId = CUSTOMER_IDS.get(random.nextInt(CUSTOMER_IDS.size()));
 				int employeeId = 1 + random.nextInt(9);
 				int productId = 1 + random.nextInt(77);
 				double price = random.nextDouble();
-				int quantity = random.nextInt(config.getMaxQuantity());
+				int quantity = random.nextInt(100);
 
-				orderStatement.setInt(1, orderId);
+				orderStatement.setInt(1, index);
 				orderStatement.setString(2, customerId);
 				orderStatement.setInt(3, employeeId);
 				orderStatement.addBatch();
 
-				detailsStatement.setInt(1, orderId);
+				detailsStatement.setInt(1, index);
 				detailsStatement.setInt(2, productId);
 				detailsStatement.setDouble(3, price);
 				detailsStatement.setInt(4, quantity);
 				detailsStatement.addBatch();
 
-				if (index % config.getBatchSize() == 0) {
+				if (index % config.getBatch() == 0) {
 					orderStatement.executeBatch();
 					orderStatement.close();
 					orderStatement = connection.prepareStatement(insertOrderSQL);
 					detailsStatement.executeBatch();
 					detailsStatement.close();
 					detailsStatement = connection.prepareStatement(insertOrderDetailsSQL);
+					log.info(String.format("Inserted %,d/%,d rows", index, config.getRows()));
 				}
 			}
 			orderStatement.executeBatch();
