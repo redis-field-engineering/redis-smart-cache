@@ -7,22 +7,21 @@ import java.util.Map;
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 
-import io.lettuce.core.AbstractRedisClient;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class MeterRegistryManager {
 
-	private final Map<AbstractRedisClient, MeterRegistry> registries = new HashMap<>();
+	private final Map<String, MeterRegistry> registries = new HashMap<>();
 
-	public MeterRegistry getRegistry(AbstractRedisClient redisClient, Config config) {
-		if (!registries.containsKey(redisClient)) {
-			registries.put(redisClient, registry(redisClient, config));
+	public MeterRegistry getRegistry(Config config) {
+		if (!registries.containsKey(config.getRedis().getUri())) {
+			registries.put(config.getRedis().getUri(), registry(config));
 		}
-		return registries.get(redisClient);
+		return registries.get(config.getRedis().getUri());
 	}
 
-	private MeterRegistry registry(AbstractRedisClient redisClient, Config config) {
+	private MeterRegistry registry(Config config) {
 		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
 
 			@Override
@@ -50,7 +49,7 @@ public class MeterRegistryManager {
 				return Duration.ofSeconds(config.getMetricsStep());
 			}
 
-		}, Clock.SYSTEM, redisClient);
+		}, Clock.SYSTEM);
 	}
 
 	public void clear() {

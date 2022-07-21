@@ -63,7 +63,8 @@ public class NonRegisteringSidecarDriver implements Driver {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
 		config.getRedis().setUri(matcher.group(1));
-		AbstractRedisClient redisClient = redisManager.getClient(config.getRedis());
+		MeterRegistry meterRegistry = meterRegistryManager.getRegistry(config);
+		AbstractRedisClient redisClient = redisManager.getClient(config.getRedis(), meterRegistry);
 		Connection backendConnection = backendConnection(config, info);
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		try {
@@ -72,7 +73,6 @@ public class NonRegisteringSidecarDriver implements Driver {
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}
-		MeterRegistry meterRegistry = meterRegistryManager.getRegistry(redisClient, config);
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(),
 				config.getRedis().getBufferSize(), meterRegistry);
 		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager

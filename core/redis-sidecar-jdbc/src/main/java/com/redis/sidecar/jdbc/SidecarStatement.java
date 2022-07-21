@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -18,6 +19,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.util.TablesNamesFinder;
 
 public class SidecarStatement implements Statement {
@@ -117,15 +119,13 @@ public class SidecarStatement implements Statement {
 		if (cachedResultSet.isPresent()) {
 			return cachedResultSet.get();
 		}
-		ResultSet backendResultSet = executable.execute();
-		if (isCachingEnabled()) {
-			return cache(backendResultSet);
-		}
-		return backendResultSet;
-
+		return cache(executable.execute());
 	}
 
-	private CachedRowSet cache(ResultSet resultSet) throws SQLException {
+	private ResultSet cache(ResultSet resultSet) throws SQLException {
+		if (resultSet == null || !isCachingEnabled()) {
+			return resultSet;
+		}
 		CachedRowSet rowSet = connection.createCachedRowSet();
 		rowSet.populate(resultSet);
 		connection.getCache().put(key(), ttl, rowSet);
@@ -143,15 +143,7 @@ public class SidecarStatement implements Statement {
 
 	private Optional<ResultSet> getCachedResultSet() {
 		String key = key();
-		List<String> tables;
-		try {
-			net.sf.jsqlparser.statement.Statement parsedStatement = CCJSqlParserUtil.parse(sql);
-			TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
-			tables = tablesNamesFinder.getTableList(parsedStatement);
-		} catch (JSQLParserException e) {
-			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
-			return Optional.empty();
-		}
+		List<String> tables = tables(sql);
 		if (tables.isEmpty()) {
 			return Optional.empty();
 		}
@@ -165,6 +157,19 @@ public class SidecarStatement implements Statement {
 			return resultSet;
 		}
 		return Optional.empty();
+	}
+
+	private List<String> tables(String sql) {
+		try {
+			net.sf.jsqlparser.statement.Statement parsedStatement = CCJSqlParserUtil.parse(sql);
+			if (parsedStatement instanceof Select) {
+				TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
+				return tablesNamesFinder.getTableList(parsedStatement);
+			}
+		} catch (JSQLParserException e) {
+			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
+		}
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -242,11 +247,7 @@ public class SidecarStatement implements Statement {
 		if (resultSet.isPresent()) {
 			return resultSet.get();
 		}
-		ResultSet backendResultSet = statement.getResultSet();
-		if (isCachingEnabled()) {
-			return cache(backendResultSet);
-		}
-		return backendResultSet;
+		return cache(statement.getResultSet());
 	}
 
 	@Override
