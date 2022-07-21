@@ -9,6 +9,15 @@ public class Config {
 
 	private Loader loader = new Loader();
 	private Query query = new Query();
+	private boolean flush;
+
+	public boolean isFlush() {
+		return flush;
+	}
+
+	public void setFlush(boolean flush) {
+		this.flush = flush;
+	}
 
 	public Query getQuery() {
 		return query;

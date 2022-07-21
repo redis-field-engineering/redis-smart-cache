@@ -21,6 +21,7 @@ import com.redis.sidecar.SidecarDriver;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
+import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 
 @Component
@@ -50,6 +51,9 @@ public class PostgresQueryExecutor implements DisposableBean {
 
 	@PostConstruct
 	public void executeQueries() {
+		if (config.isFlush()) {
+			RedisClient.create(redisURI).connect().sync().flushall();
+		}
 		HikariConfig hikariConfig = new HikariConfig();
 		hikariConfig.setJdbcUrl("jdbc:" + redisURI.toString());
 		hikariConfig.setDriverClassName(SidecarDriver.class.getName());
