@@ -8,8 +8,16 @@ import org.springframework.context.annotation.Configuration;
 public class Config {
 
 	private Loader loader = new Loader();
-	private Query query = new Query();
 	private boolean flush;
+	private int queryThreads;
+
+	public int getQueryThreads() {
+		return queryThreads;
+	}
+
+	public void setQueryThreads(int queryThreads) {
+		this.queryThreads = queryThreads;
+	}
 
 	public boolean isFlush() {
 		return flush;
@@ -17,14 +25,6 @@ public class Config {
 
 	public void setFlush(boolean flush) {
 		this.flush = flush;
-	}
-
-	public Query getQuery() {
-		return query;
-	}
-
-	public void setQuery(Query query) {
-		this.query = query;
 	}
 
 	public Loader getLoader() {
@@ -35,51 +35,13 @@ public class Config {
 		this.loader = loader;
 	}
 
-	public static class Query {
-
-		private int cardinality;
-		private int results;
-		private int threads;
-
-		public int getThreads() {
-			return threads;
-		}
-
-		public void setThreads(int threads) {
-			this.threads = threads;
-		}
-
-		public int getCardinality() {
-			return cardinality;
-		}
-
-		public void setCardinality(int cardinality) {
-			this.cardinality = cardinality;
-		}
-
-		public int getResults() {
-			return results;
-		}
-
-		public void setResults(int results) {
-			this.results = results;
-		}
-
-	}
-
 	public static class Loader {
 
 		private int batch;
-		private int rows;
-		private boolean drop;
-
-		public boolean isDrop() {
-			return drop;
-		}
-
-		public void setDrop(boolean drop) {
-			this.drop = drop;
-		}
+		private int products;
+		private int customers;
+		private int orders;
+		private int orderDetails;
 
 		public int getBatch() {
 			return batch;
@@ -89,12 +51,36 @@ public class Config {
 			this.batch = batchSize;
 		}
 
-		public int getRows() {
-			return rows;
+		public int getProducts() {
+			return products;
 		}
 
-		public void setRows(int rows) {
-			this.rows = rows;
+		public void setProducts(int products) {
+			this.products = products;
+		}
+
+		public int getCustomers() {
+			return customers;
+		}
+
+		public void setCustomers(int customers) {
+			this.customers = customers;
+		}
+
+		public int getOrders() {
+			return orders;
+		}
+
+		public void setOrders(int orders) {
+			this.orders = orders;
+		}
+
+		public int getOrderDetails() {
+			return orderDetails;
+		}
+
+		public void setOrderDetails(int orderDetails) {
+			this.orderDetails = orderDetails;
 		}
 
 	}

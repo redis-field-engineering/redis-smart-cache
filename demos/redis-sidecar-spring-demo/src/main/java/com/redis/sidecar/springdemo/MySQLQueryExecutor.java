@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Random;
 
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
@@ -25,25 +24,19 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 
 @Component
-@ConditionalOnExpression(value = "#{ '${database}' matches 'postgres' }")
-public class PostgresQueryExecutor implements DisposableBean {
+@ConditionalOnExpression(value = "#{ '${database}' matches 'mysql' }")
+public class MySQLQueryExecutor implements DisposableBean {
 
-	private static Logger log = LoggerFactory.getLogger(PostgresQueryExecutor.class);
+	private static Logger log = LoggerFactory.getLogger(MySQLQueryExecutor.class);
 
-	private static final String QUERY = "SELECT * FROM orders o INNER JOIN order_details d ON o.order_id = d.order_id"
-			+ "                     INNER JOIN products p ON p.product_id = d.product_id"
-			+ "                     INNER JOIN customers c ON c.customer_id = o.customer_id"
-			+ "                     INNER JOIN employees e ON e.employee_id = o.employee_id"
-			+ "                     INNER JOIN categories g ON g.category_id = p.category_id"
-			+ "                     WHERE o.order_id BETWEEN ? AND ?";
+	private static final String QUERY = "SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode WHERE orders.orderNumber = ?";
 
-	private final Random random = new Random();
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
 	private final Config config;
 	private boolean stopped;
 
-	public PostgresQueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
+	public MySQLQueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
 		this.redisURI = redisURI;
 		this.dataSourceProperties = dataSourceProperties;
 		this.config = config;
@@ -64,12 +57,12 @@ public class PostgresQueryExecutor implements DisposableBean {
 		hikariConfig.setPassword(dataSourceProperties.determinePassword());
 		DataSource dataSource = new HikariDataSource(hikariConfig);
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(config.getQuery().getThreads());
-		executor.setMaxPoolSize(config.getQuery().getThreads());
+		executor.setCorePoolSize(config.getQueryThreads());
+		executor.setMaxPoolSize(config.getQueryThreads());
 		executor.setThreadNamePrefix("query-task");
 		executor.initialize();
-		log.info("Starting {} threads", config.getQuery().getThreads());
-		for (int index = 0; index < config.getQuery().getThreads(); index++) {
+		log.info("Starting {} threads", config.getQueryThreads());
+		for (int index = 0; index < config.getQueryThreads(); index++) {
 			executor.execute(new QueryTask(dataSource, config));
 		}
 	}
@@ -90,33 +83,22 @@ public class PostgresQueryExecutor implements DisposableBean {
 
 		@Override
 		public void run() {
-			int executionCount = 0;
-			int totalRowCount = 0;
+			int index = 0;
 			while (!isStopped()) {
+				index++;
 				try (Connection connection = dataSource.getConnection();
 						PreparedStatement statement = connection.prepareStatement(QUERY)) {
-					int orderIdStart = random.nextInt(config.getQuery().getCardinality());
-					statement.setInt(1, orderIdStart);
-					int orderIdEnd = orderIdStart + config.getQuery().getResults() - 1;
-					statement.setInt(2, orderIdEnd);
+					statement.setInt(1, index % config.getLoader().getOrders());
 					try (ResultSet resultSet = statement.executeQuery()) {
-						int rowCount = 0;
 						while (resultSet.next()) {
 							for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
 									.getColumnCount(); columnIndex++) {
 								resultSet.getObject(columnIndex);
 							}
-							rowCount++;
 						}
-						totalRowCount += rowCount;
 					}
-					executionCount++;
 				} catch (SQLException e) {
 					log.error("Could not run query", e);
-				}
-				if (executionCount % 10 == 0) {
-					log.debug("Ran {} queries; Avg ResultSet size: {} rows", executionCount,
-							totalRowCount / executionCount);
 				}
 			}
 		}

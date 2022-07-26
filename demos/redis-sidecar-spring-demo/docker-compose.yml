@@ -3,6 +3,8 @@ version: "2.2"
 services:
   mysql:
     image: mysql:latest
+    hostname: mysql
+    container_name: mysql
     ports:
       - 3306:3306
     environment:
@@ -13,15 +15,6 @@ services:
       - MYSQL_DATABASE=sidecar
     volumes:
       - "./conf.d:/etc/mysql/conf.d:ro"
-
-  postgres:
-    image: postgres:14.1
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_PASSWORD=sidecar
-      - POSTGRES_USER=sidecar
-      - POSTGRES_DB=sidecar
 
   grafana:
     image: grafana/grafana
