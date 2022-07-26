@@ -250,7 +250,6 @@ public class MySQLDataLoader {
 				progressBarBuilder.setTaskName("Populating " + table);
 				progressBarBuilder.showSpeed();
 				try (ProgressBar progressBar = progressBarBuilder.build()) {
-					log.info("Populating {}", table);
 					String insertSQL = String.format("INSERT INTO %s %s VALUES %s", table,
 							columns.stream().collect(Collectors.joining(",", "(", ")")),
 							columns.stream().map(n -> "?").collect(Collectors.joining(",", "(", ")")));
