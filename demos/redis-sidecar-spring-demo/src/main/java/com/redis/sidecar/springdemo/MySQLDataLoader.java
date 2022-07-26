@@ -236,6 +236,7 @@ public class MySQLDataLoader {
 
 		public void execute(RowProvider rowProvider, DataSource dataSource, int batchSize) throws SQLException {
 			try (Connection connection = dataSource.getConnection()) {
+				connection.setAutoCommit(false);
 				try (Statement statement = connection.createStatement()) {
 					ResultSet countResultSet = statement.executeQuery("SELECT COUNT(*) FROM " + table);
 					countResultSet.next();
@@ -260,19 +261,18 @@ public class MySQLDataLoader {
 						statement.addBatch();
 						index++;
 						if (index > 0 && index % batchSize == 0) {
-							execute(statement);
+							statement.executeBatch();
+							connection.commit();
+							statement.close();
 							statement = statement.getConnection().prepareStatement(insertSQL);
 							progressBar.stepTo(index);
 						}
 					}
-					execute(statement);
+					statement.executeBatch();
+					connection.commit();
+					statement.close();
 				}
 			}
-		}
-
-		private void execute(PreparedStatement statement) throws SQLException {
-			statement.executeBatch();
-			statement.close();
 		}
 
 	}
