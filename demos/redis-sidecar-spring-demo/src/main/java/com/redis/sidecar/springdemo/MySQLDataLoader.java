@@ -236,7 +236,6 @@ public class MySQLDataLoader {
 
 		public void execute(RowProvider rowProvider, DataSource dataSource, int batchSize) throws SQLException {
 			try (Connection connection = dataSource.getConnection()) {
-				connection.setAutoCommit(false);
 				try (Statement statement = connection.createStatement()) {
 					ResultSet countResultSet = statement.executeQuery("SELECT COUNT(*) FROM " + table);
 					countResultSet.next();
@@ -245,6 +244,7 @@ public class MySQLDataLoader {
 						return;
 					}
 				}
+				connection.setAutoCommit(false);
 				ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
 				progressBarBuilder.setInitialMax(rowProvider.getTotalRows());
 				progressBarBuilder.setTaskName("Populating " + table);
@@ -271,6 +271,7 @@ public class MySQLDataLoader {
 					connection.commit();
 					statement.close();
 				}
+				connection.setAutoCommit(true);
 			}
 		}
 

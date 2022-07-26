@@ -22,6 +22,8 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
+import me.tongfei.progressbar.ProgressBar;
+import me.tongfei.progressbar.ProgressBarBuilder;
 
 @Component
 @ConditionalOnExpression(value = "#{ '${database}' matches 'mysql' }")
@@ -84,21 +86,27 @@ public class MySQLQueryExecutor implements DisposableBean {
 		@Override
 		public void run() {
 			int index = 0;
-			while (!isStopped()) {
-				index++;
-				try (Connection connection = dataSource.getConnection();
-						PreparedStatement statement = connection.prepareStatement(QUERY)) {
-					statement.setInt(1, index % config.getLoader().getOrders());
-					try (ResultSet resultSet = statement.executeQuery()) {
-						while (resultSet.next()) {
-							for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
-									.getColumnCount(); columnIndex++) {
-								resultSet.getObject(columnIndex);
+			ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
+			progressBarBuilder.setTaskName("Querying");
+			progressBarBuilder.showSpeed();
+			try (ProgressBar progressBar = progressBarBuilder.build()) {
+				while (!isStopped()) {
+					index++;
+					try (Connection connection = dataSource.getConnection();
+							PreparedStatement statement = connection.prepareStatement(QUERY)) {
+						statement.setInt(1, index % config.getLoader().getOrders());
+						try (ResultSet resultSet = statement.executeQuery()) {
+							while (resultSet.next()) {
+								for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
+										.getColumnCount(); columnIndex++) {
+									resultSet.getObject(columnIndex);
+								}
 							}
 						}
+						progressBar.step();
+					} catch (SQLException e) {
+						log.error("Could not run query", e);
 					}
-				} catch (SQLException e) {
-					log.error("Could not run query", e);
 				}
 			}
 		}
