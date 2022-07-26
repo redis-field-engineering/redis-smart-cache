@@ -215,7 +215,7 @@ public class MySQLDataLoader {
 	}
 
 	@PostConstruct
-	public void execute() throws SQLException {
+	public void start() throws SQLException {
 		CUSTOMERS.execute(new CustomerRowProvider(config.getCustomers()), dataSource, config.getBatch());
 		PRODUCTS.execute(new ProductRowProvider(config.getProducts()), dataSource, config.getBatch());
 		ORDERS.execute(new OrderRowProvider(config.getOrders(), config.getCustomers()), dataSource, config.getBatch());

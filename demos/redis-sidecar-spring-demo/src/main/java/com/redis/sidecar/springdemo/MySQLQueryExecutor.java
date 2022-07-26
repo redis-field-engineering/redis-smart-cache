@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
@@ -49,7 +50,7 @@ public class MySQLQueryExecutor implements DisposableBean {
 	}
 
 	@PostConstruct
-	public void executeQueries() {
+	public void start() {
 		if (config.isFlush()) {
 			RedisClient.create(redisURI).connect().sync().flushall();
 		}
@@ -80,6 +81,7 @@ public class MySQLQueryExecutor implements DisposableBean {
 
 	private static class QueryTask implements Runnable {
 
+		private final Random random = new Random();
 		private final DataSource dataSource;
 		private final ProgressBar progressBar;
 		private final int totalRows;
@@ -93,17 +95,15 @@ public class MySQLQueryExecutor implements DisposableBean {
 
 		@Override
 		public void run() {
-			int index = 0;
 			while (!stopped) {
-				index++;
 				try (Connection connection = dataSource.getConnection();
 						PreparedStatement statement = connection.prepareStatement(QUERY)) {
-					statement.setInt(1, index % totalRows);
+					int orderNumber = random.nextInt(totalRows) + 1;
+					statement.setInt(1, orderNumber);
 					try (ResultSet resultSet = statement.executeQuery()) {
 						while (resultSet.next()) {
-							for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
-									.getColumnCount(); columnIndex++) {
-								resultSet.getObject(columnIndex);
+							for (int index = 0; index < resultSet.getMetaData().getColumnCount(); index++) {
+								resultSet.getObject(index + 1);
 							}
 						}
 					}
