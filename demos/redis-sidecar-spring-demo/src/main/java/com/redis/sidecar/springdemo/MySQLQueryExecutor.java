@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
@@ -36,7 +38,9 @@ public class MySQLQueryExecutor implements DisposableBean {
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
 	private final Config config;
-	private boolean stopped;
+	private final List<QueryTask> tasks = new ArrayList<>();
+
+	private ProgressBar progressBar;
 
 	public MySQLQueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
 		this.redisURI = redisURI;
@@ -63,62 +67,66 @@ public class MySQLQueryExecutor implements DisposableBean {
 		executor.setMaxPoolSize(config.getQueryThreads());
 		executor.setThreadNamePrefix("query-task");
 		executor.initialize();
-		log.info("Starting {} threads", config.getQueryThreads());
+		ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
+		progressBarBuilder.setTaskName("Querying");
+		progressBarBuilder.showSpeed();
+		progressBar = progressBarBuilder.build();
 		for (int index = 0; index < config.getQueryThreads(); index++) {
-			executor.execute(new QueryTask(dataSource, config));
+			QueryTask task = new QueryTask(dataSource, config.getLoader().getOrders(), progressBar);
+			tasks.add(task);
+			executor.execute(task);
 		}
 	}
 
-	public void stop() {
-		this.stopped = true;
-	}
-
-	private class QueryTask implements Runnable {
+	private static class QueryTask implements Runnable {
 
 		private final DataSource dataSource;
-		private final Config config;
+		private final ProgressBar progressBar;
+		private final int totalRows;
+		private boolean stopped;
 
-		public QueryTask(DataSource dataSource, Config config) {
+		public QueryTask(DataSource dataSource, int totalRows, ProgressBar progressBar) {
 			this.dataSource = dataSource;
-			this.config = config;
+			this.totalRows = totalRows;
+			this.progressBar = progressBar;
 		}
 
 		@Override
 		public void run() {
 			int index = 0;
-			ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
-			progressBarBuilder.setTaskName("Querying");
-			progressBarBuilder.showSpeed();
-			try (ProgressBar progressBar = progressBarBuilder.build()) {
-				while (!isStopped()) {
-					index++;
-					try (Connection connection = dataSource.getConnection();
-							PreparedStatement statement = connection.prepareStatement(QUERY)) {
-						statement.setInt(1, index % config.getLoader().getOrders());
-						try (ResultSet resultSet = statement.executeQuery()) {
-							while (resultSet.next()) {
-								for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
-										.getColumnCount(); columnIndex++) {
-									resultSet.getObject(columnIndex);
-								}
+			while (!stopped) {
+				index++;
+				try (Connection connection = dataSource.getConnection();
+						PreparedStatement statement = connection.prepareStatement(QUERY)) {
+					statement.setInt(1, index % totalRows);
+					try (ResultSet resultSet = statement.executeQuery()) {
+						while (resultSet.next()) {
+							for (int columnIndex = 1; columnIndex <= resultSet.getMetaData()
+									.getColumnCount(); columnIndex++) {
+								resultSet.getObject(columnIndex);
 							}
 						}
-						progressBar.step();
-					} catch (SQLException e) {
-						log.error("Could not run query", e);
 					}
+					progressBar.step();
+				} catch (SQLException e) {
+					log.error("Could not run query", e);
 				}
 			}
 		}
 
-		private boolean isStopped() {
-			return stopped;
+		public void stop() {
+			this.stopped = true;
 		}
+
 	}
 
 	@Override
 	public void destroy() throws Exception {
-		this.stopped = true;
+		tasks.forEach(QueryTask::stop);
+		tasks.clear();
+		if (progressBar != null) {
+			progressBar.close();
+		}
 	}
 
 }
