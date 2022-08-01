@@ -65,6 +65,11 @@ subprojects {
 		info {
 			description = project.project_description
 		}
+		coverage {
+		    jacoco {
+		        toolVersion = '0.8.8'
+		    }
+		}
 	}
 	
 	dependencies {
