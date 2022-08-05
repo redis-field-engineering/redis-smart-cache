@@ -1,6 +1,5 @@
 package com.redis.sidecar;
 
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -13,36 +12,43 @@ import java.util.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.json.SetMode;
 
-import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisURI;
 
 public class ConfigManager implements AutoCloseable {
 
 	private static final Logger log = Logger.getLogger(ConfigManager.class.getName());
 
+	private final RedisManager redisManager;
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final Map<String, ScheduledFuture<?>> futures = new HashMap<>();
+	private final Map<RedisURI, Map<String, Config>> configs = new HashMap<>();
 
-	private StatefulRedisModulesConnection<String, String> connection(AbstractRedisClient redisClient) {
-		if (redisClient instanceof RedisModulesClusterClient) {
-			return ((RedisModulesClusterClient) redisClient).connect();
-		}
-		return ((RedisModulesClient) redisClient).connect();
+	public ConfigManager(RedisManager redisManager) {
+		this.redisManager = redisManager;
 	}
 
-	public void register(AbstractRedisClient redisClient, String key, Object config, Duration refreshRate)
-			throws JsonProcessingException {
-		StatefulRedisModulesConnection<String, String> connection = connection(redisClient);
+	public synchronized Config getConfig(Config config) throws JsonProcessingException {
+		String key = key(config);
+		RedisURI uri = config.getRedis().uri();
+		if (configs.containsKey(uri)) {
+			Map<String, Config> keys = configs.get(uri);
+			if (keys.containsKey(key)) {
+				return keys.get(key);
+			}
+		} else {
+			configs.put(uri, new HashMap<>());
+		}
+		configs.get(uri).put(key, config);
+		StatefulRedisModulesConnection<String, String> connection = redisManager.connection(config);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		connection.sync().jsonSet(key, "$", json, SetMode.NX);
 		ObjectReader reader = mapper.readerForUpdating(config);
 		read(connection, key, reader);
-		long refreshRateMillis = refreshRate.toMillis();
+		long refreshRateMillis = config.getRefreshRate() * 1000;
 		futures.put(key, executor.scheduleAtFixedRate(() -> {
 			try {
 				read(connection, key, reader);
@@ -50,6 +56,11 @@ public class ConfigManager implements AutoCloseable {
 				log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key), e);
 			}
 		}, refreshRateMillis, refreshRateMillis, TimeUnit.MILLISECONDS));
+		return config;
+	}
+
+	public String key(Config config) {
+		return config.getRedis().key("config");
 	}
 
 	private void read(StatefulRedisModulesConnection<String, String> connection, String key, ObjectReader reader)

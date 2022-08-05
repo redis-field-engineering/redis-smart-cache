@@ -6,7 +6,6 @@ import java.sql.Driver;
 import java.sql.DriverPropertyInfo;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -42,9 +41,10 @@ public class NonRegisteringSidecarDriver implements Driver {
 	private static final String PROPERTY_PREFIX = "sidecar";
 	private static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
 
-	private static RedisManager redisManager = new RedisManager();
-	private static ConfigManager configManager = new ConfigManager();
-	private static MeterRegistryManager meterRegistryManager = new MeterRegistryManager();
+	private static BackendManager backendManager = new BackendManager();
+	private static MeterManager meterManager = new MeterManager();
+	private static RedisManager redisManager = new RedisManager(meterManager);
+	private static ConfigManager configManager = new ConfigManager(redisManager);
 
 	public NonRegisteringSidecarDriver() {
 		// Needed for Class.forName().newInstance()
@@ -63,20 +63,18 @@ public class NonRegisteringSidecarDriver implements Driver {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
 		config.getRedis().setUri(matcher.group(1));
-		MeterRegistry meterRegistry = meterRegistryManager.getRegistry(config);
-		AbstractRedisClient redisClient = redisManager.getClient(config.getRedis(), meterRegistry);
-		Connection backendConnection = backendConnection(config, info);
-		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		try {
-			configManager.register(redisClient, config.getRedis().key("config"), config,
-					Duration.ofSeconds(config.getRefreshRate()));
+			config = configManager.getConfig(config);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}
+		MeterRegistry meterRegistry = meterManager.getRegistry(config);
+		AbstractRedisClient redisClient = redisManager.getClient(config);
+		Connection backendConnection = backendManager.connect(config, info);
+		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
 		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(),
 				config.getRedis().getBufferSize(), meterRegistry);
-		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager
-				.getConnectionPool(config.getRedis(), codec);
+		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);
 	}
@@ -101,23 +99,7 @@ public class NonRegisteringSidecarDriver implements Driver {
 		return c -> ((StatefulRedisConnection<String, ResultSet>) c).sync();
 	}
 
-	private Connection backendConnection(Config config, Properties info) throws SQLException {
-		if (isEmpty(config.getDriver().getClassName())) {
-			throw new SQLException("No backend driver class specified");
-		}
-		if (isEmpty(config.getDriver().getUrl())) {
-			throw new SQLException("No backend URL specified");
-		}
-		java.sql.Driver driver;
-		try {
-			driver = (java.sql.Driver) Class.forName(config.getDriver().getClassName()).getConstructor().newInstance();
-		} catch (Exception e) {
-			throw new SQLException("Cannot initialize backend driver '" + config.getDriver().getClassName() + "'", e);
-		}
-		return driver.connect(config.getDriver().getUrl(), info);
-	}
-
-	private boolean isEmpty(String string) {
+	public static boolean isEmpty(String string) {
 		return string == null || string.isEmpty();
 	}
 
@@ -160,7 +142,7 @@ public class NonRegisteringSidecarDriver implements Driver {
 
 	public void clear() {
 		configManager.close();
-		meterRegistryManager.clear();
+		meterManager.clear();
 		redisManager.clear();
 	}
 

@@ -1,7 +1,6 @@
 package com.redis.sidecar;
 
 import java.sql.SQLException;
-import java.time.Duration;
 
 import org.awaitility.Awaitility;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,9 +15,13 @@ class ConfigManagerTests extends AbstractSidecarTests {
 	@RedisTestContextsSource
 	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException, JsonProcessingException {
 		Config config = new Config();
-		String key = "myconfig";
-		try (ConfigManager updater = new ConfigManager()) {
-			updater.register(redis.getClient(), key, config, Duration.ofMillis(100));
+		config.getRedis().setUri(redis.getRedisURI());
+		config.getRedis().setCluster(redis.isCluster());
+		config.setRefreshRate(1);
+		RedisManager redisManager = new RedisManager(new MeterManager());
+		try (ConfigManager configManager = new ConfigManager(redisManager)) {
+			String key = configManager.key(config);
+			configManager.getConfig(config);
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".redis.bufferSize", String.valueOf(bufferSize));

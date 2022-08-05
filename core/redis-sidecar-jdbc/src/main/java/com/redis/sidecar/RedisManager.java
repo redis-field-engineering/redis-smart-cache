@@ -9,6 +9,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.redis.lettucemod.RedisModulesClient;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.sidecar.Config.Pool;
 import com.redis.sidecar.Config.Redis;
@@ -20,50 +21,52 @@ import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.metrics.MicrometerCommandLatencyRecorder;
 import io.lettuce.core.metrics.MicrometerOptions;
 import io.lettuce.core.resource.ClientResources;
+import io.lettuce.core.resource.ClientResources.Builder;
 import io.lettuce.core.support.ConnectionPoolSupport;
-import io.micrometer.core.instrument.MeterRegistry;
 
 public class RedisManager {
 
 	private final Map<RedisURI, AbstractRedisClient> clients = new HashMap<>();
 	private final Map<RedisURI, GenericObjectPool<StatefulConnection<String, ResultSet>>> pools = new HashMap<>();
 
-	public AbstractRedisClient getClient(Redis redis, MeterRegistry meterRegistry) {
-		if (!clients.containsKey(redis.redisURI())) {
-			clients.put(redis.redisURI(), client(redis, meterRegistry));
-		}
-		return clients.get(redis.redisURI());
+	private final MeterManager meterManager;
+
+	public RedisManager(MeterManager meterManager) {
+		this.meterManager = meterManager;
 	}
 
-	private AbstractRedisClient client(Redis redis, MeterRegistry meterRegistry) {
-		MicrometerOptions options = MicrometerOptions.create();
-		ClientResources resources = ClientResources.builder()
-				.commandLatencyRecorder(new MicrometerCommandLatencyRecorder(meterRegistry, options)).build();
-		if (redis.isCluster()) {
-			return RedisModulesClusterClient.create(resources, redis.redisURI());
+	@SuppressWarnings("unchecked")
+	public <T extends AbstractRedisClient> T getClient(Config config) {
+		Redis redis = config.getRedis();
+		RedisURI uri = redis.uri();
+		if (clients.containsKey(uri)) {
+			return (T) clients.get(uri);
 		}
-		return RedisModulesClient.create(resources, redis.redisURI());
+		Builder builder = ClientResources.builder();
+		if (config.getMetrics().isLettuce()) {
+			builder = builder.commandLatencyRecorder(
+					new MicrometerCommandLatencyRecorder(meterManager.getRegistry(config), MicrometerOptions.create()));
+		}
+		ClientResources resources = builder.build();
+		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(resources, uri)
+				: RedisModulesClient.create(resources, uri);
+		clients.put(uri, client);
+		return (T) client;
 	}
 
-	public AbstractRedisClient client(Redis redis) {
-		if (redis.isCluster()) {
-			return RedisModulesClusterClient.create(redis.redisURI());
-		}
-		return RedisModulesClient.create(redis.redisURI());
-	}
-
-	public GenericObjectPool<StatefulConnection<String, ResultSet>> getConnectionPool(Redis redis,
+	public GenericObjectPool<StatefulConnection<String, ResultSet>> getConnectionPool(Config config,
 			RedisCodec<String, ResultSet> codec) {
-		RedisURI uri = redis.redisURI();
-		if (!pools.containsKey(uri)) {
-			AbstractRedisClient client = clients.get(redis.redisURI());
-			boolean cluster = redis.isCluster();
-			GenericObjectPool<StatefulConnection<String, ResultSet>> pool = ConnectionPoolSupport
-					.createGenericObjectPool(() -> cluster ? ((RedisModulesClusterClient) client).connect(codec)
-							: ((RedisModulesClient) client).connect(codec), poolConfig(redis.getPool()));
-			pools.put(uri, pool);
+		Redis redis = config.getRedis();
+		RedisURI uri = redis.uri();
+		if (pools.containsKey(uri)) {
+			return pools.get(uri);
 		}
-		return pools.get(uri);
+		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = ConnectionPoolSupport.createGenericObjectPool(
+				() -> redis.isCluster() ? ((RedisModulesClusterClient) getClient(config)).connect(codec)
+						: ((RedisModulesClient) getClient(config)).connect(codec),
+				poolConfig(redis.getPool()));
+		pools.put(uri, pool);
+		return pool;
 	}
 
 	private GenericObjectPoolConfig<StatefulConnection<String, ResultSet>> poolConfig(Pool pool) {
@@ -76,6 +79,13 @@ public class RedisManager {
 		return config;
 	}
 
+	public StatefulRedisModulesConnection<String, String> connection(Config config) {
+		if (config.getRedis().isCluster()) {
+			return ((RedisModulesClusterClient) getClient(config)).connect();
+		}
+		return ((RedisModulesClient) getClient(config)).connect();
+	}
+
 	public void clear() {
 		pools.forEach((k, v) -> v.close());
 		pools.clear();
@@ -86,5 +96,4 @@ public class RedisManager {
 		clients.clear();
 
 	}
-
 }

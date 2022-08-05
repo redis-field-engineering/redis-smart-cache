@@ -16,10 +16,18 @@ public class Config {
 	public static final Duration DEFAULT_METRICS_STEP = Duration.ofMinutes(1);
 
 	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
-	private long metricsStep = DEFAULT_METRICS_STEP.toSeconds();
 	private Driver driver = new Driver();
 	private Redis redis = new Redis();
+	private Metrics metrics = new Metrics();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
+
+	public Metrics getMetrics() {
+		return metrics;
+	}
+
+	public void setMetrics(Metrics metrics) {
+		this.metrics = metrics;
+	}
 
 	public long getRefreshRate() {
 		return refreshRate;
@@ -27,14 +35,6 @@ public class Config {
 
 	public void setRefreshRate(long refreshRate) {
 		this.refreshRate = refreshRate;
-	}
-
-	public long getMetricsStep() {
-		return metricsStep;
-	}
-
-	public void setMetricsStep(long metricsStep) {
-		this.metricsStep = metricsStep;
 	}
 
 	public Driver getDriver() {
@@ -118,7 +118,7 @@ public class Config {
 			this.tls = tls;
 		}
 
-		public RedisURI redisURI() {
+		public RedisURI uri() {
 			RedisURI redisURI = RedisURI.create(uri);
 			redisURI.setVerifyPeer(!insecure);
 			if (tls) {
@@ -289,6 +289,29 @@ public class Config {
 
 		public void setTimeBetweenEvictionRuns(long timeBetweenEvictionRuns) {
 			this.timeBetweenEvictionRuns = timeBetweenEvictionRuns;
+		}
+
+	}
+
+	public static class Metrics {
+
+		private long step = DEFAULT_METRICS_STEP.toSeconds();
+		private boolean lettuce;
+
+		public boolean isLettuce() {
+			return lettuce;
+		}
+
+		public void setLettuce(boolean commandLatencyEnabled) {
+			this.lettuce = commandLatencyEnabled;
+		}
+
+		public long getStep() {
+			return step;
+		}
+
+		public void setStep(long step) {
+			this.step = step;
 		}
 
 	}

@@ -7,22 +7,20 @@ import java.util.Map;
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 
+import io.lettuce.core.RedisURI;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class MeterRegistryManager {
+public class MeterManager {
 
-	private final Map<String, MeterRegistry> registries = new HashMap<>();
+	private final Map<RedisURI, MeterRegistry> registries = new HashMap<>();
 
 	public MeterRegistry getRegistry(Config config) {
-		if (!registries.containsKey(config.getRedis().getUri())) {
-			registries.put(config.getRedis().getUri(), registry(config));
+		RedisURI uri = config.getRedis().uri();
+		if (registries.containsKey(uri)) {
+			return registries.get(uri);
 		}
-		return registries.get(config.getRedis().getUri());
-	}
-
-	private MeterRegistry registry(Config config) {
-		return new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+		MeterRegistry registry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
 
 			@Override
 			public String get(String key) {
@@ -46,10 +44,12 @@ public class MeterRegistryManager {
 
 			@Override
 			public Duration step() {
-				return Duration.ofSeconds(config.getMetricsStep());
+				return Duration.ofSeconds(config.getMetrics().getStep());
 			}
 
 		}, Clock.SYSTEM);
+		registries.put(uri, registry);
+		return registry;
 	}
 
 	public void clear() {
