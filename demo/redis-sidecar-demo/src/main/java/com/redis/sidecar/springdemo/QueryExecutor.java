@@ -7,14 +7,12 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Callable;
 
-import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
@@ -29,12 +27,11 @@ import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
 
 @Component
-@ConditionalOnExpression(value = "#{ '${database}' matches 'mysql' }")
-public class MySQLQueryExecutor implements DisposableBean {
+public class QueryExecutor implements AutoCloseable {
 
-	private static Logger log = LoggerFactory.getLogger(MySQLQueryExecutor.class);
+	private static final Logger log = LoggerFactory.getLogger(QueryExecutor.class);
 
-	private static final String QUERY = "SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode WHERE orders.orderNumber = ?";
+	private static final String QUERY = "SELECT SLEEP(1), orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode WHERE orders.orderNumber = ?";
 
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
@@ -43,23 +40,22 @@ public class MySQLQueryExecutor implements DisposableBean {
 
 	private ProgressBar progressBar;
 
-	public MySQLQueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
+	public QueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
 		this.redisURI = redisURI;
 		this.dataSourceProperties = dataSourceProperties;
 		this.config = config;
 	}
 
-	@PostConstruct
-	public void start() {
+	public void execute() {
 		if (config.isFlush()) {
 			RedisClient.create(redisURI).connect().sync().flushall();
 		}
 		HikariConfig hikariConfig = new HikariConfig();
 		hikariConfig.setJdbcUrl("jdbc:" + redisURI.toString());
 		hikariConfig.setDriverClassName(SidecarDriver.class.getName());
-		System.setProperty("sidecar.driver.url", dataSourceProperties.determineUrl());
-		System.setProperty("sidecar.driver.class-name", dataSourceProperties.determineDriverClassName());
-		System.setProperty("sidecar.metrics-step", "5");
+		hikariConfig.addDataSourceProperty("sidecar.driver.url", dataSourceProperties.determineUrl());
+		hikariConfig.addDataSourceProperty("sidecar.driver.class-name", dataSourceProperties.determineDriverClassName());
+		hikariConfig.addDataSourceProperty("sidecar.metrics.step", "5");
 		hikariConfig.setUsername(dataSourceProperties.determineUsername());
 		hikariConfig.setPassword(dataSourceProperties.determinePassword());
 		DataSource dataSource = new HikariDataSource(hikariConfig);
@@ -75,11 +71,11 @@ public class MySQLQueryExecutor implements DisposableBean {
 		for (int index = 0; index < config.getQueryThreads(); index++) {
 			QueryTask task = new QueryTask(dataSource, config.getLoader().getOrders(), progressBar);
 			tasks.add(task);
-			executor.execute(task);
+			executor.submit(task);
 		}
 	}
 
-	private static class QueryTask implements Runnable {
+	private static class QueryTask implements Callable<Integer> {
 
 		private final Random random = new Random();
 		private final DataSource dataSource;
@@ -94,7 +90,8 @@ public class MySQLQueryExecutor implements DisposableBean {
 		}
 
 		@Override
-		public void run() {
+		public Integer call() throws Exception {
+			int count = 0;
 			while (!stopped) {
 				try (Connection connection = dataSource.getConnection();
 						PreparedStatement statement = connection.prepareStatement(QUERY)) {
@@ -108,10 +105,12 @@ public class MySQLQueryExecutor implements DisposableBean {
 						}
 					}
 					progressBar.step();
+					count++;
 				} catch (SQLException e) {
 					log.error("Could not run query", e);
 				}
 			}
+			return count;
 		}
 
 		public void stop() {
@@ -121,7 +120,7 @@ public class MySQLQueryExecutor implements DisposableBean {
 	}
 
 	@Override
-	public void destroy() throws Exception {
+	public void close() throws Exception {
 		tasks.forEach(QueryTask::stop);
 		tasks.clear();
 		if (progressBar != null) {

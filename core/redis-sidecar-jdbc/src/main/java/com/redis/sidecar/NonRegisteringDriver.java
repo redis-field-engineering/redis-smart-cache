@@ -32,9 +32,9 @@ import io.lettuce.core.cluster.RedisClusterClient;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class NonRegisteringSidecarDriver implements Driver {
+public class NonRegisteringDriver implements Driver {
 
-	private static final Logger log = Logger.getLogger(NonRegisteringSidecarDriver.class.getName());
+	private static final Logger log = Logger.getLogger(NonRegisteringDriver.class.getName());
 
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
@@ -46,7 +46,7 @@ public class NonRegisteringSidecarDriver implements Driver {
 	private static RedisManager redisManager = new RedisManager(meterManager);
 	private static ConfigManager configManager = new ConfigManager(redisManager);
 
-	public NonRegisteringSidecarDriver() {
+	public NonRegisteringDriver() {
 		// Needed for Class.forName().newInstance()
 	}
 

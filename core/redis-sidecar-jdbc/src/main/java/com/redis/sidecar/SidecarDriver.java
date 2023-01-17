@@ -3,7 +3,7 @@ package com.redis.sidecar;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class SidecarDriver extends NonRegisteringSidecarDriver {
+public class SidecarDriver extends NonRegisteringDriver {
 
 	static {
 		try {

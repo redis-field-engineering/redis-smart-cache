@@ -38,17 +38,17 @@ public class Config {
 	public static class Loader {
 
 		private int batch;
-		private int products;
 		private int customers;
+		private int products;
 		private int orders;
-		private int orderDetails;
+		private int orderdetails;
 
-		public int getBatch() {
-			return batch;
+		public int getCustomers() {
+			return customers;
 		}
 
-		public void setBatch(int batchSize) {
-			this.batch = batchSize;
+		public void setCustomers(int customers) {
+			this.customers = customers;
 		}
 
 		public int getProducts() {
@@ -59,14 +59,6 @@ public class Config {
 			this.products = products;
 		}
 
-		public int getCustomers() {
-			return customers;
-		}
-
-		public void setCustomers(int customers) {
-			this.customers = customers;
-		}
-
 		public int getOrders() {
 			return orders;
 		}
@@ -75,12 +67,20 @@ public class Config {
 			this.orders = orders;
 		}
 
-		public int getOrderDetails() {
-			return orderDetails;
+		public int getOrderdetails() {
+			return orderdetails;
 		}
 
-		public void setOrderDetails(int orderDetails) {
-			this.orderDetails = orderDetails;
+		public void setOrderdetails(int orderdetails) {
+			this.orderdetails = orderdetails;
+		}
+
+		public int getBatch() {
+			return batch;
+		}
+
+		public void setBatch(int batchSize) {
+			this.batch = batchSize;
 		}
 
 	}

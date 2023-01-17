@@ -76,6 +76,14 @@ subprojects {
         testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     }
     
+    configurations.all {
+		resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+			if (details.requested.name == 'lettuce-core' ) {
+				details.useVersion lettuceVersion
+			}
+		}
+	}
+    
     test {
         useJUnitPlatform()
     }
