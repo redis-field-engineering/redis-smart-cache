@@ -31,3 +31,18 @@ services:
     container_name: redis
     ports:
       - 6379:6379
+      
+  redis-sidecar-demo:
+    image: fieldengineering/redis-sidecar-demo
+    hostname: sidecar-demo
+    container_name: sidecar-demo
+    build: .
+    restart: on-failure
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - 8080:8080
+    environment:
+      - SPRING_REDIS_HOST=redis
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql/sidecar
