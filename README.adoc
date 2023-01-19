@@ -4,9 +4,11 @@
 :project-name:    redis-sidecar
 :project-group:   com.redis
 :project-version: 0.1.1
+:project-url:     https://github.com/{project-owner}/{project-name}
 :product-name:    Redis Sidecar
 :artifact-id:     redis-sidecar-jdbc
 :codecov-token:   y0NMn7uIJ0
+:grafana-dir:     demo/redis-sidecar-demo/grafana
 
 
 image:https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
@@ -14,15 +16,81 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-== Overview
-{product-name} is a transparent cache for JDBC which stores results of SQL queries in Redis.
-Repeated identical queries are answered from Redis, bypassing the database.
+{product-name} is a JDBC query cache for https://redis.io/docs/stack/[Redis Stack], https://redis.com/redis-enterprise-cloud/overview/[Redis Cloud], and https://redis.com/redis-enterprise-software/overview/[Redis Enterprise].
 
-{product-name} is implemented as a JDBC driver and acts as a wrapper around any backend JDBC driver.
+{product-name} is implemented as a JDBC driver and acts as a wrapper around any backend database JDBC driver.
+Repeated identical queries are answered from Redis, bypassing the backend database and often greatly
+ improving overall response time.
+ 
+== Table of Contents
 
-== Getting Started
+* link:#background[Background]
+* link:#quick-start[Quick start]
+* link:#installation[Installation]
+* link:#Usage[Usage]
+* link:#Support[Support]
+* link:#License[License]
 
-=== Application Dependencies
+== Background
+
+Redis is an in-memory data store designed to serve data with the fastest possible response times.
+For this reason, Redis is frequently used for caching OLTP-style application queries like SQL.
+Implementing a caching solution is usually not trivial.
+Among other things it involves:
+* Fault-tolerance
+* Result-set serialization and deserialization
+* Cache invalidation: dynamic configuration, exclude/include rules, ...
+
+We built {product-name} so that an existing JDBC application can take advantage of Redis as a cache without any code change, just configuration changes.
+
+== Quick start
+
+To understand how {product-name} works, it's best to try it for yourself.
+This example showcases an application that continuously performs queries against a MySQL database and uses {product-name} to cache query results.
+
+Follow the steps below:
+
+First, clone this git repository:
+[source,console,subs="verbatim,attributes"]
+----
+git clone {project-url}.git
+cd {project-name}
+----
+
+Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and {product-name) example app instance:
+[source,console]
+----
+docker-compose up
+----
+
+When all containers have started log into Grafana: http://localhost:3000
+
+Username / password: `admin` / `admin`
+
+In the Grafana UI click on http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
+
+In the filter box enter `Redis` and click on the first entry (*Redis datasource*).
+
+In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click on `Save & test`.
+
+image::{grafana-dir}/redis-datasource.png[Redis Datasource]
+
+Now import the demo dashboard by clicking on Dashboards/Import in the sidebar.
+
+image::{grafana-dir}/import-dashboard.png[Import Dashboard]
+
+Click on `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
+At the bottom of the page select the Redis datasource that you previously created and click `Import`.
+
+You should see the following dashboard:
+
+image::{grafana-dir}/redis-datasource.png[Dashboard]
+
+After a few minutes the Redis cache will be populated and you should see dramatically improved response times.
+
+== Installation
+
+Add the {product-name} JDBC driver as an application dependency.
 
 .Maven
 [source,xml,subs="verbatim,attributes"]
@@ -41,6 +109,8 @@ dependencies {
     implementation '{project-group}:{artifact-id}:{project-version}'
 }
 ----
+
+== Usage
 
 === Configuration
 When the {product-name} driver is initialized by your application it needs to know at the very least how to connect to the Redis database.
@@ -105,3 +175,10 @@ Rules are processed in order and consist of *criteria* (conditions) and *actions
 `ttl`:: Key expiration duration in seconds (default: `3600`). Use `0` for no caching, `-1` for no expiration.
 
 
+== Support
+
+{product-name} is supported by Redis, Inc. on a good faith effort basis. To report bugs, request features, or receive assistance, please {project-url}/issues[file an issue].
+
+== License
+
+{product-name} is licensed under the MIT License. Copyright (C) 2023 Redis, Inc.
