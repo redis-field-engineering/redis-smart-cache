@@ -73,18 +73,18 @@ In the filter box enter `Redis` and click on the first entry (*Redis datasource*
 
 In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click on `Save & test`.
 
-image::{grafana-dir}/redis-datasource.png[Redis Datasource,width=200]
+image::{grafana-dir}/redis-datasource.png[Redis Datasource,role=half-width]
 
 Now import the demo dashboard by clicking on Dashboards/Import in the sidebar.
 
-image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=100]
+image::{grafana-dir}/import-dashboard.png[Import Dashboard,role=half-width]
 
 Click on `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
 At the bottom of the page select the Redis datasource that you previously created and click `Import`.
 
 You should see the following dashboard:
 
-image::{grafana-dir}/dashboard.png[Dashboard,width=200]
+image::{grafana-dir}/dashboard.png[Dashboard,role=half-width]
 
 After a few minutes the Redis cache will be populated and you should see dramatically improved response times.
 
