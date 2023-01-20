@@ -18,9 +18,11 @@ image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/b
 
 {product-name} is a JDBC query cache for https://redis.io/docs/stack/[Redis Stack], https://redis.com/redis-enterprise-cloud/overview/[Redis Cloud], and https://redis.com/redis-enterprise-software/overview/[Redis Enterprise].
 
-{product-name} is implemented as a JDBC driver and acts as a wrapper around any backend database JDBC driver.
-Repeated identical queries are answered from Redis, bypassing the backend database and often greatly
- improving overall response time.
+{product-name} lets you adds caching to your application without changing any lines of code.
+
+Implemented as a wrapper around your backend database's JDBC driver, {product-name} can answer
+slow, repeated queries from Redis, bypassing expensive database calls and often greatly
+improving response times.
  
 == Table of Contents
 
@@ -34,18 +36,20 @@ Repeated identical queries are answered from Redis, bypassing the backend databa
 == Background
 
 Redis is an in-memory data store designed to serve data with the fastest possible response times.
-For this reason, Redis is frequently used for caching OLTP-style application queries like SQL.
-Implementing a caching solution is usually not trivial.
-Among other things it involves:
-* Fault-tolerance
-* Result-set serialization and deserialization
-* Cache invalidation: dynamic configuration, exclude/include rules, ...
+For this reason, Redis is frequently used for caching.
 
-We built {product-name} so that an existing JDBC application can take advantage of Redis as a cache without any code change, just configuration changes.
+It's not always easy to modify your code to utilize Redis as a cache. You need to think about a number of issues, including:
+
+* Result set serialization and deserialization
+* Fault-tolerance
+* Cache invalidation
+
+This is why we built {product-name}. After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any code changes.
 
 == Quick start
 
 To understand how {product-name} works, it's best to try it for yourself.
+
 This example showcases an application that continuously performs queries against a MySQL database and uses {product-name} to cache query results.
 
 Follow the steps below:
@@ -63,30 +67,32 @@ Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, a
 docker-compose up
 ----
 
-When all containers have started log into Grafana: http://localhost:3000
+Once all of these containers have started, log in to Grafana by pointing your browser to http://localhost:3000. Use the following credentials:
 
-Username / password: `admin` / `admin`
+Username: `admin`
+Password: `admin`
 
-In the Grafana UI click on http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
+In the Grafana UI, click http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
 
-In the filter box enter `Redis` and click on the first entry (*Redis datasource*).
+In the filter box, enter `Redis` and click on the first entry (*Redis datasource*).
 
-In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click on `Save & test`.
+In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click `Save & test`.
 
 image::{grafana-dir}/redis-datasource.png[Redis Datasource,width=400]
 
-Now import the demo dashboard by clicking on Dashboards/Import in the sidebar.
+Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
 image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=200]
 
-Click on `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
+Next, click `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
+
 At the bottom of the page select the Redis datasource that you previously created and click `Import`.
 
 You should see the following dashboard:
 
 image::{grafana-dir}/dashboard.png[Dashboard,width=400]
 
-After a few minutes the Redis cache will be populated and you should see dramatically improved response times.
+After a few minutes, the Redis cache will be populated and you should see dramatically improved response times.
 
 == Installation
 
@@ -113,17 +119,22 @@ dependencies {
 == Usage
 
 === Configuration
-When the {product-name} driver is initialized by your application it needs to know at the very least how to connect to the Redis database.
-This is called bootstrap configuration and can be achieved with the following parameters in your application: 
+
+First, ensure that your application is using {product-name} as its JDBC driver:
 
 Driver class name:: `com.redis.sidecar.SidecarDriver`
 
-JDBC URL:: `jdbc:redis://...` - see https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for details on the Redis URI syntax.
+Next, set your JDBC URL to the URI for your Redis instance. For example:
 
-Once connected, {product-name} read its configuration from the JSON document located under `sidecar:config`.
-If that document does not yet exist it is possible to populate it at startup with the following JDBC properties.
+JDBC URL:: `jdbc:redis://cache.redis.cloud:6379`
 
-==== Backend Database
+See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax]
+
+Once connected, {product-name} reads its configuration from a Redis JSON document located under `sidecar:config`.
+
+If that document does not yet exist, you can populate it at startup with the following JDBC properties.
+
+==== Backend database
 `sidecar.driver.class-name`:: Class name of the backend database JDBC driver
 
 `sidecar.driver.url`:: JDBC URL for the backend database
@@ -132,21 +143,21 @@ You can also include any property your backend JDBC driver requires, like `usern
 These will be passed to the backend JDBC driver as is.
 
 ==== Redis
-The following properties can be used to configure Redis connections and storage:
+To further configure how {product-name} connects to Redis, use the following properties:
 
-`sidecar.redis.uri`:: Redis URI. See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[here] for syntax.
+`sidecar.redis.uri`:: Redis URI. See the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce Redis URI] for syntax for what's permitted here.
 
-`sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`)
+`sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`).
 
 `sidecar.redis.tls`:: Establish a secure TLS connection.
 
 `sidecar.redis.insecure`:: Allow insecure TLS connection by skipping cert validation.
 
-`sidecar.redis.username`:: Used to send ACL style 'AUTH username pass'. Overrides username in Redis URI. Needs password.
+`sidecar.redis.username`:: Authenticate using the provided username. Overrides username in Redis URI. Requires password.
 
-`sidecar.redis.password`:: Password to use when connecting to the server. Overrides password in Redis URI.
+`sidecar.redis.password`:: Authenticate using the provided password. Overrides password in Redis URI.
 
-`sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar like cache entries, configuration, and metrics (default: `sidecar`)
+`sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics. (default: `sidecar`)
 
 `sidecar.redis.key-separator`:: Delimiter to use between key elements (default: `:`).
 
@@ -158,12 +169,13 @@ The following properties can be used to configure Redis connections and storage:
 
 `sidecar.redis.pool.max-wait`:: Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`). Use a negative value to block indefinitely.
 
-`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`). When positive, the idle object evictor thread starts, otherwise no idle object eviction is performed.
+`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`). When positive, the idle object evictor thread starts; otherwise no idle object eviction is performed.
 
-`sidecar.redis.buffer-size`:: Maximum capacity in MB of the buffer used to encode a resultset (default: `100`).
+`sidecar.redis.buffer-size`:: Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
 
 ==== Rules
 {product-name} uses rules to determine how SQL queries are cached.
+
 Rules are processed in order and consist of *criteria* (conditions) and *actions* (results):
 
 * Criteria
