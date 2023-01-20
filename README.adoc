@@ -14,7 +14,7 @@
   <img alt="Redis Sidecar" src=".github/images/redis-sidecar-banner.png">
 
   <p align="center">
-    Redis SQL Trino is a is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
+    Redis SQL Trino is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
   </p>
 </p>
 ++++
@@ -28,8 +28,8 @@ image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/b
 
 {product-name} lets you adds caching to your application without changing any lines of code.
 
-Implemented as a wrapper around your backend database's JDBC driver, {product-name} can answer
-slow, repeated queries from Redis, bypassing expensive database calls and often greatly
+Implemented as a wrapper around your backend database's JDBC driver, {product-name} can cache
+slow, repeated queries from Redis, bypassing expensive database calls and greatly
 improving response times.
  
 == Table of Contents
