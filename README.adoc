@@ -4,17 +4,17 @@
 :project-group:   com.redis
 :project-version: 0.1.1
 :project-url:     https://github.com/{project-owner}/{project-name}
-:product-name:    Redis Sidecar
+:product-name:    Redis Smart Cache
 :artifact-id:     redis-sidecar-jdbc
 :codecov-token:   y0NMn7uIJ0
 :grafana-dir:     demo/redis-sidecar-demo/grafana
 
 ++++
 <p align="center">
-  <img alt="Redis Sidecar" src=".github/images/redis-sidecar-banner.png">
+  <img alt="Redis Sidecar" src=".github/images/redis-smart-cache-banner-light.png">
 
   <p align="center">
-    Redis Sidecar is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
+    Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
   </p>
 </p>
 ++++
@@ -26,7 +26,7 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-{product-name} lets you adds caching to your application without changing any lines of code.
+{product-name} lets you adds caching to your application without changing your code.
 
 Implemented as a wrapper around your backend database's JDBC driver, {product-name} can cache
 slow, repeated queries from Redis, bypassing expensive database calls and greatly
