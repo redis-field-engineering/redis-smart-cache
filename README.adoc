@@ -1,4 +1,3 @@
-= Redis Sidecar
 :linkattrs:
 :project-owner:   redis-field-engineering
 :project-name:    redis-sidecar
@@ -10,13 +9,22 @@
 :codecov-token:   y0NMn7uIJ0
 :grafana-dir:     demo/redis-sidecar-demo/grafana
 
+++++
+<p align="center">
+  <img alt="Redis Sidecar" src=".github/images/redis-sidecar-banner.png">
+
+  <p align="center">
+    Redis SQL Trino is a is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
+  </p>
+</p>
+++++
+
+'''
 
 image:https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
 image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Download, link="https://search.maven.org/#search|ga|1|{artifact-id}"]
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
-
-{product-name} is a JDBC query cache for https://redis.io/docs/stack/[Redis Stack], https://redis.com/redis-enterprise-cloud/overview/[Redis Cloud], and https://redis.com/redis-enterprise-software/overview/[Redis Enterprise].
 
 {product-name} lets you adds caching to your application without changing any lines of code.
 
@@ -44,7 +52,7 @@ It's not always easy to modify your code to utilize Redis as a cache. You need t
 * Fault-tolerance
 * Cache invalidation
 
-This is why we built {product-name}. After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any code changes.
+This is why we built {product-name}. After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any changes to your code.
 
 == Quick start
 
