@@ -60,8 +60,6 @@ To understand how {product-name} works, it's best to try it for yourself.
 
 This example showcases an application that continuously performs queries against a MySQL database and uses {product-name} to cache query results.
 
-Follow the steps below:
-
 First, clone this git repository:
 [source,console,subs="verbatim,attributes"]
 ----
@@ -104,7 +102,7 @@ After a few minutes, the Redis cache will be populated and you should see dramat
 
 == Installation
 
-Add the {product-name} JDBC driver as an application dependency.
+To use {product-name} with an existing application, you'll need to add the {product-name} JDBC driver as an application dependency.
 
 .Maven
 [source,xml,subs="verbatim,attributes"]
@@ -124,6 +122,8 @@ dependencies {
 }
 ----
 
+The next step is to configure {product-name}, as described below.
+
 == Usage
 
 === Configuration
@@ -132,15 +132,15 @@ First, ensure that your application is using {product-name} as its JDBC driver:
 
 Driver class name:: `com.redis.sidecar.SidecarDriver`
 
-Next, set your JDBC URL to the URI for your Redis instance. For example:
+Next, set your JDBC URL to the URI of your Redis instance. For example:
 
 JDBC URL:: `jdbc:redis://cache.redis.cloud:6379`
 
-See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax]
+See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax] for all of the possible URI parameters you can use here.
 
-Once connected, {product-name} reads its configuration from a Redis JSON document located under `sidecar:config`.
+Once connected, {product-name} reads its configuration from a Redis JSON document located at the key `sidecar:config`.
 
-If that document does not yet exist, you can populate it at startup with the following JDBC properties.
+If that document does not yet exist, you can populate it at startup by setting the following JDBC properties:
 
 ==== Backend database
 `sidecar.driver.class-name`:: Class name of the backend database JDBC driver
