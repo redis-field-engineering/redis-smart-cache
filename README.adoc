@@ -14,7 +14,7 @@
   <img alt="Redis Sidecar" src=".github/images/redis-sidecar-banner.png">
 
   <p align="center">
-    Redis SQL Trino is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
+    Redis Sidecar is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
   </p>
 </p>
 ++++
