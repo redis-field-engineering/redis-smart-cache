@@ -67,7 +67,7 @@ git clone {project-url}.git
 cd {project-name}
 ----
 
-Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and {product-name) example app instance:
+Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and {product-name} example app instance:
 [source,console]
 ----
 docker-compose up
