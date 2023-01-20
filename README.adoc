@@ -92,13 +92,13 @@ image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=200]
 
 Next, click `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
 
-At the bottom of the page select the Redis datasource that you previously created and click `Import`.
+At the bottom of the page, select the Redis datasource that you just created and click `Import`.
 
 You should see the following dashboard:
 
 image::{grafana-dir}/dashboard.png[Dashboard,width=400]
 
-After a few minutes, the Redis cache will be populated and you should see dramatically improved response times.
+After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
 
 == Installation
 
@@ -128,17 +128,18 @@ The next step is to configure {product-name}, as described below.
 
 === Configuration
 
+Here's how to configure {product-name}.
 First, ensure that your application is using {product-name} as its JDBC driver:
 
 Driver class name:: `com.redis.sidecar.SidecarDriver`
 
-Next, set your JDBC URL to the URI of your Redis instance. For example:
+Next, set your JDBC URI to the URI of your Redis instance. For example:
 
 JDBC URL:: `jdbc:redis://cache.redis.cloud:6379`
 
 See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax] for all of the possible URI parameters you can use here.
 
-Once connected, {product-name} reads its configuration from a Redis JSON document located at the key `sidecar:config`.
+Once connected, {product-name} reads its configuration from a Redis JSON document located in Redis at the key `sidecar:config`.
 
 If that document does not yet exist, you can populate it at startup by setting the following JDBC properties:
 
@@ -151,7 +152,7 @@ You can also include any property your backend JDBC driver requires, like `usern
 These will be passed to the backend JDBC driver as is.
 
 ==== Redis
-To further configure how {product-name} connects to Redis, use the following properties:
+To further configure how {product-name} connects to Redis, set the following properties:
 
 `sidecar.redis.uri`:: Redis URI. See the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce Redis URI] for syntax for what's permitted here.
 
@@ -182,6 +183,7 @@ To further configure how {product-name} connects to Redis, use the following pro
 `sidecar.redis.buffer-size`:: Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
 
 ==== Rules
+
 {product-name} uses rules to determine how SQL queries are cached.
 
 Rules are processed in order and consist of *criteria* (conditions) and *actions* (results):
@@ -193,7 +195,6 @@ Rules are processed in order and consist of *criteria* (conditions) and *actions
 * Action
 
 `ttl`:: Key expiration duration in seconds (default: `3600`). Use `0` for no caching, `-1` for no expiration.
-
 
 == Support
 
