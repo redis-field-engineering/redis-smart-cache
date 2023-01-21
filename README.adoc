@@ -26,7 +26,7 @@ image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Downl
 image:https://img.shields.io/nexus/s/{project-group}/{artifact-id}?server=https%3A%2F%2Fs01.oss.sonatype.org[Snapshot,link="https://s01.oss.sonatype.org/#nexus-search;quick~{artifact-id}"]
 image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
-{product-name} lets you adds caching to your application without changing your code.
+{product-name} lets you add caching to your application without changing the code.
 
 Implemented as a wrapper around your backend database's JDBC driver, {product-name} can cache
 slow, repeated queries from Redis, bypassing expensive database calls and greatly
@@ -46,13 +46,15 @@ improving response times.
 Redis is an in-memory data store designed to serve data with the fastest possible response times.
 For this reason, Redis is frequently used for caching.
 
-It's not always easy to modify your code to utilize Redis as a cache. You need to think about a number of issues, including:
+It's not always easy to modify your code to utilize Redis as a cache.
+You need to think about a number of issues, including:
 
 * Result set serialization and deserialization
 * Fault-tolerance
 * Cache invalidation
 
-This is why we built {product-name}. After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any changes to your code.
+This is why we built {product-name}.
+After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any changes to your code.
 
 == Quick start
 
@@ -73,7 +75,8 @@ Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, a
 docker-compose up
 ----
 
-Once all of these containers have started, log in to Grafana by pointing your browser to http://localhost:3000. Use the following credentials:
+Once all of these containers have started, log in to Grafana by pointing your browser to http://localhost:3000.
+Use the following credentials:
 
 Username: `admin`
 Password: `admin`
@@ -133,7 +136,8 @@ First, ensure that your application is using {product-name} as its JDBC driver:
 
 Driver class name:: `com.redis.sidecar.SidecarDriver`
 
-Next, set your JDBC URI to the URI of your Redis instance. For example:
+Next, set your JDBC URI to the URI of your Redis instance.
+For example:
 
 JDBC URL:: `jdbc:redis://cache.redis.cloud:6379`
 
@@ -154,7 +158,8 @@ These will be passed to the backend JDBC driver as is.
 ==== Redis
 To further configure how {product-name} connects to Redis, set the following properties:
 
-`sidecar.redis.uri`:: Redis URI. See the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce Redis URI] for syntax for what's permitted here.
+`sidecar.redis.uri`:: Redis URI.
+See the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce Redis URI] for syntax for what's permitted here.
 
 `sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`).
 
@@ -162,23 +167,31 @@ To further configure how {product-name} connects to Redis, set the following pro
 
 `sidecar.redis.insecure`:: Allow insecure TLS connection by skipping cert validation.
 
-`sidecar.redis.username`:: Authenticate using the provided username. Overrides username in Redis URI. Requires password.
+`sidecar.redis.username`:: Authenticate using the provided username.
+Overrides username in Redis URI.
+Requires password.
 
-`sidecar.redis.password`:: Authenticate using the provided password. Overrides password in Redis URI.
+`sidecar.redis.password`:: Authenticate using the provided password.
+Overrides password in Redis URI.
 
 `sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics. (default: `sidecar`)
 
 `sidecar.redis.key-separator`:: Delimiter to use between key elements (default: `:`).
 
-`sidecar.redis.pool.max-active`:: Maximum number of connections that can be allocated by the pool at a given time (default: `8`). Use a negative value for no limit.
+`sidecar.redis.pool.max-active`:: Maximum number of connections that can be allocated by the pool at a given time (default: `8`).
+Use a negative value for no limit.
 
-`sidecar.redis.pool.max-idle`:: Maximum number of "idle" connections in the pool (default: `8`). Use a negative value to indicate an unlimited number of idle connections.
+`sidecar.redis.pool.max-idle`:: Maximum number of "idle" connections in the pool (default: `8`).
+Use a negative value to indicate an unlimited number of idle connections.
 
-`sidecar.redis.pool.min-idle`:: Target for the minimum number of idle connections to maintain in the pool (default: `0`). This setting only has an effect if both it and time between eviction runs are positive.
+`sidecar.redis.pool.min-idle`:: Target for the minimum number of idle connections to maintain in the pool (default: `0`).
+This setting only has an effect if both it and time between eviction runs are positive.
 
-`sidecar.redis.pool.max-wait`:: Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`). Use a negative value to block indefinitely.
+`sidecar.redis.pool.max-wait`:: Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`).
+Use a negative value to block indefinitely.
 
-`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`). When positive, the idle object evictor thread starts; otherwise no idle object eviction is performed.
+`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`).
+When positive, the idle object evictor thread starts; otherwise no idle object eviction is performed.
 
 `sidecar.redis.buffer-size`:: Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
 
@@ -190,7 +203,8 @@ Rules are processed in order and consist of *criteria* (conditions) and *actions
 
 * Criteria
 
-`table`:: matches if given name is present in the query tables (default: `null`). Use null (empty) value to match all tables. 
+`table`:: matches if given name is present in the query tables (default: `null`).
+Use null (empty) value to match all tables. 
 
 * Action
 
@@ -198,7 +212,8 @@ Rules are processed in order and consist of *criteria* (conditions) and *actions
 
 == Support
 
-{product-name} is supported by Redis, Inc. on a good faith effort basis. To report bugs, request features, or receive assistance, please {project-url}/issues[file an issue].
+{product-name} is supported by Redis, Inc. on a good faith effort basis.
+To report bugs, request features, or receive assistance, please {project-url}/issues[file an issue].
 
 == License
 
