@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.sql.DataSource;
 
@@ -46,32 +48,41 @@ public class QueryExecutor implements AutoCloseable {
 		this.config = config;
 	}
 
-	public void execute() {
+	public void execute() throws InterruptedException, ExecutionException {
 		if (config.isFlush()) {
-			RedisClient.create(redisURI).connect().sync().flushall();
+			try (RedisClient client = RedisClient.create(redisURI)) {
+				client.connect().sync().flushall();
+			}
 		}
 		HikariConfig hikariConfig = new HikariConfig();
 		hikariConfig.setJdbcUrl("jdbc:" + redisURI.toString());
 		hikariConfig.setDriverClassName(SidecarDriver.class.getName());
 		hikariConfig.addDataSourceProperty("sidecar.driver.url", dataSourceProperties.determineUrl());
-		hikariConfig.addDataSourceProperty("sidecar.driver.class-name", dataSourceProperties.determineDriverClassName());
+		hikariConfig.addDataSourceProperty("sidecar.driver.class-name",
+				dataSourceProperties.determineDriverClassName());
 		hikariConfig.addDataSourceProperty("sidecar.metrics.step", "5");
 		hikariConfig.setUsername(dataSourceProperties.determineUsername());
 		hikariConfig.setPassword(dataSourceProperties.determinePassword());
-		DataSource dataSource = new HikariDataSource(hikariConfig);
-		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(config.getQueryThreads());
-		executor.setMaxPoolSize(config.getQueryThreads());
-		executor.setThreadNamePrefix("query-task");
-		executor.initialize();
-		ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
-		progressBarBuilder.setTaskName("Querying");
-		progressBarBuilder.showSpeed();
-		progressBar = progressBarBuilder.build();
-		for (int index = 0; index < config.getQueryThreads(); index++) {
-			QueryTask task = new QueryTask(dataSource, config.getLoader().getOrders(), progressBar);
-			tasks.add(task);
-			executor.submit(task);
+		try (HikariDataSource dataSource = new HikariDataSource(hikariConfig)) {
+			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+			executor.setCorePoolSize(config.getQueryThreads());
+			executor.setMaxPoolSize(config.getQueryThreads());
+			executor.setThreadNamePrefix("query-task");
+			executor.initialize();
+			ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
+			progressBarBuilder.setTaskName("Querying");
+			progressBarBuilder.showSpeed();
+			progressBar = progressBarBuilder.build();
+			List<Future<Integer>> futures = new ArrayList<>();
+			for (int index = 0; index < config.getQueryThreads(); index++) {
+				QueryTask task = new QueryTask(dataSource, config.getLoader().getOrders(), progressBar);
+				tasks.add(task);
+				futures.add(executor.submit(task));
+			}
+			executor.shutdown();
+			for (Future<?> future : futures) {
+				future.get();
+			}
 		}
 	}
 
@@ -96,7 +107,7 @@ public class QueryExecutor implements AutoCloseable {
 				try (Connection connection = dataSource.getConnection();
 						PreparedStatement statement = connection.prepareStatement(QUERY)) {
 					int orderNumber = random.nextInt(totalRows) + 1;
-					statement.setInt(1, random.nextInt(0, 5));
+					statement.setInt(1, random.nextInt(5));
 					statement.setInt(2, orderNumber);
 					try (ResultSet resultSet = statement.executeQuery()) {
 						while (resultSet.next()) {
