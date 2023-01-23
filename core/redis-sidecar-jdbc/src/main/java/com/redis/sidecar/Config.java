@@ -118,6 +118,7 @@ public class Config {
 			this.tls = tls;
 		}
 
+		@SuppressWarnings("deprecation")
 		public RedisURI uri() {
 			RedisURI redisURI = RedisURI.create(uri);
 			redisURI.setVerifyPeer(!insecure);

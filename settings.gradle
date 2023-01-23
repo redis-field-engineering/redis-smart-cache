@@ -9,6 +9,7 @@ buildscript {
         classpath "org.kordamp.gradle:java-project-gradle-plugin:$kordampPluginVersion"
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
         classpath "gradle.plugin.com.github.johnrengelman:shadow:$shadowPluginVersion"
+        classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
     }
 }
 
@@ -32,6 +33,7 @@ projects {
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
             id 'com.github.johnrengelman.shadow'
+            id 'me.champeau.jmh'
         }
         dirs(['demo']) {
             id 'java'

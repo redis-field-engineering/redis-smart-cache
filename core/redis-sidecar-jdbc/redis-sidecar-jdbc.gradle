@@ -36,3 +36,10 @@ shadowJar {
 }
 
 jar.finalizedBy shadowJar
+
+jmh {
+    iterations = 1 // Number of measurement iterations to do.
+    fork = 1 // How many times to fork a single benchmark. Use 0 to disable forking altogether
+    warmupIterations = 1 // Number of warmup iterations to do.
+    timeUnit = 'ns'
+}
