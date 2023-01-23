@@ -8,14 +8,16 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.sidecar.AbstractSidecarTests;
+import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -24,14 +26,20 @@ class OracleTests extends AbstractSidecarTests {
 	private static final DockerImageName ORACLE_DOCKER_IMAGE_NAME = DockerImageName.parse("gvenzl/oracle-xe")
 			.withTag("18.4.0-slim");
 
-	@Container
 	private static final OracleContainer ORACLE = new OracleContainer(ORACLE_DOCKER_IMAGE_NAME);
 
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
+	protected void setupDatabaseContainer() throws SQLException, IOException {
+		Assumptions.assumeTrue(RedisServer.isEnabled("ORACLE"));
+		ORACLE.start();
 		Connection backendConnection = connection(ORACLE);
 		runScript(backendConnection, "oracle/hr.sql");
 		runScript(backendConnection, "oracle/employee.sql");
+	}
+
+	@AfterAll
+	protected void teardownDatabaseContainer() {
+		ORACLE.stop();
 	}
 
 	@ParameterizedTest

@@ -11,10 +11,15 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 
 public class SqlParser {
 
+	public Statement parse(String sql) throws JSQLParserException {
+		return CCJSqlParserUtil.parse(sql,
+				parser -> parser.withSquareBracketQuotation(true).withAllowComplexParsing(false));
+	}
+
 	public List<String> getTableList(String sql) throws JSQLParserException {
-		Statement parsedStatement = CCJSqlParserUtil.parse(sql);
-		if (parsedStatement instanceof Select) {
-			return new TablesNamesFinder().getTableList(parsedStatement);
+		Statement statement = parse(sql);
+		if (statement instanceof Select) {
+			return new TablesNamesFinder().getTableList(statement);
 		}
 		return Collections.emptyList();
 	}

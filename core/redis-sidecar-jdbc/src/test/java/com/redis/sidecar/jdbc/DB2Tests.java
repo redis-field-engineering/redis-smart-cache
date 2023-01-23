@@ -4,26 +4,34 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.Db2Container;
-import org.testcontainers.junit.jupiter.Container;
 
 import com.redis.sidecar.AbstractSidecarTests;
+import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 class DB2Tests extends AbstractSidecarTests {
 
 	@SuppressWarnings("deprecation")
-	@Container
 	private static final Db2Container DB2 = new Db2Container().acceptLicense();
 
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
+	protected void setupDatabaseContainer() throws SQLException, IOException {
+		Assumptions.assumeTrue(RedisServer.isEnabled("DB2"));
+		DB2.start();
 		Connection backendConnection = connection(DB2);
 		runScript(backendConnection, "db2/create.sql");
 		runScript(backendConnection, "db2/data.sql");
+	}
+
+	@AfterAll
+	protected void teardownDatabaseContainer() {
+		DB2.stop();
 	}
 
 	@ParameterizedTest
