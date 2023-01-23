@@ -4,15 +4,11 @@ dependencies {
   implementation group: 'com.redis', name: 'spring-lettucemod', version: lettucemodVersion
   implementation group: 'com.github.javafaker', name: 'javafaker', version: fakerVersion
   implementation group: 'me.tongfei', name: 'progressbar', version: progressbarVersion
-  runtimeOnly 'mysql:mysql-connector-java'
+  runtimeOnly 'com.mysql:mysql-connector-j'
   runtimeOnly 'org.postgresql:postgresql'
   runtimeOnly 'com.oracle.database.jdbc:ojdbc8'
   runtimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
   runtimeOnly group: 'com.ibm.db2', name: 'jcc', version: db2Version  
   developmentOnly 'org.springframework.boot:spring-boot-devtools'
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
-}
-
-test {
-  useJUnitPlatform()
 }

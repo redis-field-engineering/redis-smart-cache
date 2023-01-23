@@ -1,12 +1,13 @@
 buildscript {
     repositories {
-        gradlePluginPortal()
-        mavenCentral()
         mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
     }
     dependencies {
-        classpath "org.kordamp.gradle:kordamp-parentbuild:$kordampBuildVersion"
         classpath "org.kordamp.gradle:java-project-gradle-plugin:$kordampPluginVersion"
+        classpath "org.kordamp.gradle:jacoco-gradle-plugin:$kordampPluginVersion"
+        classpath "org.kordamp.gradle:kordamp-parentbuild:$kordampBuildVersion"
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
         classpath "gradle.plugin.com.github.johnrengelman:shadow:$shadowPluginVersion"
         classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
@@ -27,18 +28,18 @@ projects {
         path(':') {
             id 'org.kordamp.gradle.java-project'
         }
-        dirs(['core']) {
-            id 'java-library'
-            id 'java-library-distribution'
+        dirs(['core', 'demo']) {
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
+        }
+        dir('core') {
+            id 'java-library'
+            id 'java-library-distribution'
             id 'com.github.johnrengelman.shadow'
             id 'me.champeau.jmh'
         }
-        dirs(['demo']) {
+        dir('demo') {
             id 'java'
-            id 'org.springframework.boot'
-            id 'io.spring.dependency-management'        
         }
     }
 }

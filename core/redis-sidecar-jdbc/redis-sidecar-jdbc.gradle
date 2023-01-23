@@ -8,7 +8,7 @@ dependencies {
     testImplementation 'org.slf4j:slf4j-jdk14'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
-    testImplementation 'mysql:mysql-connector-java'
+    testImplementation 'com.mysql:mysql-connector-j'
     testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
     testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
@@ -21,16 +21,6 @@ dependencies {
     testImplementation 'com.zaxxer:HikariCP'
 }
 
-    
-bootJar {
-    enabled = false
-}
-
-jar {
-    enabled = true
-    archiveClassifier = ''
-}
-
 shadowJar {
    archiveClassifier.set('')
 }
@@ -38,8 +28,8 @@ shadowJar {
 jar.finalizedBy shadowJar
 
 jmh {
-    iterations = 1 // Number of measurement iterations to do.
-    fork = 1 // How many times to fork a single benchmark. Use 0 to disable forking altogether
+    iterations = 3 // Number of measurement iterations to do.
+    fork = 2 // How many times to fork a single benchmark. Use 0 to disable forking altogether
     warmupIterations = 1 // Number of warmup iterations to do.
-    timeUnit = 'ns'
+    timeUnit = 'us'
 }

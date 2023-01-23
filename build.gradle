@@ -23,18 +23,17 @@ config {
 		implementation {
 			enabled = true
 		}
+		
+		people {
+            person {
+                id = 'jruaux'
+                name = 'Julien Ruaux'
+                roles = ['developer', 'author']
+            }
+        }
 	}
-
-	licensing {
-		enabled = false
-		licenses {
-			license {
-				id = 'MIT'
-			}
-		}
-	}
-
-	docs {
+	
+    docs {
 		javadoc {
 			options {
 				autoLinks {
@@ -46,18 +45,38 @@ config {
 			}
 		}
 	}
+
+	licensing {
+		enabled = false
+		licenses {
+			license {
+				id = 'MIT'
+			}
+		}
+	}
+	
+	coverage {
+        jacoco {
+            enabled = true
+            toolVersion = jacocoVersion
+        }
+    }
+
 }
 
 allprojects {
 	repositories {
+		mavenLocal()	
 		gradlePluginPortal()
-		mavenCentral()
-		mavenLocal()
 	}
 
 	tasks.withType(GenerateModuleMetadata) {
 		enabled = false
 	}
+	
+	tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
 }
 
 subprojects {
@@ -65,17 +84,34 @@ subprojects {
 		info {
 			description = project.project_description
 		}
-		coverage {
-		    jacoco {
-		        toolVersion = '0.8.8'
-		    }
-		}
 	}
+	
+	license {
+        exclude('build/**')
+    }
 	
 	dependencies {
         testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     }
     
+    test {
+        useJUnitPlatform()
+        maxHeapSize = "1g" // maximum heap size
+    }
+    
+    bootJar {
+        enabled = false
+    }
+
+    jar {
+        enabled = true
+        archiveClassifier = ''
+    }
+
+    configurations {
+        all*.exclude module: 'spring-boot-starter-logging'
+    }
+
     configurations.all {
 		resolutionStrategy.eachDependency { DependencyResolveDetails details ->
 			if (details.requested.name == 'lettuce-core' ) {
@@ -83,12 +119,6 @@ subprojects {
 			}
 		}
 	}
-    
-    test {
-        useJUnitPlatform()
-    }
 
-	sourceCompatibility = 8
-    targetCompatibility = 8
 }
    
