@@ -79,10 +79,10 @@ public class QueryExecutor implements AutoCloseable {
 				tasks.add(task);
 				futures.add(executor.submit(task));
 			}
-			executor.shutdown();
 			for (Future<?> future : futures) {
 				future.get();
 			}
+			executor.shutdown();
 		}
 	}
 
