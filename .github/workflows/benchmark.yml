@@ -1,0 +1,15 @@
+name: 'Early Access'
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  earlyaccess:
+    name: 'Early Access'
+    if: github.repository == 'redis-field-engineering/redis-sidecar' && startsWith(github.event.head_commit.message, 'Releasing version') != true
+    uses: redis-field-engineering/redis-github-workflows/.github/workflows/benchmark.yml@main
+    with:
+      jmh-results-path: core/redis-sidecar-jdbc/build/results/jmh/results.txt
+    secrets:
+      github-token: ${{ secrets.GIT_ACCESS_TOKEN }}
