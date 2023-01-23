@@ -31,7 +31,7 @@ public class QueryExecutor implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(QueryExecutor.class);
 
-	private static final String QUERY = "SELECT SLEEP(1), orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode WHERE orders.orderNumber = ?";
+	private static final String QUERY = "SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?";
 
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
@@ -96,7 +96,8 @@ public class QueryExecutor implements AutoCloseable {
 				try (Connection connection = dataSource.getConnection();
 						PreparedStatement statement = connection.prepareStatement(QUERY)) {
 					int orderNumber = random.nextInt(totalRows) + 1;
-					statement.setInt(1, orderNumber);
+					statement.setInt(1, random.nextInt(0, 5));
+					statement.setInt(2, orderNumber);
 					try (ResultSet resultSet = statement.executeQuery()) {
 						while (resultSet.next()) {
 							for (int index = 0; index < resultSet.getMetaData().getColumnCount(); index++) {
