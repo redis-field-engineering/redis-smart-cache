@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.sql.rowset.CachedRowSet;
 
@@ -17,7 +18,9 @@ import com.redis.sidecar.SqlParser;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import net.sf.jsqlparser.JSQLParserException;
+import io.trino.sql.parser.ParsingException;
+import io.trino.sql.tree.QualifiedName;
+import io.trino.sql.tree.Table;
 
 public class SidecarStatement implements Statement {
 
@@ -143,8 +146,9 @@ public class SidecarStatement implements Statement {
 		String key = key();
 		List<String> tables;
 		try {
-			tables = parser.getTableList(sql);
-		} catch (JSQLParserException e) {
+			tables = parser.getTables(sql).map(Table::getName).map(QualifiedName::toString)
+					.collect(Collectors.toList());
+		} catch (ParsingException e) {
 			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
 			return Optional.empty();
 		}

@@ -24,8 +24,8 @@ class ConfigManagerTests extends AbstractSidecarTests {
 			configManager.getConfig(config);
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
-			redis.sync().jsonSet(key, ".redis.bufferSize", String.valueOf(bufferSize));
-			Awaitility.await().until(() -> config.getRedis().getBufferSize() == bufferSize);
+			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
+			Awaitility.await().until(() -> config.getBufferSize() == bufferSize);
 		}
 	}
 

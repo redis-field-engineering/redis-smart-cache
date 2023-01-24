@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
+import com.redis.sidecar.codec.ExplicitResultSetCodec;
 import com.redis.sidecar.jdbc.SidecarConnection;
 
 import io.lettuce.core.AbstractRedisClient;
@@ -72,8 +73,7 @@ public class NonRegisteringDriver implements Driver {
 		AbstractRedisClient redisClient = redisManager.getClient(config);
 		Connection backendConnection = backendManager.connect(config, info);
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(RowSetProvider.newFactory(),
-				config.getRedis().getBufferSize(), meterRegistry);
+		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(RowSetProvider.newFactory(), config.getBufferSize());
 		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);

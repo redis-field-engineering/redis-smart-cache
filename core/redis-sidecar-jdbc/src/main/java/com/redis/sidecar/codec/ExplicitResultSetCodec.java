@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.codec;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -26,29 +26,23 @@ import javax.sql.rowset.RowSetMetaDataImpl;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
-public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
+public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	private static final byte[] EMPTY = new byte[0];
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 	private static final int MEGA = 1000000;
 
-	private final Timer encodeTimer;
-	private final Timer decodeTimer;
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ByteArrayResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacityMB, MeterRegistry meterRegistry) {
+	public ExplicitResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacityMB) {
 		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxBufferCapacityMB * MEGA;
-		this.encodeTimer = meterRegistry.timer("encoding", "codec", "byte");
-		this.decodeTimer = meterRegistry.timer("decoding", "codec", "byte");
 	}
 
 	@Override
@@ -64,9 +58,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	@Override
 	public RowSet decodeValue(ByteBuffer bytes) {
 		try {
-			return decodeTimer.recordCallable(() -> {
-				return decode(Unpooled.wrappedBuffer(bytes));
-			});
+			return decode(Unpooled.wrappedBuffer(bytes));
 		} catch (Exception e) {
 			throw new IllegalStateException("Could not decode RowSet", e);
 		}
@@ -207,18 +199,16 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	@Override
 	public ByteBuffer encodeValue(ResultSet resultSet) {
 		try {
-			return encodeTimer.recordCallable(() -> {
-				if (resultSet == null) {
-					return ByteBuffer.wrap(EMPTY);
-				}
-				ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
-				ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
-				byteBuf.clear();
-				encode(resultSet, byteBuf);
-				int writerIndex = byteBuf.writerIndex();
-				buffer.limit(writerIndex);
-				return buffer;
-			});
+			if (resultSet == null) {
+				return ByteBuffer.wrap(EMPTY);
+			}
+			ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
+			ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
+			byteBuf.clear();
+			encode(resultSet, byteBuf);
+			int writerIndex = byteBuf.writerIndex();
+			buffer.limit(writerIndex);
+			return buffer;
 		} catch (Exception e) {
 			throw new IllegalStateException("Could not encode ResultSet", e);
 		}
@@ -237,12 +227,16 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 	}
 
 	public void encodeRow(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-		for (int columnIndex = 1; columnIndex <= resultSet.getMetaData().getColumnCount(); columnIndex++) {
-			int sqlType = resultSet.getMetaData().getColumnType(columnIndex);
-			switch (sqlType) {
+		int columnCount = resultSet.getMetaData().getColumnCount();
+		int[] sqlTypes = new int[columnCount];
+		for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+			sqlTypes[columnIndex] = resultSet.getMetaData().getColumnType(columnIndex + 1);
+		}
+		for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+			switch (sqlTypes[columnIndex]) {
 			case Types.BIT:
 			case Types.BOOLEAN:
-				boolean booleanValue = resultSet.getBoolean(columnIndex);
+				boolean booleanValue = resultSet.getBoolean(columnIndex + 1);
 				if (resultSet.wasNull()) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -253,7 +247,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.TINYINT:
 			case Types.SMALLINT:
 			case Types.INTEGER:
-				int intValue = resultSet.getInt(columnIndex);
+				int intValue = resultSet.getInt(columnIndex + 1);
 				if (resultSet.wasNull()) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -262,7 +256,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				}
 				break;
 			case Types.BIGINT:
-				long longValue = resultSet.getLong(columnIndex);
+				long longValue = resultSet.getLong(columnIndex + 1);
 				if (resultSet.wasNull()) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -272,7 +266,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				break;
 			case Types.FLOAT:
 			case Types.REAL:
-				float floatValue = resultSet.getFloat(columnIndex);
+				float floatValue = resultSet.getFloat(columnIndex + 1);
 				if (resultSet.wasNull()) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -281,7 +275,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				}
 				break;
 			case Types.DOUBLE:
-				double doubleValue = resultSet.getDouble(columnIndex);
+				double doubleValue = resultSet.getDouble(columnIndex + 1);
 				if (resultSet.wasNull()) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -291,7 +285,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				break;
 			case Types.NUMERIC:
 			case Types.DECIMAL:
-				Double bigDecimalDoubleValue = getBigDecimalDouble(resultSet, columnIndex);
+				Double bigDecimalDoubleValue = getBigDecimalDouble(resultSet, columnIndex + 1);
 				if (resultSet.wasNull() || bigDecimalDoubleValue == null) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -305,7 +299,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.NCHAR:
 			case Types.NVARCHAR:
 			case Types.LONGNVARCHAR:
-				String string = resultSet.getString(columnIndex);
+				String string = resultSet.getString(columnIndex + 1);
 				if (resultSet.wasNull() || string == null) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -318,7 +312,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.TIME_WITH_TIMEZONE:
 			case Types.TIMESTAMP:
 			case Types.TIMESTAMP_WITH_TIMEZONE:
-				Long timestamp = getLong(resultSet, columnIndex);
+				Long timestamp = getLong(resultSet, columnIndex + 1);
 				if (resultSet.wasNull() || timestamp == null) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -327,7 +321,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				}
 				break;
 			case Types.ROWID:
-				RowId rowId = resultSet.getRowId(columnIndex);
+				RowId rowId = resultSet.getRowId(columnIndex + 1);
 				if (resultSet.wasNull() || rowId == null) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -336,7 +330,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 				}
 				break;
 			case Types.CLOB:
-				Clob clob = resultSet.getClob(columnIndex);
+				Clob clob = resultSet.getClob(columnIndex + 1);
 				try {
 					if (resultSet.wasNull() || clob == null) {
 						byteBuf.writeBoolean(true);
@@ -363,7 +357,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.BLOB:
 			case Types.VARBINARY:
 			case Types.LONGVARBINARY:
-				byte[] bytes = resultSet.getBytes(columnIndex);
+				byte[] bytes = resultSet.getBytes(columnIndex + 1);
 				if (resultSet.wasNull() || bytes == null) {
 					byteBuf.writeBoolean(true);
 				} else {
@@ -384,7 +378,7 @@ public class ByteArrayResultSetCodec implements RedisCodec<String, ResultSet> {
 			case Types.SQLXML:
 			case Types.REF_CURSOR:
 			default:
-				throw new SQLException("Column type no supported: " + sqlType);
+				throw new SQLException("Column type no supported: " + sqlTypes[columnIndex]);
 			}
 		}
 	}

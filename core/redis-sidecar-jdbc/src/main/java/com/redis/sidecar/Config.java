@@ -14,12 +14,26 @@ public class Config {
 
 	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
 	public static final Duration DEFAULT_METRICS_STEP = Duration.ofMinutes(1);
+	public static final int DEFAULT_BUFFER_SIZE = 100; // MB
 
 	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
 	private Driver driver = new Driver();
 	private Redis redis = new Redis();
 	private Metrics metrics = new Metrics();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
+	private int bufferSize = DEFAULT_BUFFER_SIZE;
+
+	/**
+	 * 
+	 * @return max byte buffer capacity in megabytes
+	 */
+	public int getBufferSize() {
+		return bufferSize;
+	}
+
+	public void setBufferSize(int bufferSize) {
+		this.bufferSize = bufferSize;
+	}
 
 	public Metrics getMetrics() {
 		return metrics;
@@ -89,7 +103,6 @@ public class Config {
 		public static final String DEFAULT_URI = "redis://localhost:6379";
 		public static final String DEFAULT_KEYSPACE = "sidecar";
 		public static final String DEFAULT_KEY_SEPARATOR = ":";
-		public static final int DEFAULT_BUFFER_SIZE = 100; // MB
 
 		private String uri = DEFAULT_URI;
 		private boolean tls;
@@ -99,7 +112,6 @@ public class Config {
 		private String password;
 		private String keyspace = DEFAULT_KEYSPACE;
 		private String keySeparator = DEFAULT_KEY_SEPARATOR;
-		private int bufferSize = DEFAULT_BUFFER_SIZE;
 		private Pool pool = new Pool();
 
 		public String getUri() {
@@ -132,18 +144,6 @@ public class Config {
 				redisURI.setPassword((CharSequence) password);
 			}
 			return redisURI;
-		}
-
-		/**
-		 * 
-		 * @return max byte buffer capacity in megabytes
-		 */
-		public int getBufferSize() {
-			return bufferSize;
-		}
-
-		public void setBufferSize(int bufferSize) {
-			this.bufferSize = bufferSize;
 		}
 
 		public String key(String id) {

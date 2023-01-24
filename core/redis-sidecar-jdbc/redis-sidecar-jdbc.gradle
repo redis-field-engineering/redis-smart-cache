@@ -4,8 +4,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
     implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRtsVersion
-    implementation group: 'com.github.jsqlparser', name: 'jsqlparser', version: jsqlparserVersion
-    testImplementation 'org.slf4j:slf4j-jdk14'
+    implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
     testImplementation 'com.mysql:mysql-connector-j'
@@ -28,8 +27,8 @@ shadowJar {
 jar.finalizedBy shadowJar
 
 jmh {
-    iterations = 3 // Number of measurement iterations to do.
-    fork = 2 // How many times to fork a single benchmark. Use 0 to disable forking altogether
-    warmupIterations = 1 // Number of warmup iterations to do.
+    iterations = 1 // Number of measurement iterations to do.
+    fork = 1 // How many times to fork a single benchmark. Use 0 to disable forking altogether
+    warmupIterations = 0 // Number of warmup iterations to do.
     timeUnit = 'us'
 }

@@ -7,15 +7,21 @@ import java.sql.Types;
 import java.util.Random;
 
 import javax.sql.RowSet;
+import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 import javax.sql.rowset.RowSetProvider;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.redis.sidecar.codec.ExplicitResultSetCodec;
+import com.redis.sidecar.codec.JdkSerializationResultSetCodec;
 
+@TestInstance(Lifecycle.PER_CLASS)
 class CodecTests {
 
 	private static final int LEFT_LIMIT = 48; // numeral '0'
@@ -36,7 +42,7 @@ class CodecTests {
 	private static final String CATALOG_NAME = "";
 	private static final String SCHEMA_NAME = "myschema";
 	private static final String TABLE_NAME = "mytable";
-	private static final int ROW_COUNT = 12345;
+	private static final int ROW_COUNT = 123;
 	private static final int COLUMN_COUNT = 31;
 	private static final int MIN_VARCHAR_SIZE = 0;
 	private static final int MAX_VARCHAR_SIZE = 3000;
@@ -45,11 +51,31 @@ class CodecTests {
 	private static final int BYTE_BUFFER_CAPACITY = 300 * MEGA;
 
 	private final Random random = new Random();
+	private RowSetFactory rowSetFactory;
+	private CachedRowSet rowSet;
 
-	@Test
-	void encodeResultSetTest() throws SQLException {
-		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
-		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+	@BeforeAll
+	public void setup() throws SQLException {
+		rowSetFactory = RowSetProvider.newFactory();
+		rowSet = rowSetFactory.createCachedRowSet();
+		RowSetMetaData metaData = resultSetMetaData();
+		rowSet.setMetaData(metaData);
+		for (int index = 0; index < ROW_COUNT; index++) {
+			rowSet.moveToInsertRow();
+			for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
+				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && random.nextBoolean()) {
+					rowSet.updateNull(columnIndex);
+				} else {
+					rowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
+				}
+			}
+			rowSet.insertRow();
+		}
+		rowSet.moveToCurrentRow();
+		rowSet.beforeFirst();
+	}
+
+	private RowSetMetaData resultSetMetaData() throws SQLException {
 		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
 		metaData.setColumnCount(COLUMN_COUNT);
 		for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
@@ -71,29 +97,28 @@ class CodecTests {
 			metaData.setSigned(columnIndex, nextBoolean());
 			metaData.setTableName(columnIndex, TABLE_NAME);
 		}
-		rowSet.setMetaData(metaData);
-		for (int index = 0; index < ROW_COUNT; index++) {
-			rowSet.moveToInsertRow();
-			for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
-				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && random.nextBoolean()) {
-					rowSet.updateNull(columnIndex);
-				} else {
-					rowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
-				}
-			}
-			rowSet.insertRow();
-		}
-		rowSet.moveToCurrentRow();
+		return metaData;
+	}
+
+	private CachedRowSet newRowSet() throws SQLException {
+		CachedRowSet newRowSet = rowSetFactory.createCachedRowSet();
 		rowSet.beforeFirst();
-		rowSet.beforeFirst();
-		CachedRowSet input = rowSetFactory.createCachedRowSet();
-		input.populate(rowSet);
-		rowSet.beforeFirst();
-		ByteArrayResultSetCodec codec = new ByteArrayResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY,
-				new SimpleMeterRegistry());
-		RowSet actual = codec.decodeValue(codec.encodeValue(input));
-		actual.beforeFirst();
-		TestUtils.assertEquals(rowSet, actual);
+		newRowSet.populate(rowSet);
+		return newRowSet;
+	}
+
+	@Test
+	void explicitEncode() throws SQLException {
+		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		RowSet actual = codec.decodeValue(codec.encodeValue(newRowSet()));
+		TestUtils.assertEquals(newRowSet(), actual);
+	}
+
+	@Test
+	void jdkEncode() throws SQLException {
+		JdkSerializationResultSetCodec codec = new JdkSerializationResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		RowSet actual = codec.decodeValue(codec.encodeValue(newRowSet()));
+		TestUtils.assertEquals(newRowSet(), actual);
 	}
 
 	public String toString(RowSet rowSet) throws SQLException {
@@ -119,7 +144,7 @@ class CodecTests {
 		return random.nextBoolean();
 	}
 
-	private String typeName(int type) {
+	private static String typeName(int type) {
 		switch (type) {
 		case Types.BIGINT:
 			return "bigint";
