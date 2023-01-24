@@ -1,4 +1,4 @@
-name: 'Early Access'
+name: 'Benchmark'
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   earlyaccess:
-    name: 'Early Access'
+    name: 'Benchmark'
     if: github.repository == 'redis-field-engineering/redis-sidecar' && startsWith(github.event.head_commit.message, 'Releasing version') != true
     uses: redis-field-engineering/redis-github-workflows/.github/workflows/benchmark.yml@main
     with:
