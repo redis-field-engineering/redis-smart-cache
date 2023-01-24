@@ -19,14 +19,10 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.springframework.util.unit.DataSize;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
-import com.redis.enterprise.Database;
-import com.redis.enterprise.RedisModule;
-import com.redis.testcontainers.RedisEnterpriseContainer;
-import com.redis.testcontainers.RedisModulesContainer;
 import com.redis.testcontainers.RedisServer;
+import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 
@@ -34,18 +30,18 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	private static final int BUFFER_SIZE = 50;
 
-	private final RedisModulesContainer redis = new RedisModulesContainer(
-			RedisModulesContainer.DEFAULT_IMAGE_NAME.withTag(RedisModulesContainer.DEFAULT_TAG));
-	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
-			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag("latest"))
-			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(50)).ossCluster(true)
-					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
+	private final RedisStackContainer redis = new RedisStackContainer(
+			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
+//	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
+//			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag("latest"))
+//			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(50)).ossCluster(true)
+//					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
 
 	private SidecarDriver sidecarDriver;
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
-		return Arrays.asList(redis, redisEnterprise);
+		return Arrays.asList(redis);
 	}
 
 	@BeforeAll
