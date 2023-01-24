@@ -4,32 +4,24 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
 
 import com.redis.sidecar.AbstractSidecarTests;
-import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 class MySQLTests extends AbstractSidecarTests {
 
+	@Container
 	private static final MySQLContainer<?> MYSQL = new MySQLContainer<>(MySQLContainer.NAME);
 
 	@BeforeAll
-	protected void setupDatabaseContainer() throws SQLException, IOException {
-		Assumptions.assumeTrue(RedisServer.isEnabled("MYSQL"));
-		MYSQL.start();
+	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(MYSQL);
 		runScript(backendConnection, "mysql/northwind.sql");
-	}
-
-	@AfterAll
-	protected void teardownDatabaseContainer() {
-		MYSQL.stop();
 	}
 
 	@ParameterizedTest

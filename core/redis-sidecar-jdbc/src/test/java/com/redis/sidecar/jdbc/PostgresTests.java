@@ -9,16 +9,14 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.sidecar.AbstractSidecarTests;
-import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -27,20 +25,14 @@ class PostgresTests extends AbstractSidecarTests {
 	private static final DockerImageName POSTGRE_DOCKER_IMAGE_NAME = DockerImageName.parse(PostgreSQLContainer.IMAGE)
 			.withTag(PostgreSQLContainer.DEFAULT_TAG);
 
+	@Container
 	private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>(POSTGRE_DOCKER_IMAGE_NAME);
 
 	@BeforeAll
-	protected void setupDatabaseContainer() throws SQLException, IOException {
-		Assumptions.assumeTrue(RedisServer.isEnabled("POSTGRESQL"));
-		POSTGRESQL.start();
+	public void setupAll() throws SQLException, IOException {
 		Connection backendConnection = connection(POSTGRESQL);
 		runScript(backendConnection, "postgres/northwind.sql");
 		runScript(backendConnection, "postgres/employee.sql");
-	}
-
-	@AfterAll
-	protected void teardownDatabaseContainer() {
-		POSTGRESQL.stop();
 	}
 
 	@ParameterizedTest
