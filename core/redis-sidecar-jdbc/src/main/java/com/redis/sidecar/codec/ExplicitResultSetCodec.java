@@ -32,14 +32,13 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	private static final byte[] EMPTY = new byte[0];
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
-	private static final int MEGA = 1000000;
 
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ExplicitResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacityMB) {
+	public ExplicitResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
 		this.rowSetFactory = rowSetFactory;
-		this.maxByteBufferCapacity = maxBufferCapacityMB * MEGA;
+		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
 	@Override

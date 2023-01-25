@@ -1,7 +1,5 @@
 package com.redis.sidecar;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -9,22 +7,13 @@ import java.sql.Types;
 import java.util.Random;
 
 import javax.sql.RowSet;
+import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 import javax.sql.rowset.RowSetProvider;
 
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Param;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
-
-import com.redis.sidecar.codec.ExplicitResultSetCodec;
-import com.redis.sidecar.codec.JdkSerializationResultSetCodec;
-
-@State(Scope.Benchmark)
-public class CodecExecutionPlan {
+public class RowSetBuilder {
 
 	public enum Type {
 		BIGINT("bigint", Types.BIGINT), INTEGER("int", Types.BIGINT), BOOLEAN("boolean", Types.BOOLEAN),
@@ -66,31 +55,44 @@ public class CodecExecutionPlan {
 	private static final String TABLE_NAME = "mytable";
 	private static final int MIN_VARCHAR_SIZE = 0;
 	private static final int MAX_VARCHAR_SIZE = 3000;
-	private static final int BYTE_BUFFER_CAPACITY = 10000000;
 	private static final Random RANDOM = new Random();
 
-	@Param({ "10", "100" })
-	public int columns;
-	@Param({ "10", "100", "1000" })
-	public int rows;
+	private final RowSetFactory rowSetFactory;
 
-	private RowSet rowSet;
-	private RowSetFactory rowSetFactory;
-	private ExplicitResultSetCodec explicitCodec;
-	private JdkSerializationResultSetCodec jdkCodec;
-	private ByteBuffer explicitByteBuffer;
-	private byte[] jdkBytes;
-
-	@Setup(Level.Trial)
-	public void setUpTrial() throws SQLException {
-		this.rowSetFactory = RowSetProvider.newFactory();
-		this.explicitCodec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
-		this.jdkCodec = new JdkSerializationResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+	public RowSetBuilder() throws SQLException {
+		this(RowSetProvider.newFactory());
 	}
 
-	@Setup(Level.Invocation)
-	public void setUpInvocation() throws SQLException, IOException {
+	public RowSetBuilder(RowSetFactory rowSetFactory) {
+		this.rowSetFactory = rowSetFactory;
+	}
+
+	public RowSetFactory getRowSetFactory() {
+		return rowSetFactory;
+	}
+
+	public CachedRowSet build(int columns, int rows) throws SQLException {
 		CachedRowSet cachedRowSet = rowSetFactory.createCachedRowSet();
+		RowSetMetaData metaData = metaData(columns, rows);
+		cachedRowSet.setMetaData(metaData);
+		for (int index = 0; index < rows; index++) {
+			cachedRowSet.moveToInsertRow();
+			for (int columnIndex = 1; columnIndex <= columns; columnIndex++) {
+				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && RANDOM.nextBoolean()) {
+					cachedRowSet.updateNull(columnIndex);
+				} else {
+					cachedRowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
+				}
+			}
+			cachedRowSet.insertRow();
+		}
+		cachedRowSet.moveToCurrentRow();
+		cachedRowSet.beforeFirst();
+		cachedRowSet.beforeFirst();
+		return cachedRowSet;
+	}
+
+	private RowSetMetaData metaData(int columns, int rows) throws SQLException {
 		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
 		metaData.setColumnCount(columns);
 		Type[] types = Type.values();
@@ -113,31 +115,14 @@ public class CodecExecutionPlan {
 			metaData.setSigned(columnIndex, nextBoolean());
 			metaData.setTableName(columnIndex, TABLE_NAME);
 		}
-		cachedRowSet.setMetaData(metaData);
-		for (int index = 0; index < rows; index++) {
-			cachedRowSet.moveToInsertRow();
-			for (int columnIndex = 1; columnIndex <= columns; columnIndex++) {
-				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && RANDOM.nextBoolean()) {
-					cachedRowSet.updateNull(columnIndex);
-				} else {
-					cachedRowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
-				}
-			}
-			cachedRowSet.insertRow();
-		}
-		cachedRowSet.moveToCurrentRow();
-		cachedRowSet.beforeFirst();
-		cachedRowSet.beforeFirst();
-		this.rowSet = cachedRowSet;
-		this.explicitByteBuffer = explicitCodec.encodeValue(newRowSet());
-		this.jdkBytes = jdkCodec.encode(newRowSet());
+		return metaData;
 	}
 
-	public RowSet newRowSet() throws SQLException {
-		CachedRowSet input = rowSetFactory.createCachedRowSet();
+	public RowSet copy(RowSet rowSet) throws SQLException {
+		CachedRowSet copy = rowSetFactory.createCachedRowSet();
 		rowSet.beforeFirst();
-		input.populate(rowSet);
-		return input;
+		copy.populate(rowSet);
+		return copy;
 	}
 
 	private static int randomInt(int min, int max) {
@@ -172,21 +157,5 @@ public class CodecExecutionPlan {
 		return RANDOM.ints(LEFT_LIMIT, RIGHT_LIMIT + 1).filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
 				.limit(length).collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
 				.toString();
-	}
-
-	public ExplicitResultSetCodec getExplicitCodec() {
-		return explicitCodec;
-	}
-
-	public ByteBuffer getExplicitByteBufer() {
-		return explicitByteBuffer;
-	}
-
-	public JdkSerializationResultSetCodec getJdkCodec() {
-		return jdkCodec;
-	}
-
-	public byte[] getJdkBytes() {
-		return jdkBytes;
 	}
 }

@@ -38,9 +38,13 @@ tasks.shadowJar.dependsOn tasks.relocateShadowJar
 jar.finalizedBy shadowJar
 
 jmh {
-    iterations = 2 // Number of measurement iterations to do.
+    iterations = 1 // Number of measurement iterations to do.
     fork = 1 // How many times to fork a single benchmark. Use 0 to disable forking altogether
-    warmupIterations = 1 // Number of warmup iterations to do.
+    warmupIterations = 0 // Number of warmup iterations to do.
     timeUnit = 'us'
-    jvmArgs = ['-Xmx1g']
+    includeTests = true
+}
+
+jmhJar {
+    exclude('org/slf4j/impl/**')
 }
