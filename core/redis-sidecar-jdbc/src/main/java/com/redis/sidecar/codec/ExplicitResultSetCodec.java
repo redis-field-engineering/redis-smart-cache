@@ -56,7 +56,7 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 	public RowSet decodeValue(ByteBuffer bytes) {
 		try {
 			return decodeRowSet(Unpooled.wrappedBuffer(bytes));
-		} catch (Exception e) {
+		} catch (SQLException e) {
 			throw new IllegalStateException("Could not decode RowSet", e);
 		}
 	}
@@ -69,7 +69,8 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		ColumnDecoder[] columnDecoders = new ColumnDecoder[columnCount];
 		for (int index = 0; index < columnCount; index++) {
 			int columnIndex = index + 1;
-			columnDecoders[index] = columnDecoder(columnIndex, metaData.getColumnType(columnIndex));
+			int columnType = metaData.getColumnType(columnIndex);
+			columnDecoders[index] = columnDecoder(columnIndex, columnType);
 		}
 		while (byteBuf.isReadable()) {
 			rowSet.moveToInsertRow();
@@ -377,29 +378,25 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 			int writerIndex = byteBuf.writerIndex();
 			buffer.limit(writerIndex);
 			return buffer;
-		} catch (Exception e) {
+		} catch (SQLException e) {
 			throw new IllegalStateException("Could not encode ResultSet", e);
 		}
 	}
 
-	public void encode(ResultSet resultSet, ByteBuf byteBuf) {
-		try {
-			ResultSetMetaData metaData = resultSet.getMetaData();
-			encode(metaData, byteBuf);
-			int columnCount = metaData.getColumnCount();
-			ColumnEncoder[] encoders = new ColumnEncoder[columnCount];
-			for (int index = 0; index < columnCount; index++) {
-				int columnIndex = index + 1;
-				int columnType = resultSet.getMetaData().getColumnType(columnIndex);
-				encoders[index] = columnEncoder(columnIndex, columnType);
+	public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
+		ResultSetMetaData metaData = resultSet.getMetaData();
+		encode(metaData, byteBuf);
+		int columnCount = metaData.getColumnCount();
+		ColumnEncoder[] encoders = new ColumnEncoder[columnCount];
+		for (int index = 0; index < columnCount; index++) {
+			int columnIndex = index + 1;
+			int columnType = resultSet.getMetaData().getColumnType(columnIndex);
+			encoders[index] = columnEncoder(columnIndex, columnType);
+		}
+		while (resultSet.next()) {
+			for (int index = 0; index < encoders.length; index++) {
+				encoders[index].encode(resultSet, byteBuf);
 			}
-			while (resultSet.next()) {
-				for (int index = 0; index < encoders.length; index++) {
-					encoders[index].encode(resultSet, byteBuf);
-				}
-			}
-		} catch (SQLException e) {
-			throw new IllegalStateException(e);
 		}
 	}
 
@@ -660,7 +657,7 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 
 		@Override
 		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			byte[] bytes = resultSet.getBytes(columnIndex + 1);
+			byte[] bytes = resultSet.getBytes(columnIndex);
 			if (resultSet.wasNull() || bytes == null) {
 				byteBuf.writeBoolean(true);
 			} else {
