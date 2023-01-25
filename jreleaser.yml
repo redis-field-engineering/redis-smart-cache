@@ -55,8 +55,32 @@ announce:
 distributions:
   redis-sidecar-jdbc:
     artifacts:
-      - path: core/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar
-        transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.jar'
+      - path: core/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip
+        transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'
+  redis-sidecar-demo:
+    type: SINGLE_JAR
+    artifacts:
+      - path: demo/redis-sidecar-demo/build/libs/redis-sidecar-demo-{{projectVersion}}.jar
+        transform: '{{distributionName}}-{{projectEffectiveVersion}}.jar'
+    executable:
+      name: 'redis-sidecar-demo-launcher'
+    docker:
+      active: always
+      repository:
+        active: never
+      registries:
+        - serverName: DEFAULT
+          repositoryName: fieldengineering
+      imageNames:
+        - 'fieldengineering/redis-demo-sidecar:{{tagName}}'
+        - 'fieldengineering/redis-demo-sidecar:latest'
+      labels:
+        'org.opencontainers.image.title': 'redis-demo-sidecar'
+      buildx:
+        enabled: true
+        platforms:
+          - 'linux/amd64'
+          - 'linux/arm64'
 
 files:
   artifacts:
