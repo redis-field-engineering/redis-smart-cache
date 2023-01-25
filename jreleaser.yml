@@ -2,16 +2,16 @@ project:
   name: redis-sidecar
   description: JDBC Cache
   longDescription: JDBC driver that transparently caches SQL queries 
-  website: https://github.com/redis-field-engineering/redis-sidecar
+  links:
+    homepage: https://github.com/redis-field-engineering/redis-sidecar
   authors:
     - Julien Ruaux
   license: MIT
+  inceptionYear: 2022
   java:
     groupId: com.redis
-    version: 8
+    version: 17
     multiProject: true
-  extraProperties:
-    inceptionYear: 2020
   tags:
     - 'redis'
     - 'jdbc'
