@@ -61,12 +61,11 @@ config {
             toolVersion = jacocoVersion
         }
     }
-
 }
 
 allprojects {
 	repositories {
-		mavenLocal()	
+		mavenLocal()
 		gradlePluginPortal()
 	}
 
@@ -106,10 +105,6 @@ subprojects {
     jar {
         enabled = true
         archiveClassifier = ''
-    }
-
-    configurations {
-        all*.exclude module: 'spring-boot-starter-logging'
     }
 
     configurations.all {

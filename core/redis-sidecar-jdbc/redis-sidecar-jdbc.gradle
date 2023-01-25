@@ -24,6 +24,16 @@ shadowJar {
    archiveClassifier.set('')
 }
 
+// Configure Auto Relocation
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
+
+task relocateShadowJar(type: ConfigureShadowRelocation) {
+    target = tasks.shadowJar
+    prefix = "com.redis.sidecar.shaded"
+}
+
+tasks.shadowJar.dependsOn tasks.relocateShadowJar
+
 jar.finalizedBy shadowJar
 
 jmh {
