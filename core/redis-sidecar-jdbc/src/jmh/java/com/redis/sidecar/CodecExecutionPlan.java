@@ -26,14 +26,34 @@ import com.redis.sidecar.codec.JdkSerializationResultSetCodec;
 @State(Scope.Benchmark)
 public class CodecExecutionPlan {
 
+	public enum Type {
+		BIGINT("bigint", Types.BIGINT), INTEGER("int", Types.BIGINT), BOOLEAN("boolean", Types.BOOLEAN),
+		REAL("real", Types.REAL), TIMESTAMP("timestamp", Types.TIMESTAMP), DOUBLE("double", Types.DOUBLE),
+		VARCHAR("varchar", Types.VARCHAR);
+
+		private String name;
+		private int code;
+
+		private Type(String name, int code) {
+			this.name = name;
+			this.code = code;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public int getCode() {
+			return code;
+		}
+	}
+
 	private static final int LEFT_LIMIT = 48; // numeral '0'
 	private static final int RIGHT_LIMIT = 122; // letter 'z'
 
 	private static final int KILO = 1024;
 	private static final int MEGA = KILO * KILO;
 
-	private static final int[] TYPES = { Types.BIGINT, Types.INTEGER, Types.BOOLEAN, Types.REAL, Types.TIMESTAMP,
-			Types.DOUBLE, Types.VARCHAR };
 	private static final int MAX_DISPLAY_SIZE = 1024;
 	private static final int MIN_DISPLAY_SIZE = 5;
 	private static final int MIN_COLUMN_NAME_SIZE = 2;
@@ -65,27 +85,28 @@ public class CodecExecutionPlan {
 	private byte[] jdkBytes;
 
 	@Setup(Level.Trial)
-	public void setUpFactory() throws SQLException {
+	public void setUpTrial() throws SQLException {
 		this.rowSetFactory = RowSetProvider.newFactory();
 		this.explicitCodec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
 		this.jdkCodec = new JdkSerializationResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)
-	public void setUp() throws SQLException, IOException {
+	public void setUpInvocation() throws SQLException, IOException {
 		CachedRowSet cachedRowSet = rowSetFactory.createCachedRowSet();
 		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
 		metaData.setColumnCount(columns);
+		Type[] types = Type.values();
 		for (int columnIndex = 1; columnIndex <= columns; columnIndex++) {
-			int type = TYPES[RANDOM.nextInt(TYPES.length)];
+			Type type = types[RANDOM.nextInt(types.length)];
 			metaData.setAutoIncrement(columnIndex, nextBoolean());
 			metaData.setCaseSensitive(columnIndex, nextBoolean());
 			metaData.setCatalogName(columnIndex, CATALOG_NAME);
 			metaData.setColumnDisplaySize(columnIndex, randomInt(MIN_DISPLAY_SIZE, MAX_DISPLAY_SIZE));
 			metaData.setColumnLabel(columnIndex, string(MIN_COLUMN_LABEL_SIZE, MAX_COLUMN_LABEL_SIZE));
 			metaData.setColumnName(columnIndex, string(MIN_COLUMN_NAME_SIZE, MAX_COLUMN_NAME_SIZE));
-			metaData.setColumnType(columnIndex, type);
-			metaData.setColumnTypeName(columnIndex, typeName(type));
+			metaData.setColumnType(columnIndex, type.getCode());
+			metaData.setColumnTypeName(columnIndex, type.getName());
 			metaData.setCurrency(columnIndex, nextBoolean());
 			metaData.setNullable(columnIndex, RANDOM.nextInt(ResultSetMetaData.columnNullableUnknown + 1));
 			metaData.setPrecision(columnIndex, randomInt(MIN_PRECISION, MAX_PRECISION));
@@ -128,25 +149,6 @@ public class CodecExecutionPlan {
 
 	private static boolean nextBoolean() {
 		return RANDOM.nextBoolean();
-	}
-
-	private static String typeName(int type) {
-		switch (type) {
-		case Types.BIGINT:
-			return "bigint";
-		case Types.INTEGER:
-			return "int";
-		case Types.BOOLEAN:
-			return "boolean";
-		case Types.TIMESTAMP:
-			return "timestamp";
-		case Types.DOUBLE:
-			return "double";
-		case Types.REAL:
-			return "real";
-		default:
-			return "varchar";
-		}
 	}
 
 	private static Object value(int type) {

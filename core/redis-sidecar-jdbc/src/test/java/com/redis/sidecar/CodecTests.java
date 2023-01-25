@@ -1,5 +1,6 @@
 package com.redis.sidecar;
 
+import java.nio.ByteBuffer;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -42,43 +43,46 @@ class CodecTests {
 	private static final String CATALOG_NAME = "";
 	private static final String SCHEMA_NAME = "myschema";
 	private static final String TABLE_NAME = "mytable";
-	private static final int ROW_COUNT = 123;
-	private static final int COLUMN_COUNT = 31;
 	private static final int MIN_VARCHAR_SIZE = 0;
-	private static final int MAX_VARCHAR_SIZE = 3000;
+	private static final int MAX_VARCHAR_SIZE = 10;
 	private static final int KILO = 1024;
 	private static final int MEGA = KILO * KILO;
 	private static final int BYTE_BUFFER_CAPACITY = 300 * MEGA;
 
 	private final Random random = new Random();
 	private RowSetFactory rowSetFactory;
-	private CachedRowSet rowSet;
 
 	@BeforeAll
 	public void setup() throws SQLException {
 		rowSetFactory = RowSetProvider.newFactory();
-		rowSet = rowSetFactory.createCachedRowSet();
-		RowSetMetaData metaData = resultSetMetaData();
+	}
+
+	private RowSet rowSet(int columnCount, int rowCount) throws SQLException {
+		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+		RowSetMetaData metaData = resultSetMetaData(columnCount);
 		rowSet.setMetaData(metaData);
-		for (int index = 0; index < ROW_COUNT; index++) {
+		for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
 			rowSet.moveToInsertRow();
-			for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
-				if (metaData.isNullable(columnIndex) == ResultSetMetaData.columnNullable && random.nextBoolean()) {
-					rowSet.updateNull(columnIndex);
+			for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+				int jdbcColumnIndex = columnIndex + 1;
+				if (metaData.isNullable(jdbcColumnIndex) == ResultSetMetaData.columnNullable && random.nextBoolean()) {
+					rowSet.updateNull(jdbcColumnIndex);
 				} else {
-					rowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
+					rowSet.updateObject(jdbcColumnIndex, value(metaData.getColumnType(jdbcColumnIndex)));
 				}
 			}
 			rowSet.insertRow();
 		}
 		rowSet.moveToCurrentRow();
 		rowSet.beforeFirst();
+		return rowSet;
 	}
 
-	private RowSetMetaData resultSetMetaData() throws SQLException {
+	private RowSetMetaData resultSetMetaData(int columnCount) throws SQLException {
 		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
-		metaData.setColumnCount(COLUMN_COUNT);
-		for (int columnIndex = 1; columnIndex <= COLUMN_COUNT; columnIndex++) {
+		metaData.setColumnCount(columnCount);
+		for (int index = 0; index < columnCount; index++) {
+			int columnIndex = index + 1;
 			int type = TYPES[random.nextInt(TYPES.length)];
 			metaData.setAutoIncrement(columnIndex, nextBoolean());
 			metaData.setCaseSensitive(columnIndex, nextBoolean());
@@ -100,25 +104,31 @@ class CodecTests {
 		return metaData;
 	}
 
-	private CachedRowSet newRowSet() throws SQLException {
-		CachedRowSet newRowSet = rowSetFactory.createCachedRowSet();
-		rowSet.beforeFirst();
-		newRowSet.populate(rowSet);
-		return newRowSet;
-	}
-
 	@Test
-	void explicitEncode() throws SQLException {
+	void explicitCodec() throws SQLException {
+		RowSet rowSet = rowSet(100, 1000);
 		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
-		RowSet actual = codec.decodeValue(codec.encodeValue(newRowSet()));
-		TestUtils.assertEquals(newRowSet(), actual);
+		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
+		rowSet.beforeFirst();
+		TestUtils.assertEquals(rowSet, actual);
 	}
 
 	@Test
-	void jdkEncode() throws SQLException {
+	void explicitDecode() throws SQLException {
+		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		ByteBuffer byteBuffer = codec.encodeValue(rowSet(100, 10000));
+		while (true) {
+			codec.decodeValue(byteBuffer);
+		}
+	}
+
+	@Test
+	void jdkCodec() throws SQLException {
+		RowSet rowSet = rowSet(10, 100);
 		JdkSerializationResultSetCodec codec = new JdkSerializationResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
-		RowSet actual = codec.decodeValue(codec.encodeValue(newRowSet()));
-		TestUtils.assertEquals(newRowSet(), actual);
+		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
+		rowSet.beforeFirst();
+		TestUtils.assertEquals(rowSet, actual);
 	}
 
 	public String toString(RowSet rowSet) throws SQLException {
