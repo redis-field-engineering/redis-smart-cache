@@ -66,7 +66,7 @@ public class CodecExecutionPlan {
 	private static final String TABLE_NAME = "mytable";
 	private static final int MIN_VARCHAR_SIZE = 0;
 	private static final int MAX_VARCHAR_SIZE = 3000;
-	private static final int BYTE_BUFFER_CAPACITY = 10000000;
+	private static final int BYTE_BUFFER_CAPACITY = 100000000;
 	private static final Random RANDOM = new Random();
 
 	@Param({ "10", "100" })
