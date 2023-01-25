@@ -1,4 +1,4 @@
-package com.redis.sidecar.springdemo;
+package com.redis.sidecar.demo;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,11 +10,11 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
@@ -31,7 +31,7 @@ import me.tongfei.progressbar.ProgressBarBuilder;
 @Component
 public class QueryExecutor implements AutoCloseable {
 
-	private static final Logger log = LoggerFactory.getLogger(QueryExecutor.class);
+	private static final Logger log = Logger.getLogger(QueryExecutor.class.getName());
 
 	private static final String QUERY = "SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?";
 
@@ -119,7 +119,7 @@ public class QueryExecutor implements AutoCloseable {
 					progressBar.step();
 					count++;
 				} catch (SQLException e) {
-					log.error("Could not run query", e);
+					log.log(Level.SEVERE, "Could not run query", e);
 				}
 			}
 			return count;

@@ -1,4 +1,4 @@
-package com.redis.sidecar.springdemo.loader;
+package com.redis.sidecar.demo.loader;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -7,7 +7,7 @@ import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 import com.github.javafaker.Faker;
-import com.redis.sidecar.springdemo.Config.Loader;
+import com.redis.sidecar.demo.Config.Loader;
 
 public class OrderProvider implements RowProvider {
 

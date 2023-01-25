@@ -1,4 +1,4 @@
-package com.redis.sidecar.springdemo.loader;
+package com.redis.sidecar.demo.loader;
 
 public class TableLoad {
 

@@ -1,4 +1,4 @@
-package com.redis.sidecar.springdemo;
+package com.redis.sidecar.demo;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -11,16 +11,14 @@ import java.util.stream.Stream;
 
 import javax.sql.DataSource;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.redis.sidecar.springdemo.Config.Loader;
-import com.redis.sidecar.springdemo.loader.CustomerProvider;
-import com.redis.sidecar.springdemo.loader.OrderDetailsProvider;
-import com.redis.sidecar.springdemo.loader.OrderProvider;
-import com.redis.sidecar.springdemo.loader.ProductProvider;
-import com.redis.sidecar.springdemo.loader.RowProvider;
+import com.redis.sidecar.demo.Config.Loader;
+import com.redis.sidecar.demo.loader.CustomerProvider;
+import com.redis.sidecar.demo.loader.OrderDetailsProvider;
+import com.redis.sidecar.demo.loader.OrderProvider;
+import com.redis.sidecar.demo.loader.ProductProvider;
+import com.redis.sidecar.demo.loader.RowProvider;
 
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
@@ -32,8 +30,6 @@ public class DataLoader {
 	public static final String CUSTOMERS = "customers";
 	public static final String ORDERS = "orders";
 	public static final String ORDERDETAILS = "orderdetails";
-
-	public static final Logger log = LoggerFactory.getLogger(DataLoader.class);
 
 	private static final String[] PRODUCT_COLUMNS = { "productCode", "productName", "quantityInStock", "MSRP",
 			"buyPrice", "productVendor", "productLine", "productScale", "productDescription" };

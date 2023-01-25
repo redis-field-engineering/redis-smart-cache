@@ -1,11 +1,11 @@
-package com.redis.sidecar.springdemo.loader;
+package com.redis.sidecar.demo.loader;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.Date;
 
-import com.redis.sidecar.springdemo.Config.Loader;
+import com.redis.sidecar.demo.Config.Loader;
 
 public interface RowProvider {
 

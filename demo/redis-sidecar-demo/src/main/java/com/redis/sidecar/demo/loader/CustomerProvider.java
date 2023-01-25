@@ -1,10 +1,10 @@
-package com.redis.sidecar.springdemo.loader;
+package com.redis.sidecar.demo.loader;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import com.github.javafaker.Faker;
-import com.redis.sidecar.springdemo.Config.Loader;
+import com.redis.sidecar.demo.Config.Loader;
 
 public class CustomerProvider implements RowProvider {
 	

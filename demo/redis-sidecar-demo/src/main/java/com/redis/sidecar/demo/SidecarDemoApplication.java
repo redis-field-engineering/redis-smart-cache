@@ -1,4 +1,4 @@
-package com.redis.sidecar.springdemo;
+package com.redis.sidecar.demo;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
