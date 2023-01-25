@@ -65,7 +65,7 @@ distributions:
     executable:
       name: 'redis-sidecar-demo-launcher'
     docker:
-      active: ALWAYS
+      active: RELEASE
       repository:
         active: NEVER
       registries:
