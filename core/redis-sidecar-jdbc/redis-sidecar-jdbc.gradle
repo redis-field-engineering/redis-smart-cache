@@ -31,4 +31,5 @@ jmh {
     fork = 1 // How many times to fork a single benchmark. Use 0 to disable forking altogether
     warmupIterations = 1 // Number of warmup iterations to do.
     timeUnit = 'us'
+    jvmArgs = ['-Xmx1g']
 }
