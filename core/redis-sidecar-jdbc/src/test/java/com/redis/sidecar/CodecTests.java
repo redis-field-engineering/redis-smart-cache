@@ -1,6 +1,5 @@
 package com.redis.sidecar;
 
-import java.nio.ByteBuffer;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -111,15 +110,6 @@ class CodecTests {
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
 		TestUtils.assertEquals(rowSet, actual);
-	}
-
-	@Test
-	void explicitDecode() throws SQLException {
-		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
-		ByteBuffer byteBuffer = codec.encodeValue(rowSet(100, 10000));
-		while (true) {
-			codec.decodeValue(byteBuffer);
-		}
 	}
 
 	@Test
