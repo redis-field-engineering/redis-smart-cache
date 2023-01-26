@@ -28,10 +28,6 @@ jar {
     archiveClassifier = ''
 }
 
-jmh {
-    timeUnit = 'ms'
-}
-
 jmhJar {
     exclude('org/slf4j/impl/**')
 }
