@@ -1,17 +1,12 @@
 package com.redis.sidecar.codec;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.Blob;
-import java.sql.Clob;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -27,7 +22,6 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 import javax.sql.rowset.RowSetProvider;
-import javax.sql.rowset.serial.SerialClob;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.netty.buffer.ByteBuf;
@@ -379,78 +373,6 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	static class RowIdColumnCodec extends NullableColumnCodec<RowId> {
-
-		private final StringCodec codec;
-
-		public RowIdColumnCodec(int columnIndex, StringCodec codec) {
-			super(columnIndex);
-			this.codec = codec;
-		}
-
-		@Override
-		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			String string = codec.decode(byteBuf);
-			RowId rowId = new com.redis.sidecar.jdbc.RowId(string);
-			resultSet.updateRowId(columnIndex, rowId);
-		}
-
-		@Override
-		protected void write(ByteBuf byteBuf, RowId value) throws SQLException {
-			codec.encode(byteBuf, value.toString());
-		}
-
-		@Override
-		protected RowId getValue(ResultSet resultSet) throws SQLException {
-			return resultSet.getRowId(columnIndex);
-		}
-	}
-
-	static class ClobColumnCodec extends NullableColumnCodec<Clob> {
-
-		private static final String EMPTY_STRING = "";
-
-		private final StringCodec codec;
-
-		public ClobColumnCodec(int columnIndex, StringCodec codec) {
-			super(columnIndex);
-			this.codec = codec;
-		}
-
-		@Override
-		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			String string = codec.decode(byteBuf);
-			Clob clob = new SerialClob(string.toCharArray());
-			resultSet.updateClob(columnIndex, clob);
-		}
-
-		@Override
-		protected void write(ByteBuf byteBuf, Clob clob) throws SQLException {
-			try {
-				int length;
-				try {
-					length = Math.toIntExact(clob.length());
-				} catch (ArithmeticException e) {
-					throw new SQLException("CLOB is too large", e);
-				}
-				String string = length == 0 ? EMPTY_STRING : clob.getSubString(1, length);
-				byteBuf.writeBoolean(false);
-				codec.encode(byteBuf, string);
-			} finally {
-				try {
-					clob.free();
-				} catch (AbstractMethodError e) {
-					// May occur with old JDBC drivers
-				}
-			}
-		}
-
-		@Override
-		protected Clob getValue(ResultSet resultSet) throws SQLException {
-			return resultSet.getClob(columnIndex);
-		}
-	}
-
 	abstract static class NullableColumnCodec<T> implements ColumnCodec {
 
 		protected final int columnIndex;
@@ -485,70 +407,6 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		protected abstract void write(ByteBuf byteBuf, T value) throws SQLException;
 
 		protected abstract T getValue(ResultSet resultSet) throws SQLException;
-
-	}
-
-	static class BytesColumnCodec extends NullableColumnCodec<byte[]> {
-
-		public BytesColumnCodec(int columnIndex) {
-			super(columnIndex);
-		}
-
-		@Override
-		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			int length = byteBuf.readInt();
-			byte[] bytes = new byte[length];
-			byteBuf.readBytes(bytes);
-			resultSet.updateBytes(columnIndex, bytes);
-		}
-
-		@Override
-		protected byte[] getValue(ResultSet resultSet) throws SQLException {
-			return resultSet.getBytes(columnIndex);
-		}
-
-		@Override
-		protected void write(ByteBuf byteBuf, byte[] value) {
-			byteBuf.writeInt(value.length);
-			byteBuf.writeBytes(value);
-		}
-	}
-
-	static class BlobColumnCodec extends NullableColumnCodec<Blob> {
-
-		public BlobColumnCodec(int columnIndex) {
-			super(columnIndex);
-		}
-
-		@Override
-		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			int length = byteBuf.readInt();
-			byte[] bytes = new byte[length];
-			byteBuf.readBytes(bytes);
-			try (ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes)) {
-				resultSet.updateBlob(length, inputStream);
-			} catch (IOException e) {
-				throw new SQLException("Could not close ByteArrayInputStream", e);
-			}
-		}
-
-		@Override
-		protected Blob getValue(ResultSet resultSet) throws SQLException {
-			return resultSet.getBlob(columnIndex);
-		}
-
-		@Override
-		protected void write(ByteBuf byteBuf, Blob value) throws SQLException {
-			int length;
-			try {
-				length = Math.toIntExact(value.length());
-			} catch (ArithmeticException e) {
-				throw new SQLException("BLOB is too large", e);
-			}
-			byte[] bytes = length == 0 ? EMPTY_BYTE_ARRAY : value.getBytes(1, length);
-			byteBuf.writeInt(bytes.length);
-			byteBuf.writeBytes(bytes);
-		}
 
 	}
 
