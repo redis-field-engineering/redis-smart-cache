@@ -20,6 +20,7 @@ project:
 release:
   github:
     overwrite: true
+    artifacts: false
     changelog:
       formatted: ALWAYS
       preset: conventional-commits
@@ -64,6 +65,7 @@ distributions:
         transform: '{{distributionName}}-{{projectEffectiveVersion}}.jar'
     executable:
       name: 'redis-sidecar-demo-launcher'
+    skipRelease: true
     docker:
       active: RELEASE
       repository:

@@ -32,10 +32,12 @@ projects {
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
         }
-        dir('core') {
+        path(':redis-sidecar-jdbc') {
             id 'java-library'
             id 'java-library-distribution'
             id 'com.github.johnrengelman.shadow'
+        }
+        path(':redis-sidecar-test') {
             id 'me.champeau.jmh'
         }
         dir('demo') {

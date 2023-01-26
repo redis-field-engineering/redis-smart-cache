@@ -1,8 +1,12 @@
 package com.redis.sidecar.codec;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -22,33 +26,38 @@ import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
+import javax.sql.rowset.RowSetProvider;
+import javax.sql.rowset.serial.SerialClob;
 
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 
-	private static final byte[] EMPTY = new byte[0];
-	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
+	public static final int DEFAULT_BYTE_BUFFER_CAPACITY = 10000000; // 10 MB
+	public static final StringCodec DEFAULT_STRING_CODEC = CharsetStringCodec.UTF8;
+
+	private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
+	private final StringCodec stringCodec;
 
-	public ExplicitResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
-		this.rowSetFactory = rowSetFactory;
-		this.maxByteBufferCapacity = maxByteBufferCapacity;
+	private ExplicitResultSetCodec(Builder builder) {
+		this.rowSetFactory = builder.rowSetFactory;
+		this.maxByteBufferCapacity = builder.maxByteBufferCapacity;
+		this.stringCodec = builder.stringCodec;
 	}
 
 	@Override
 	public String decodeKey(ByteBuffer bytes) {
-		return STRING_CODEC.decodeKey(bytes);
+		return io.lettuce.core.codec.StringCodec.UTF8.decodeKey(bytes);
 	}
 
 	@Override
 	public ByteBuffer encodeKey(String key) {
-		return STRING_CODEC.encodeKey(key);
+		return io.lettuce.core.codec.StringCodec.UTF8.encodeKey(key);
 	}
 
 	@Override
@@ -65,21 +74,16 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		RowSetMetaData metaData = decodeMetaData(byteBuf);
 		rowSet.setMetaData(metaData);
 		int columnCount = metaData.getColumnCount();
-		ColumnDecoder[] columnDecoders = new ColumnDecoder[columnCount];
+		ColumnCodec[] columnCodec = new ColumnCodec[columnCount];
 		for (int index = 0; index < columnCount; index++) {
 			int columnIndex = index + 1;
 			int columnType = metaData.getColumnType(columnIndex);
-			columnDecoders[index] = columnDecoder(columnIndex, columnType);
+			columnCodec[index] = columnCodec(columnIndex, columnType);
 		}
 		while (byteBuf.isReadable()) {
 			rowSet.moveToInsertRow();
-			for (int index = 0; index < columnDecoders.length; index++) {
-				boolean nullValue = byteBuf.readBoolean();
-				if (nullValue) {
-					rowSet.updateNull(index + 1);
-				} else {
-					columnDecoders[index].decode(byteBuf, rowSet);
-				}
+			for (int index = 0; index < columnCodec.length; index++) {
+				columnCodec[index].decode(byteBuf, rowSet);
 			}
 			rowSet.insertRow();
 		}
@@ -88,484 +92,205 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		return rowSet;
 	}
 
-	interface ColumnDecoder {
+	interface ColumnCodec {
 
 		void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException;
-
-	}
-
-	interface ColumnEncoder {
 
 		void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException;
 
 	}
 
-	static class BooleanColumnDecoder implements ColumnDecoder {
+	interface StringCodec {
 
-		private final int columnIndex;
+		String decode(ByteBuf buffer);
 
-		public BooleanColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		void encode(ByteBuf buffer, String string);
+
+	}
+
+	static class CharsetStringCodec implements StringCodec {
+
+		public static final StringCodec UTF8 = CharsetStringCodec.of(StandardCharsets.UTF_8);
+
+		private final Charset charset;
+
+		public CharsetStringCodec(Charset charset) {
+			this.charset = charset;
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		public String decode(ByteBuf buffer) {
+			int length = buffer.readInt();
+			byte[] bytes = new byte[length];
+			buffer.readBytes(bytes);
+			return new String(bytes, charset);
+		}
+
+		@Override
+		public void encode(ByteBuf buffer, String string) {
+			byte[] bytes = string.getBytes(charset);
+			buffer.writeInt(bytes.length);
+			buffer.writeBytes(bytes);
+		}
+
+		public static CharsetStringCodec of(Charset charset) {
+			return new CharsetStringCodec(charset);
+		}
+	}
+
+	static class BooleanColumnCodec extends NullableColumnCodec<Boolean> {
+
+		public BooleanColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateBoolean(columnIndex, byteBuf.readBoolean());
 		}
-	}
 
-	static class IntegerColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public IntegerColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Boolean value) throws SQLException {
+			byteBuf.writeBoolean(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		protected Boolean getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getBoolean(columnIndex);
+		}
+	}
+
+	static class IntegerColumnCodec extends NullableColumnCodec<Integer> {
+
+		public IntegerColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateInt(columnIndex, byteBuf.readInt());
 		}
-	}
 
-	static class LongColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public LongColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Integer value) throws SQLException {
+			byteBuf.writeInt(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		protected Integer getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getInt(columnIndex);
+		}
+	}
+
+	static class LongColumnCodec extends NullableColumnCodec<Long> {
+
+		public LongColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateLong(columnIndex, byteBuf.readLong());
 		}
-	}
 
-	static class FloatColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public FloatColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Long value) throws SQLException {
+			byteBuf.writeLong(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		protected Long getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getLong(columnIndex);
+		}
+	}
+
+	static class FloatColumnCodec extends NullableColumnCodec<Float> {
+
+		public FloatColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateFloat(columnIndex, byteBuf.readFloat());
 		}
-	}
 
-	static class DoubleColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public DoubleColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Float value) throws SQLException {
+			byteBuf.writeFloat(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		protected Float getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getFloat(columnIndex);
+		}
+	}
+
+	static class DoubleColumnCodec extends NullableColumnCodec<Double> {
+
+		public DoubleColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateDouble(columnIndex, byteBuf.readDouble());
 		}
-	}
 
-	static class StringColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public StringColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Double value) throws SQLException {
+			byteBuf.writeDouble(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			resultSet.updateString(columnIndex, readString(byteBuf));
+		protected Double getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getDouble(columnIndex);
 		}
 	}
 
-	static class DateColumnDecoder implements ColumnDecoder {
+	static class StringColumnCodec extends NullableColumnCodec<String> {
 
-		private final int columnIndex;
+		private final StringCodec codec;
 
-		public DateColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		public StringColumnCodec(int columnIndex, StringCodec codec) {
+			super(columnIndex);
+			this.codec = codec;
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			resultSet.updateString(columnIndex, codec.decode(byteBuf));
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, String value) throws SQLException {
+			codec.encode(byteBuf, value);
+		}
+
+		@Override
+		protected String getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getString(columnIndex);
+		}
+	}
+
+	static class DateColumnCodec extends NullableColumnCodec<Long> {
+
+		public DateColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
 			resultSet.updateDate(columnIndex, new Date(byteBuf.readLong()));
 		}
-	}
 
-	static class TimeColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public TimeColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		@Override
+		protected void write(ByteBuf byteBuf, Long value) throws SQLException {
+			byteBuf.writeLong(value);
 		}
 
 		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			resultSet.updateTime(columnIndex, new Time(byteBuf.readLong()));
-		}
-	}
-
-	static class TimestampColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public TimestampColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			resultSet.updateTimestamp(columnIndex, new Timestamp(byteBuf.readLong()));
-		}
-	}
-
-	static class RowIdColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public RowIdColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			resultSet.updateRowId(columnIndex, new com.redis.sidecar.jdbc.RowId(readString(byteBuf)));
-		}
-	}
-
-	static class ClobColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public ClobColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			resultSet.updateClob(columnIndex, new com.redis.sidecar.jdbc.Clob(readString(byteBuf)));
-		}
-	}
-
-	static class BytesColumnDecoder implements ColumnDecoder {
-
-		private final int columnIndex;
-
-		public BytesColumnDecoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-			byte[] bytes = new byte[byteBuf.readInt()];
-			byteBuf.readBytes(bytes);
-			resultSet.updateBytes(columnIndex, bytes);
-		}
-	}
-
-	private ColumnDecoder columnDecoder(int columnIndex, int columnType) throws SQLException {
-		switch (columnType) {
-		case Types.BIT:
-		case Types.BOOLEAN:
-			return new BooleanColumnDecoder(columnIndex);
-		case Types.TINYINT:
-		case Types.SMALLINT:
-		case Types.INTEGER:
-			return new IntegerColumnDecoder(columnIndex);
-		case Types.BIGINT:
-			return new LongColumnDecoder(columnIndex);
-		case Types.FLOAT:
-		case Types.REAL:
-			return new FloatColumnDecoder(columnIndex);
-		case Types.DOUBLE:
-		case Types.NUMERIC:
-		case Types.DECIMAL:
-			return new DoubleColumnDecoder(columnIndex);
-		case Types.CHAR:
-		case Types.VARCHAR:
-		case Types.LONGVARCHAR:
-		case Types.NCHAR:
-		case Types.NVARCHAR:
-		case Types.LONGNVARCHAR:
-			return new StringColumnDecoder(columnIndex);
-		case Types.DATE:
-			return new DateColumnDecoder(columnIndex);
-		case Types.TIME:
-		case Types.TIME_WITH_TIMEZONE:
-			return new TimeColumnDecoder(columnIndex);
-		case Types.TIMESTAMP:
-		case Types.TIMESTAMP_WITH_TIMEZONE:
-			return new TimestampColumnDecoder(columnIndex);
-		case Types.ROWID:
-			return new RowIdColumnDecoder(columnIndex);
-		case Types.CLOB:
-			return new ClobColumnDecoder(columnIndex);
-		case Types.BINARY:
-		case Types.BLOB:
-		case Types.VARBINARY:
-		case Types.LONGVARBINARY:
-			return new BytesColumnDecoder(columnIndex);
-		case Types.NULL:
-		case Types.OTHER:
-		case Types.JAVA_OBJECT:
-		case Types.DISTINCT:
-		case Types.STRUCT:
-		case Types.ARRAY:
-		case Types.REF:
-		case Types.DATALINK:
-		case Types.NCLOB:
-		case Types.SQLXML:
-		case Types.REF_CURSOR:
-		default:
-			throw new SQLException("Column type no supported: " + columnType);
-		}
-	}
-
-	public RowSetMetaData decodeMetaData(ByteBuffer bytes) throws SQLException {
-		return decodeMetaData(Unpooled.wrappedBuffer(bytes));
-	}
-
-	private RowSetMetaData decodeMetaData(ByteBuf bytes) throws SQLException {
-		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
-		int columnCount = bytes.readInt();
-		metaData.setColumnCount(columnCount);
-		for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-			metaData.setCatalogName(columnIndex, readString(bytes));
-			metaData.setColumnLabel(columnIndex, readString(bytes));
-			metaData.setColumnName(columnIndex, readString(bytes));
-			metaData.setColumnTypeName(columnIndex, readString(bytes));
-			metaData.setColumnType(columnIndex, bytes.readInt());
-			metaData.setColumnDisplaySize(columnIndex, bytes.readInt());
-			metaData.setPrecision(columnIndex, bytes.readInt());
-			metaData.setTableName(columnIndex, readString(bytes));
-			metaData.setScale(columnIndex, bytes.readInt());
-			metaData.setSchemaName(columnIndex, readString(bytes));
-			metaData.setAutoIncrement(columnIndex, bytes.readBoolean());
-			metaData.setCaseSensitive(columnIndex, bytes.readBoolean());
-			metaData.setCurrency(columnIndex, bytes.readBoolean());
-			metaData.setNullable(columnIndex, bytes.readInt());
-			metaData.setSearchable(columnIndex, bytes.readBoolean());
-			metaData.setSigned(columnIndex, bytes.readBoolean());
-		}
-		return metaData;
-	}
-
-	private static String readString(ByteBuf buffer) {
-		int length = buffer.readInt();
-		byte[] bytes = new byte[length];
-		buffer.readBytes(bytes);
-		return new String(bytes, StandardCharsets.UTF_8);
-	}
-
-	@Override
-	public ByteBuffer encodeValue(ResultSet resultSet) {
-		try {
-			if (resultSet == null) {
-				return ByteBuffer.wrap(EMPTY);
-			}
-			ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
-			ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
-			byteBuf.clear();
-			encode(resultSet, byteBuf);
-			int writerIndex = byteBuf.writerIndex();
-			buffer.limit(writerIndex);
-			return buffer;
-		} catch (SQLException e) {
-			throw new IllegalStateException("Could not encode ResultSet", e);
-		}
-	}
-
-	public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-		ResultSetMetaData metaData = resultSet.getMetaData();
-		encode(metaData, byteBuf);
-		int columnCount = metaData.getColumnCount();
-		ColumnEncoder[] encoders = new ColumnEncoder[columnCount];
-		for (int index = 0; index < columnCount; index++) {
-			int columnIndex = index + 1;
-			int columnType = resultSet.getMetaData().getColumnType(columnIndex);
-			encoders[index] = columnEncoder(columnIndex, columnType);
-		}
-		while (resultSet.next()) {
-			for (int index = 0; index < encoders.length; index++) {
-				encoders[index].encode(resultSet, byteBuf);
-			}
-		}
-	}
-
-	static class BooleanColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public BooleanColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			boolean booleanValue = resultSet.getBoolean(columnIndex);
-			if (resultSet.wasNull()) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeBoolean(booleanValue);
-			}
-		}
-
-	}
-
-	static class IntegerColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public IntegerColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			int intValue = resultSet.getInt(columnIndex);
-			if (resultSet.wasNull()) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeInt(intValue);
-			}
-		}
-
-	}
-
-	static class LongColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public LongColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			long longValue = resultSet.getLong(columnIndex);
-			if (resultSet.wasNull()) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeLong(longValue);
-			}
-		}
-
-	}
-
-	static class FloatColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public FloatColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			float floatValue = resultSet.getFloat(columnIndex);
-			if (resultSet.wasNull()) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeFloat(floatValue);
-			}
-		}
-
-	}
-
-	static class DoubleColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public DoubleColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			double doubleValue = resultSet.getDouble(columnIndex);
-			if (resultSet.wasNull()) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeDouble(doubleValue);
-			}
-		}
-
-	}
-
-	static class DecimalColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public DecimalColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			BigDecimal value = resultSet.getBigDecimal(columnIndex);
-			if (resultSet.wasNull() || value == null) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeDouble(value.doubleValue());
-			}
-		}
-
-	}
-
-	static class StringColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public StringColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			String string = resultSet.getString(columnIndex);
-			if (resultSet.wasNull() || string == null) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				writeString(byteBuf, string);
-			}
-		}
-
-	}
-
-	static class DateColumnEncoder implements ColumnEncoder {
-
-		private final int columnIndex;
-
-		public DateColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
-		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			Long timestamp = getLong(resultSet, columnIndex);
-			if (resultSet.wasNull() || timestamp == null) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				byteBuf.writeLong(timestamp);
-			}
-		}
-
-		private Long getLong(ResultSet resultSet, int columnIndex) throws SQLException {
+		protected Long getValue(ResultSet resultSet) throws SQLException {
 			Object value = resultSet.getObject(columnIndex);
 			if (value == null) {
 				return null;
@@ -585,158 +310,362 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 				throw new SQLException(String.format("Unexpected value '%s' on column %s", value, columnIndex), e);
 			}
 		}
-
 	}
 
-	static class RowIdColumnEncoder implements ColumnEncoder {
+	static class BigDecimalColumnCodec extends NullableColumnCodec<BigDecimal> {
 
-		private final int columnIndex;
-
-		public RowIdColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		public BigDecimalColumnCodec(int columnIndex) {
+			super(columnIndex);
 		}
 
 		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			RowId rowId = resultSet.getRowId(columnIndex);
-			if (resultSet.wasNull() || rowId == null) {
-				byteBuf.writeBoolean(true);
-			} else {
-				byteBuf.writeBoolean(false);
-				writeString(byteBuf, rowId.toString());
-			}
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			resultSet.updateBigDecimal(columnIndex, BigDecimal.valueOf(byteBuf.readDouble()));
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, BigDecimal value) throws SQLException {
+			byteBuf.writeDouble(value.doubleValue());
+		}
+
+		@Override
+		protected BigDecimal getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getBigDecimal(columnIndex);
 		}
 
 	}
 
-	static class ClobColumnEncoder implements ColumnEncoder {
+	static class TimeColumnCodec extends NullableColumnCodec<Time> {
 
-		private final int columnIndex;
-
-		public ClobColumnEncoder(int columnIndex) {
-			this.columnIndex = columnIndex;
+		public TimeColumnCodec(int columnIndex) {
+			super(columnIndex);
 		}
 
 		@Override
-		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			Clob clob = resultSet.getClob(columnIndex);
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			resultSet.updateTime(columnIndex, new Time(byteBuf.readLong()));
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, Time value) throws SQLException {
+			byteBuf.writeLong(value.getTime());
+		}
+
+		@Override
+		protected Time getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getTime(columnIndex);
+		}
+	}
+
+	static class TimestampColumnCodec extends NullableColumnCodec<Timestamp> {
+
+		public TimestampColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			resultSet.updateTimestamp(columnIndex, new Timestamp(byteBuf.readLong()));
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, Timestamp value) throws SQLException {
+			byteBuf.writeLong(value.getTime());
+		}
+
+		@Override
+		protected Timestamp getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getTimestamp(columnIndex);
+		}
+	}
+
+	static class RowIdColumnCodec extends NullableColumnCodec<RowId> {
+
+		private final StringCodec codec;
+
+		public RowIdColumnCodec(int columnIndex, StringCodec codec) {
+			super(columnIndex);
+			this.codec = codec;
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			String string = codec.decode(byteBuf);
+			RowId rowId = new com.redis.sidecar.jdbc.RowId(string);
+			resultSet.updateRowId(columnIndex, rowId);
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, RowId value) throws SQLException {
+			codec.encode(byteBuf, value.toString());
+		}
+
+		@Override
+		protected RowId getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getRowId(columnIndex);
+		}
+	}
+
+	static class ClobColumnCodec extends NullableColumnCodec<Clob> {
+
+		private static final String EMPTY_STRING = "";
+
+		private final StringCodec codec;
+
+		public ClobColumnCodec(int columnIndex, StringCodec codec) {
+			super(columnIndex);
+			this.codec = codec;
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			String string = codec.decode(byteBuf);
+			Clob clob = new SerialClob(string.toCharArray());
+			resultSet.updateClob(columnIndex, clob);
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, Clob clob) throws SQLException {
 			try {
-				if (resultSet.wasNull() || clob == null) {
-					byteBuf.writeBoolean(true);
-				} else {
-					int size;
-					try {
-						size = Math.toIntExact(clob.length());
-					} catch (ArithmeticException e) {
-						throw new SQLException("CLOB is too large", e);
-					}
-					String clobString = size == 0 ? "" : clob.getSubString(1, size);
-					byteBuf.writeBoolean(false);
-					writeString(byteBuf, clobString);
+				int length;
+				try {
+					length = Math.toIntExact(clob.length());
+				} catch (ArithmeticException e) {
+					throw new SQLException("CLOB is too large", e);
 				}
+				String string = length == 0 ? EMPTY_STRING : clob.getSubString(1, length);
+				byteBuf.writeBoolean(false);
+				codec.encode(byteBuf, string);
 			} finally {
-				if (clob != null) {
-					try {
-						clob.free();
-					} catch (AbstractMethodError e) {
-						// May occur with old JDBC drivers
-					}
+				try {
+					clob.free();
+				} catch (AbstractMethodError e) {
+					// May occur with old JDBC drivers
 				}
 			}
 		}
+
+		@Override
+		protected Clob getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getClob(columnIndex);
+		}
 	}
 
-	static class BlobColumnEncoder implements ColumnEncoder {
+	abstract static class NullableColumnCodec<T> implements ColumnCodec {
 
-		private final int columnIndex;
+		protected final int columnIndex;
 
-		public BlobColumnEncoder(int columnIndex) {
+		protected NullableColumnCodec(int columnIndex) {
 			this.columnIndex = columnIndex;
 		}
 
 		@Override
+		public void decode(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			boolean nullValue = byteBuf.readBoolean();
+			if (nullValue) {
+				resultSet.updateNull(columnIndex);
+			} else {
+				updateValue(byteBuf, resultSet);
+			}
+		}
+
+		protected abstract void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException;
+
+		@Override
 		public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
-			byte[] bytes = resultSet.getBytes(columnIndex);
-			if (resultSet.wasNull() || bytes == null) {
+			T value = getValue(resultSet);
+			if (resultSet.wasNull() || value == null) {
 				byteBuf.writeBoolean(true);
 			} else {
 				byteBuf.writeBoolean(false);
-				byteBuf.writeInt(bytes.length);
-				byteBuf.writeBytes(bytes);
+				write(byteBuf, value);
 			}
+		}
+
+		protected abstract void write(ByteBuf byteBuf, T value) throws SQLException;
+
+		protected abstract T getValue(ResultSet resultSet) throws SQLException;
+
+	}
+
+	static class BytesColumnCodec extends NullableColumnCodec<byte[]> {
+
+		public BytesColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			int length = byteBuf.readInt();
+			byte[] bytes = new byte[length];
+			byteBuf.readBytes(bytes);
+			resultSet.updateBytes(columnIndex, bytes);
+		}
+
+		@Override
+		protected byte[] getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getBytes(columnIndex);
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, byte[] value) {
+			byteBuf.writeInt(value.length);
+			byteBuf.writeBytes(value);
 		}
 	}
 
-	private ColumnEncoder columnEncoder(int columnIndex, int columnType) throws SQLException {
+	static class BlobColumnCodec extends NullableColumnCodec<Blob> {
+
+		public BlobColumnCodec(int columnIndex) {
+			super(columnIndex);
+		}
+
+		@Override
+		protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
+			int length = byteBuf.readInt();
+			byte[] bytes = new byte[length];
+			byteBuf.readBytes(bytes);
+			try (ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes)) {
+				resultSet.updateBlob(length, inputStream);
+			} catch (IOException e) {
+				throw new SQLException("Could not close ByteArrayInputStream", e);
+			}
+		}
+
+		@Override
+		protected Blob getValue(ResultSet resultSet) throws SQLException {
+			return resultSet.getBlob(columnIndex);
+		}
+
+		@Override
+		protected void write(ByteBuf byteBuf, Blob value) throws SQLException {
+			int length;
+			try {
+				length = Math.toIntExact(value.length());
+			} catch (ArithmeticException e) {
+				throw new SQLException("BLOB is too large", e);
+			}
+			byte[] bytes = length == 0 ? EMPTY_BYTE_ARRAY : value.getBytes(1, length);
+			byteBuf.writeInt(bytes.length);
+			byteBuf.writeBytes(bytes);
+		}
+
+	}
+
+	private ColumnCodec columnCodec(int columnIndex, int columnType) throws SQLException {
 		switch (columnType) {
 		case Types.BIT:
 		case Types.BOOLEAN:
-			return new BooleanColumnEncoder(columnIndex);
+			return new BooleanColumnCodec(columnIndex);
 		case Types.TINYINT:
 		case Types.SMALLINT:
 		case Types.INTEGER:
-			return new IntegerColumnEncoder(columnIndex);
+			return new IntegerColumnCodec(columnIndex);
 		case Types.BIGINT:
-			return new LongColumnEncoder(columnIndex);
+			return new LongColumnCodec(columnIndex);
 		case Types.FLOAT:
 		case Types.REAL:
-			return new FloatColumnEncoder(columnIndex);
+			return new FloatColumnCodec(columnIndex);
 		case Types.DOUBLE:
-			return new DoubleColumnEncoder(columnIndex);
+			return new DoubleColumnCodec(columnIndex);
 		case Types.NUMERIC:
 		case Types.DECIMAL:
-			return new DecimalColumnEncoder(columnIndex);
+			return new BigDecimalColumnCodec(columnIndex);
 		case Types.CHAR:
 		case Types.VARCHAR:
 		case Types.LONGVARCHAR:
 		case Types.NCHAR:
 		case Types.NVARCHAR:
 		case Types.LONGNVARCHAR:
-			return new StringColumnEncoder(columnIndex);
+			return new StringColumnCodec(columnIndex, stringCodec);
 		case Types.DATE:
+			return new DateColumnCodec(columnIndex);
 		case Types.TIME:
-		case Types.TIME_WITH_TIMEZONE:
+			return new TimeColumnCodec(columnIndex);
 		case Types.TIMESTAMP:
-		case Types.TIMESTAMP_WITH_TIMEZONE:
-			return new DateColumnEncoder(columnIndex);
-		case Types.ROWID:
-			return new RowIdColumnEncoder(columnIndex);
-		case Types.CLOB:
-			return new ClobColumnEncoder(columnIndex);
-		case Types.BINARY:
-		case Types.BLOB:
-		case Types.VARBINARY:
-		case Types.LONGVARBINARY:
-			return new BlobColumnEncoder(columnIndex);
-		case Types.NULL:
-		case Types.OTHER:
-		case Types.JAVA_OBJECT:
-		case Types.DISTINCT:
-		case Types.STRUCT:
-		case Types.ARRAY:
-		case Types.REF:
-		case Types.DATALINK:
-		case Types.NCLOB:
-		case Types.SQLXML:
-		case Types.REF_CURSOR:
+			return new TimestampColumnCodec(columnIndex);
 		default:
 			throw new SQLException("Column type no supported: " + columnType);
+		}
+	}
+
+	public RowSetMetaData decodeMetaData(ByteBuffer bytes) throws SQLException {
+		return decodeMetaData(Unpooled.wrappedBuffer(bytes));
+	}
+
+	private RowSetMetaData decodeMetaData(ByteBuf bytes) throws SQLException {
+		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
+		int columnCount = bytes.readInt();
+		metaData.setColumnCount(columnCount);
+		for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+			metaData.setCatalogName(columnIndex, stringCodec.decode(bytes));
+			metaData.setColumnLabel(columnIndex, stringCodec.decode(bytes));
+			metaData.setColumnName(columnIndex, stringCodec.decode(bytes));
+			metaData.setColumnTypeName(columnIndex, stringCodec.decode(bytes));
+			metaData.setColumnType(columnIndex, bytes.readInt());
+			metaData.setColumnDisplaySize(columnIndex, bytes.readInt());
+			metaData.setPrecision(columnIndex, bytes.readInt());
+			metaData.setTableName(columnIndex, stringCodec.decode(bytes));
+			metaData.setScale(columnIndex, bytes.readInt());
+			metaData.setSchemaName(columnIndex, stringCodec.decode(bytes));
+			metaData.setAutoIncrement(columnIndex, bytes.readBoolean());
+			metaData.setCaseSensitive(columnIndex, bytes.readBoolean());
+			metaData.setCurrency(columnIndex, bytes.readBoolean());
+			metaData.setNullable(columnIndex, bytes.readInt());
+			metaData.setSearchable(columnIndex, bytes.readBoolean());
+			metaData.setSigned(columnIndex, bytes.readBoolean());
+		}
+		return metaData;
+	}
+
+	@Override
+	public ByteBuffer encodeValue(ResultSet resultSet) {
+		try {
+			if (resultSet == null) {
+				return ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
+			}
+			ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
+			ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
+			byteBuf.clear();
+			encode(resultSet, byteBuf);
+			int writerIndex = byteBuf.writerIndex();
+			buffer.limit(writerIndex);
+			return buffer;
+		} catch (SQLException e) {
+			throw new IllegalStateException("Could not encode ResultSet", e);
+		}
+	}
+
+	public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
+		ResultSetMetaData metaData = resultSet.getMetaData();
+		encode(metaData, byteBuf);
+		int columnCount = metaData.getColumnCount();
+		ColumnCodec[] codecs = new ColumnCodec[columnCount];
+		for (int index = 0; index < columnCount; index++) {
+			int columnIndex = index + 1;
+			int columnType = resultSet.getMetaData().getColumnType(columnIndex);
+			codecs[index] = columnCodec(columnIndex, columnType);
+		}
+		while (resultSet.next()) {
+			for (int index = 0; index < codecs.length; index++) {
+				codecs[index].encode(resultSet, byteBuf);
+			}
 		}
 	}
 
 	public void encode(ResultSetMetaData metaData, ByteBuf bytes) throws SQLException {
 		bytes.writeInt(metaData.getColumnCount());
 		for (int index = 1; index <= metaData.getColumnCount(); index++) {
-			writeString(bytes, metaData.getCatalogName(index));
-			writeString(bytes, metaData.getColumnLabel(index));
-			writeString(bytes, metaData.getColumnName(index));
-			writeString(bytes, metaData.getColumnTypeName(index));
+			stringCodec.encode(bytes, metaData.getCatalogName(index));
+			stringCodec.encode(bytes, metaData.getColumnLabel(index));
+			stringCodec.encode(bytes, metaData.getColumnName(index));
+			stringCodec.encode(bytes, metaData.getColumnTypeName(index));
 			bytes.writeInt(metaData.getColumnType(index));
 			bytes.writeInt(metaData.getColumnDisplaySize(index));
 			bytes.writeInt(metaData.getPrecision(index));
-			writeString(bytes, metaData.getTableName(index));
+			stringCodec.encode(bytes, metaData.getTableName(index));
 			bytes.writeInt(metaData.getScale(index));
-			writeString(bytes, metaData.getSchemaName(index));
+			stringCodec.encode(bytes, metaData.getSchemaName(index));
 			bytes.writeBoolean(metaData.isAutoIncrement(index));
 			bytes.writeBoolean(metaData.isCaseSensitive(index));
 			bytes.writeBoolean(metaData.isCurrency(index));
@@ -746,10 +675,42 @@ public class ExplicitResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	private static void writeString(ByteBuf buf, String string) {
-		byte[] bytes = string.getBytes(StandardCharsets.UTF_8);
-		buf.writeInt(bytes.length);
-		buf.writeBytes(bytes);
+	public static Builder builder() throws SQLException {
+		return new Builder();
+	}
+
+	public static Builder builder(RowSetFactory rowSetFactory) {
+		return new Builder(rowSetFactory);
+	}
+
+	public static class Builder {
+
+		private final RowSetFactory rowSetFactory;
+		private int maxByteBufferCapacity = DEFAULT_BYTE_BUFFER_CAPACITY;
+		private StringCodec stringCodec = DEFAULT_STRING_CODEC;
+
+		public Builder() throws SQLException {
+			this(RowSetProvider.newFactory());
+		}
+
+		public Builder(RowSetFactory rowSetFactory) {
+			this.rowSetFactory = rowSetFactory;
+		}
+
+		public Builder maxByteBufferCapacity(int capacity) {
+			this.maxByteBufferCapacity = capacity;
+			return this;
+		}
+
+		public Builder stringCodec(StringCodec codec) {
+			this.stringCodec = codec;
+			return this;
+		}
+
+		public ExplicitResultSetCodec build() {
+			return new ExplicitResultSetCodec(this);
+		}
+
 	}
 
 }

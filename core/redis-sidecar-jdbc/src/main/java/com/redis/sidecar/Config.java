@@ -7,6 +7,8 @@ import java.util.List;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
+import com.redis.sidecar.codec.ExplicitResultSetCodec;
+
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.internal.LettuceAssert;
 
@@ -14,14 +16,13 @@ public class Config {
 
 	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
 	public static final Duration DEFAULT_METRICS_STEP = Duration.ofMinutes(1);
-	public static final int DEFAULT_BUFFER_SIZE = 100; // MB
 
 	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
 	private Driver driver = new Driver();
 	private Redis redis = new Redis();
 	private Metrics metrics = new Metrics();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
-	private int bufferSize = DEFAULT_BUFFER_SIZE;
+	private int bufferSize = ExplicitResultSetCodec.DEFAULT_BYTE_BUFFER_CAPACITY;
 
 	/**
 	 * 

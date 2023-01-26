@@ -73,7 +73,8 @@ public class NonRegisteringDriver implements Driver {
 		AbstractRedisClient redisClient = redisManager.getClient(config);
 		Connection backendConnection = backendManager.connect(config, info);
 		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
-		ExplicitResultSetCodec codec = new ExplicitResultSetCodec(RowSetProvider.newFactory(), config.getBufferSize());
+		ExplicitResultSetCodec codec = ExplicitResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize())
+				.build();
 		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);

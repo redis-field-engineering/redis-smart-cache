@@ -1,11 +1,8 @@
 package com.redis.sidecar;
 
-import java.sql.SQLException;
-
 import org.awaitility.Awaitility;
 import org.junit.jupiter.params.ParameterizedTest;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -13,7 +10,7 @@ class ConfigManagerTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException, JsonProcessingException {
+	void testDriver(RedisTestContext redis) throws Exception {
 		Config config = new Config();
 		config.getRedis().setUri(redis.getRedisURI());
 		config.getRedis().setCluster(redis.isCluster());

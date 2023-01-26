@@ -98,15 +98,6 @@ subprojects {
         maxHeapSize = "1g" // maximum heap size
     }
     
-    bootJar {
-        enabled = false
-    }
-
-    jar {
-        enabled = true
-        archiveClassifier = ''
-    }
-
     configurations.all {
 		resolutionStrategy.eachDependency { DependencyResolveDetails details ->
 			if (details.requested.name == 'lettuce-core' ) {
