@@ -10,32 +10,32 @@ public class CodecBenchmark {
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void explicitDecode(CodecExecutionPlan plan) {
-		plan.getExplicitCodec().decodeValue(plan.getExplicitByteBuffer());
+	public void decodeResultSet(CodecExecutionPlan plan) {
+		plan.getCodec().decodeValue(plan.getByteBuffer());
 	}
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void explicitDecodeMetadata(CodecExecutionPlan plan) throws SQLException {
-		plan.getExplicitCodec().decodeMetaData(plan.getExplicitByteBuffer());
+	public void decodeMetadata(CodecExecutionPlan plan) throws SQLException {
+		plan.getCodec().decodeMetaData(plan.getByteBuffer());
 	}
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void explicitEncode(CodecExecutionPlan plan) {
-		plan.getExplicitCodec().encodeValue(plan.getRowSet());
+	public void encodeResultSet(CodecExecutionPlan plan) {
+		plan.getCodec().encodeValue(plan.getRowSet());
 	}
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void jdkDecode(CodecExecutionPlan plan) {
-		plan.getJdkCodec().decodeValue(plan.getJdkByteBuffer());
+	public void jdkDecodeResultSet(CodecExecutionPlan plan) {
+		plan.getSerializedCodec().decodeValue(plan.getSerializedByteBuffer());
 	}
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void jdkEncode(CodecExecutionPlan plan) {
-		plan.getJdkCodec().encodeValue(plan.getRowSet());
+	public void jdkEncodeResultSet(CodecExecutionPlan plan) {
+		plan.getSerializedCodec().encodeValue(plan.getRowSet());
 	}
 
 }

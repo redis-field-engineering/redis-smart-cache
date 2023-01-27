@@ -1,4 +1,4 @@
-package com.redis.sidecar.jdbc;
+package com.redis.sidecar;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import javax.sql.rowset.CachedRowSet;
 
 import com.redis.sidecar.Config.Rule;
-import com.redis.sidecar.SqlParser;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

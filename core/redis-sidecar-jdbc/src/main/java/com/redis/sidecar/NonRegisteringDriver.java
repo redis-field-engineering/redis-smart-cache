@@ -13,7 +13,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
@@ -22,8 +21,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.redis.sidecar.codec.ExplicitResultSetCodec;
-import com.redis.sidecar.jdbc.SidecarConnection;
+import com.redis.sidecar.codec.ResultSetCodec;
+import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.api.StatefulConnection;
@@ -72,9 +71,8 @@ public class NonRegisteringDriver implements Driver {
 		MeterRegistry meterRegistry = meterManager.getRegistry(config);
 		AbstractRedisClient redisClient = redisManager.getClient(config);
 		Connection backendConnection = backendManager.connect(config, info);
-		RowSetFactory rowSetFactory = RowSetProvider.newFactory();
-		ExplicitResultSetCodec codec = ExplicitResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize())
-				.build();
+		RowSetFactory rowSetFactory = new SidecarRowSetFactory();
+		ResultSetCodec codec = ResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize()).build();
 		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
 		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);

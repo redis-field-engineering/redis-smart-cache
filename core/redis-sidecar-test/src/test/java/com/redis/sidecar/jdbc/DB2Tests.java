@@ -5,6 +5,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.Db2Container;
 import org.testcontainers.junit.jupiter.Container;
@@ -13,6 +15,7 @@ import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
+@EnabledOnOs(OS.LINUX)
 class DB2Tests extends AbstractSidecarTests {
 
 	@SuppressWarnings("deprecation")

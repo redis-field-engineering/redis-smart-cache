@@ -1,4 +1,4 @@
-package com.redis.sidecar.jdbc;
+package com.redis.sidecar;
 
 import java.io.InputStream;
 import java.io.Reader;

@@ -7,7 +7,7 @@ import java.util.List;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.redis.sidecar.codec.ExplicitResultSetCodec;
+import com.redis.sidecar.codec.ResultSetCodec;
 
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.internal.LettuceAssert;
@@ -22,11 +22,11 @@ public class Config {
 	private Redis redis = new Redis();
 	private Metrics metrics = new Metrics();
 	private List<Rule> rules = Arrays.asList(Rule.builder().build());
-	private int bufferSize = ExplicitResultSetCodec.DEFAULT_BYTE_BUFFER_CAPACITY;
+	private int bufferSize = ResultSetCodec.DEFAULT_BYTE_BUFFER_CAPACITY;
 
 	/**
 	 * 
-	 * @return max byte buffer capacity in megabytes
+	 * @return max byte buffer capacity in bytes
 	 */
 	public int getBufferSize() {
 		return bufferSize;

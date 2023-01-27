@@ -1,4 +1,4 @@
-package com.redis.sidecar.jdbc;
+package com.redis.sidecar;
 
 import java.sql.Array;
 import java.sql.Blob;
@@ -21,9 +21,6 @@ import java.util.concurrent.Executor;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
-
-import com.redis.sidecar.Config;
-import com.redis.sidecar.ResultSetCache;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.MeterRegistry;

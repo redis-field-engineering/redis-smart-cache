@@ -14,7 +14,8 @@ import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
-import javax.sql.rowset.RowSetProvider;
+
+import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 public class RowSetBuilder {
 
@@ -39,7 +40,7 @@ public class RowSetBuilder {
 	private final RowSetFactory rowSetFactory;
 
 	public RowSetBuilder() throws SQLException {
-		this(RowSetProvider.newFactory());
+		this(new SidecarRowSetFactory());
 	}
 
 	public RowSetBuilder(RowSetFactory rowSetFactory) {

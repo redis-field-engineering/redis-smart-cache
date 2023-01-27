@@ -19,7 +19,7 @@ import io.lettuce.core.codec.StringCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
-public class JdkSerializationResultSetCodec implements RedisCodec<String, ResultSet> {
+public class SerializedResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	private static final byte[] EMPTY = new byte[0];
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
@@ -27,7 +27,7 @@ public class JdkSerializationResultSetCodec implements RedisCodec<String, Result
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public JdkSerializationResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacity) {
+	public SerializedResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacity) {
 		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxBufferCapacity;
 	}

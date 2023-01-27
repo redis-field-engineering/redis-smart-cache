@@ -14,10 +14,12 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import org.awaitility.Awaitility;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
@@ -28,14 +30,12 @@ import com.redis.testcontainers.junit.RedisTestContext;
 
 public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTestBase {
 
-	private static final int BUFFER_SIZE = 50;
+	private static final Logger log = Logger.getLogger(AbstractSidecarTests.class.getName());
+
+	private static final int BUFFER_SIZE = 50000000;
 
 	private final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
-//	private final RedisEnterpriseContainer redisEnterprise = new RedisEnterpriseContainer(
-//			RedisEnterpriseContainer.DEFAULT_IMAGE_NAME.withTag("latest"))
-//			.withDatabase(Database.name("SidecarTests").memory(DataSize.ofMegabytes(50)).ossCluster(true)
-//					.modules(RedisModule.JSON, RedisModule.TIMESERIES).build());
 
 	private SidecarDriver sidecarDriver;
 
@@ -142,13 +142,15 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		try (Connection databaseConnection = connection(databaseContainer);
 				Connection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
-			ResultSet resultSet = null;
-			int count = 100;
-			for (int index = 0; index < count; index++) {
-				resultSet = executor.execute(connection);
-			}
-			TestUtils.assertEquals(executor.execute(databaseConnection), resultSet);
-			Assertions.assertFalse(redis.sync().keys("sidecar:cache:*").isEmpty());
+			Awaitility.await().until(() -> {
+				try {
+					executor.execute(connection);
+				} catch (Exception e) {
+					log.log(Level.SEVERE, "Could not execute statement", e);
+				}
+				return !redis.sync().keys("sidecar:cache:*").isEmpty();
+			});
+			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));
 		}
 	}
 

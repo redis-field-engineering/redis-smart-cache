@@ -5,7 +5,6 @@ import java.sql.SQLException;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
-import javax.sql.rowset.RowSetProvider;
 
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Param;
@@ -13,8 +12,9 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import com.redis.sidecar.codec.ExplicitResultSetCodec;
-import com.redis.sidecar.codec.JdkSerializationResultSetCodec;
+import com.redis.sidecar.codec.ResultSetCodec;
+import com.redis.sidecar.codec.SerializedResultSetCodec;
+import com.redis.sidecar.rowset.SidecarRowSetFactory;
 import com.redis.sidecar.test.RowSetBuilder;
 
 @State(Scope.Benchmark)
@@ -28,18 +28,17 @@ public class CodecExecutionPlan {
 	private int rows;
 
 	private RowSetFactory rowSetFactory;
-	private ExplicitResultSetCodec explicitCodec;
-	private JdkSerializationResultSetCodec jdkCodec;
-	private ByteBuffer explicitByteBuffer;
-	private ByteBuffer jdkByteBuffer;
+	private ResultSetCodec codec;
+	private SerializedResultSetCodec jdkCodec;
+	private ByteBuffer byteBuffer;
+	private ByteBuffer serializedByteBuffer;
 	private CachedRowSet rowSet;
 
 	@Setup(Level.Trial)
 	public void setUpTrial() throws SQLException {
-		this.rowSetFactory = RowSetProvider.newFactory();
-		this.explicitCodec = ExplicitResultSetCodec.builder(rowSetFactory).maxByteBufferCapacity(BYTE_BUFFER_CAPACITY)
-				.build();
-		this.jdkCodec = new JdkSerializationResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		this.rowSetFactory = new SidecarRowSetFactory();
+		this.codec = ResultSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
+		this.jdkCodec = new SerializedResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)
@@ -47,9 +46,9 @@ public class CodecExecutionPlan {
 		RowSetBuilder rowSetBuilder = new RowSetBuilder();
 		this.rowSet = rowSetBuilder.build(rowSetBuilder.metaData(columns, RowSetBuilder.SUPPORTED_TYPES), rows);
 		rowSet.beforeFirst();
-		this.explicitByteBuffer = explicitCodec.encodeValue(rowSet);
+		this.byteBuffer = codec.encodeValue(rowSet);
 		rowSet.beforeFirst();
-		this.jdkByteBuffer = jdkCodec.encodeValue(rowSet);
+		this.serializedByteBuffer = jdkCodec.encodeValue(rowSet);
 		rowSet.beforeFirst();
 	}
 
@@ -65,19 +64,19 @@ public class CodecExecutionPlan {
 		return rowSet;
 	}
 
-	public ExplicitResultSetCodec getExplicitCodec() {
-		return explicitCodec;
+	public ResultSetCodec getCodec() {
+		return codec;
 	}
 
-	public ByteBuffer getExplicitByteBuffer() {
-		return explicitByteBuffer;
+	public ByteBuffer getByteBuffer() {
+		return byteBuffer;
 	}
 
-	public JdkSerializationResultSetCodec getJdkCodec() {
+	public SerializedResultSetCodec getSerializedCodec() {
 		return jdkCodec;
 	}
 
-	public ByteBuffer getJdkByteBuffer() {
-		return jdkByteBuffer;
+	public ByteBuffer getSerializedByteBuffer() {
+		return serializedByteBuffer;
 	}
 }
