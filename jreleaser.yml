@@ -65,7 +65,6 @@ distributions:
         transform: '{{distributionName}}-{{projectEffectiveVersion}}.jar'
     executable:
       name: 'redis-sidecar-demo-launcher'
-    skipRelease: true
     docker:
       active: RELEASE
       repository:
