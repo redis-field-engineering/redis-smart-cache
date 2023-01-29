@@ -29,7 +29,7 @@ public class CodecExecutionPlan {
 
 	private RowSetFactory rowSetFactory;
 	private ResultSetCodec codec;
-	private SerializedResultSetCodec jdkCodec;
+	private SerializedResultSetCodec serializedCodec;
 	private ByteBuffer byteBuffer;
 	private ByteBuffer serializedByteBuffer;
 	private CachedRowSet rowSet;
@@ -38,7 +38,7 @@ public class CodecExecutionPlan {
 	public void setUpTrial() throws SQLException {
 		this.rowSetFactory = new SidecarRowSetFactory();
 		this.codec = ResultSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
-		this.jdkCodec = new SerializedResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		this.serializedCodec = new SerializedResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)
@@ -48,7 +48,7 @@ public class CodecExecutionPlan {
 		rowSet.beforeFirst();
 		this.byteBuffer = codec.encodeValue(rowSet);
 		rowSet.beforeFirst();
-		this.serializedByteBuffer = jdkCodec.encodeValue(rowSet);
+		this.serializedByteBuffer = serializedCodec.encodeValue(rowSet);
 		rowSet.beforeFirst();
 	}
 
@@ -68,12 +68,12 @@ public class CodecExecutionPlan {
 		return codec;
 	}
 
-	public ByteBuffer getByteBuffer() {
+	public ByteBuffer getBytesCodecByteBuffer() {
 		return byteBuffer;
 	}
 
 	public SerializedResultSetCodec getSerializedCodec() {
-		return jdkCodec;
+		return serializedCodec;
 	}
 
 	public ByteBuffer getSerializedByteBuffer() {

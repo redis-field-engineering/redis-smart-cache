@@ -1,6 +1,7 @@
 package com.redis.sidecar.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -28,23 +29,21 @@ import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
 public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	public static final int DEFAULT_BYTE_BUFFER_CAPACITY = 10000000; // 10 MB
-	public static final StringCodec DEFAULT_STRING_CODEC = CharsetStringCodec.UTF8;
-
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+	public static final String EMPTY_STRING = "";
 
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
-	private final StringCodec stringCodec;
 
 	private ResultSetCodec(Builder builder) {
 		this.rowSetFactory = builder.rowSetFactory;
 		this.maxByteBufferCapacity = builder.maxByteBufferCapacity;
-		this.stringCodec = builder.stringCodec;
 	}
 
 	@Override
@@ -114,7 +113,7 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		case Types.NCHAR:
 		case Types.NVARCHAR:
 		case Types.LONGNVARCHAR:
-			return new StringColumnCodec(columnIndex, stringCodec);
+			return new StringColumnCodec(columnIndex);
 		case Types.DATE:
 			return new DateColumnCodec(columnIndex);
 		case Types.TIME:
@@ -141,16 +140,16 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		int columnCount = bytes.readInt();
 		metaData.setColumnCount(columnCount);
 		for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-			metaData.setCatalogName(columnIndex, stringCodec.decode(bytes));
-			metaData.setColumnLabel(columnIndex, stringCodec.decode(bytes));
-			metaData.setColumnName(columnIndex, stringCodec.decode(bytes));
-			metaData.setColumnTypeName(columnIndex, stringCodec.decode(bytes));
+			metaData.setCatalogName(columnIndex, readString(bytes));
+			metaData.setColumnLabel(columnIndex, readString(bytes));
+			metaData.setColumnName(columnIndex, readString(bytes));
+			metaData.setColumnTypeName(columnIndex, readString(bytes));
 			metaData.setColumnType(columnIndex, bytes.readInt());
 			metaData.setColumnDisplaySize(columnIndex, bytes.readInt());
 			metaData.setPrecision(columnIndex, bytes.readInt());
-			metaData.setTableName(columnIndex, stringCodec.decode(bytes));
+			metaData.setTableName(columnIndex, readString(bytes));
 			metaData.setScale(columnIndex, bytes.readInt());
-			metaData.setSchemaName(columnIndex, stringCodec.decode(bytes));
+			metaData.setSchemaName(columnIndex, readString(bytes));
 			metaData.setAutoIncrement(columnIndex, bytes.readBoolean());
 			metaData.setCaseSensitive(columnIndex, bytes.readBoolean());
 			metaData.setCurrency(columnIndex, bytes.readBoolean());
@@ -199,22 +198,40 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 	public void encode(ResultSetMetaData metaData, ByteBuf bytes) throws SQLException {
 		bytes.writeInt(metaData.getColumnCount());
 		for (int index = 1; index <= metaData.getColumnCount(); index++) {
-			stringCodec.encode(bytes, metaData.getCatalogName(index));
-			stringCodec.encode(bytes, metaData.getColumnLabel(index));
-			stringCodec.encode(bytes, metaData.getColumnName(index));
-			stringCodec.encode(bytes, metaData.getColumnTypeName(index));
+			writeString(bytes, metaData.getCatalogName(index));
+			writeString(bytes, metaData.getColumnLabel(index));
+			writeString(bytes, metaData.getColumnName(index));
+			writeString(bytes, metaData.getColumnTypeName(index));
 			bytes.writeInt(metaData.getColumnType(index));
 			bytes.writeInt(metaData.getColumnDisplaySize(index));
 			bytes.writeInt(metaData.getPrecision(index));
-			stringCodec.encode(bytes, metaData.getTableName(index));
+			writeString(bytes, metaData.getTableName(index));
 			bytes.writeInt(metaData.getScale(index));
-			stringCodec.encode(bytes, metaData.getSchemaName(index));
+			writeString(bytes, metaData.getSchemaName(index));
 			bytes.writeBoolean(metaData.isAutoIncrement(index));
 			bytes.writeBoolean(metaData.isCaseSensitive(index));
 			bytes.writeBoolean(metaData.isCurrency(index));
 			bytes.writeInt(metaData.isNullable(index));
 			bytes.writeBoolean(metaData.isSearchable(index));
 			bytes.writeBoolean(metaData.isSigned(index));
+		}
+	}
+
+	public static String readString(ByteBuf byteBuf) {
+		int length = byteBuf.readInt();
+		if (length == 0) {
+			return EMPTY_STRING;
+		}
+		return byteBuf.readCharSequence(length, StandardCharsets.UTF_8).toString();
+	}
+
+	public static void writeString(ByteBuf byteBuf, String string) {
+		if (string.isEmpty()) {
+			byteBuf.writeInt(0);
+		} else {
+			int length = ByteBufUtil.utf8Bytes(string);
+			byteBuf.writeInt(length);
+			ByteBufUtil.reserveAndWriteUtf8(byteBuf, string, length);
 		}
 	}
 
@@ -226,15 +243,9 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 
 		private final RowSetFactory rowSetFactory = new SidecarRowSetFactory();
 		private int maxByteBufferCapacity = DEFAULT_BYTE_BUFFER_CAPACITY;
-		private StringCodec stringCodec = DEFAULT_STRING_CODEC;
 
 		public Builder maxByteBufferCapacity(int capacity) {
 			this.maxByteBufferCapacity = capacity;
-			return this;
-		}
-
-		public Builder stringCodec(StringCodec codec) {
-			this.stringCodec = codec;
 			return this;
 		}
 

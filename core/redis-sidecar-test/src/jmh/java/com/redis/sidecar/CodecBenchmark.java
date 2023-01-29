@@ -11,13 +11,13 @@ public class CodecBenchmark {
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
 	public void decodeResultSet(CodecExecutionPlan plan) {
-		plan.getCodec().decodeValue(plan.getByteBuffer());
+		plan.getCodec().decodeValue(plan.getBytesCodecByteBuffer());
 	}
 
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
-	public void decodeMetadata(CodecExecutionPlan plan) throws SQLException {
-		plan.getCodec().decodeMetaData(plan.getByteBuffer());
+	public void decodeResultSetMetadata(CodecExecutionPlan plan) throws SQLException {
+		plan.getCodec().decodeMetaData(plan.getBytesCodecByteBuffer());
 	}
 
 	@Benchmark
