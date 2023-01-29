@@ -29,7 +29,12 @@ jar {
 }
 
 jmh {
+    fork = 1
+    iterations = 2
     timeUnit = 'ms'
+    warmup = '1s'
+    warmupForks = 1
+    warmupIterations = 1
 }
 
 jmhJar {
