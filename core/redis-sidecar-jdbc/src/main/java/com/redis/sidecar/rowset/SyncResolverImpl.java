@@ -78,18 +78,6 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
     private int rowStatus;
 
     /**
-     * This will contain the size of the {@code CachedRowSet} object
-     */
-    private int sz;
-
-    /**
-     * The {@code Connection} handle used to synchronize the changes
-     * back to datasource. This is the same connection handle as was passed
-     * to the CachedRowSet while fetching the data.
-     */
-    private transient Connection con;
-
-    /**
      * The {@code CachedRowSet} object which will encapsulate
      * a row at any time. This will be built from CachedRowSet and
      * SyncResolver values. Synchronization takes place on a row by
@@ -317,7 +305,6 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
        int iColCount;
        CachedRowSetImpl crsRow = new CachedRowSetImpl();
 
-       RowSetMetaDataImpl rsmd = new RowSetMetaDataImpl();
        RowSetMetaDataImpl rsmdWrite = (RowSetMetaDataImpl)crsSync.getMetaData();
        RowSetMetaDataImpl rsmdRow = new RowSetMetaDataImpl();
 
@@ -422,7 +409,6 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
          try {
               crsRes = (CachedRowSetImpl)crs;
               crsRes.afterLast();
-              sz = crsRes.size();
          } catch (SQLException sqle) {
             // do nothing
          }
@@ -862,8 +848,7 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
      * @see #toCollection(String)
      * @see java.util.TreeMap
      */
-    @SuppressWarnings("rawtypes")
-    public Collection toCollection() throws SQLException {
+    public Collection<?> toCollection() throws SQLException {
        throw new UnsupportedOperationException();
     }
 
@@ -885,8 +870,7 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
      * @see #toCollection(String)
      * @see java.util.Vector
      */
-    @SuppressWarnings("rawtypes")
-    public Collection toCollection(int column) throws SQLException {
+    public Collection<?> toCollection(int column) throws SQLException {
        throw new UnsupportedOperationException();
     }
 
@@ -908,8 +892,7 @@ public class SyncResolverImpl extends CachedRowSetImpl implements SyncResolver {
      * @see #toCollection(int)
      * @see java.util.Vector
      */
-    @SuppressWarnings("rawtypes")
-    public Collection toCollection(String column) throws SQLException {
+    public Collection<?> toCollection(String column) throws SQLException {
         throw new UnsupportedOperationException();
     }
 

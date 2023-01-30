@@ -1,4 +1,4 @@
-package com.redis.sidecar.jdbc;
+package com.redis.sidecar;
 
 import java.io.IOException;
 import java.sql.CallableStatement;
@@ -18,7 +18,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
-import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 

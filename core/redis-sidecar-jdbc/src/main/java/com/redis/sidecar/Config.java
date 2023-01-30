@@ -7,9 +7,6 @@ import java.util.List;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.redis.sidecar.codec.ResultSetCodec;
-
-import io.lettuce.core.RedisURI;
 import io.lettuce.core.internal.LettuceAssert;
 
 public class Config {
@@ -129,22 +126,6 @@ public class Config {
 
 		public void setTls(boolean tls) {
 			this.tls = tls;
-		}
-
-		@SuppressWarnings("deprecation")
-		public RedisURI uri() {
-			RedisURI redisURI = RedisURI.create(uri);
-			redisURI.setVerifyPeer(!insecure);
-			if (tls) {
-				redisURI.setSsl(tls);
-			}
-			if (username != null) {
-				redisURI.setUsername(username);
-			}
-			if (password != null) {
-				redisURI.setPassword((CharSequence) password);
-			}
-			return redisURI;
 		}
 
 		public String key(String id) {

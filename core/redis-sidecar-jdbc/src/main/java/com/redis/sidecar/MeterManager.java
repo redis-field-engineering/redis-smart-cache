@@ -7,16 +7,15 @@ import java.util.Map;
 import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 
-import io.lettuce.core.RedisURI;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class MeterManager {
 
-	private final Map<RedisURI, MeterRegistry> registries = new HashMap<>();
+	private final Map<String, MeterRegistry> registries = new HashMap<>();
 
 	public MeterRegistry getRegistry(Config config) {
-		RedisURI uri = config.getRedis().uri();
+		String uri = config.getRedis().getUri();
 		if (registries.containsKey(uri)) {
 			return registries.get(uri);
 		}

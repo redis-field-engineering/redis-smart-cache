@@ -3,15 +3,28 @@ package com.redis.sidecar;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Properties;
 
 import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 
+import com.redis.testcontainers.RedisServer;
+import com.redis.testcontainers.RedisStackContainer;
+import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-class SidecarDriverTests extends AbstractSidecarTests {
+class SidecarDriverTests extends AbstractTestcontainersRedisTestBase {
+
+	private final RedisStackContainer redis = new RedisStackContainer(
+			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
+
+	@Override
+	protected Collection<RedisServer> redisServers() {
+		return Arrays.asList(redis);
+	}
 
 	@ParameterizedTest
 	@RedisTestContextsSource

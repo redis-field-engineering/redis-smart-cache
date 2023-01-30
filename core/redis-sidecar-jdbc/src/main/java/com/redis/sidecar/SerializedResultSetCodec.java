@@ -1,4 +1,4 @@
-package com.redis.sidecar.codec;
+package com.redis.sidecar;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

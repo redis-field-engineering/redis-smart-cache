@@ -1,4 +1,4 @@
-package com.redis.sidecar.jdbc;
+package com.redis.sidecar;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -9,7 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 
-import com.redis.sidecar.AbstractSidecarTests;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 

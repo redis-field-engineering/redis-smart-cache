@@ -6,6 +6,7 @@ dependencies {
     testImplementation 'com.mysql:mysql-connector-j'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind'
     testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
+    testImplementation 'com.zaxxer:HikariCP'
     testImplementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
     testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version
@@ -16,7 +17,6 @@ dependencies {
     testImplementation group: 'org.testcontainers', name: 'db2', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
     testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
-    testImplementation 'com.zaxxer:HikariCP'    
 }
 
 bootJar {

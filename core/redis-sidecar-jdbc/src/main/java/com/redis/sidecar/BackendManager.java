@@ -13,11 +13,11 @@ public class BackendManager {
 
 	public Connection connect(Config config, Properties info) throws SQLException {
 		String className = config.getDriver().getClassName();
-		if (NonRegisteringDriver.isEmpty(className)) {
+		if (className == null || className.isEmpty()) {
 			throw new SQLException("No backend driver class specified");
 		}
 		String url = config.getDriver().getUrl();
-		if (NonRegisteringDriver.isEmpty(url)) {
+		if (url == null || url.isEmpty()) {
 			throw new SQLException("No backend URL specified");
 		}
 		Driver driver;

@@ -6,8 +6,10 @@ import java.sql.Driver;
 import java.sql.DriverPropertyInfo;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,21 +17,28 @@ import java.util.regex.Pattern;
 import javax.sql.rowset.RowSetFactory;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.redis.sidecar.codec.ResultSetCodec;
+import com.redis.lettucemod.RedisModulesClient;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
+import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.sidecar.Config.Pool;
+import com.redis.sidecar.Config.Redis;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.api.StatefulConnection;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisStringCommands;
-import io.lettuce.core.cluster.RedisClusterClient;
-import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.metrics.MicrometerCommandLatencyRecorder;
+import io.lettuce.core.metrics.MicrometerOptions;
+import io.lettuce.core.resource.ClientResources;
+import io.lettuce.core.resource.ClientResources.Builder;
+import io.lettuce.core.support.ConnectionPoolSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class NonRegisteringDriver implements Driver {
@@ -41,10 +50,11 @@ public class NonRegisteringDriver implements Driver {
 	private static final String PROPERTY_PREFIX = "sidecar";
 	private static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
 
-	private static BackendManager backendManager = new BackendManager();
-	private static MeterManager meterManager = new MeterManager();
-	private static RedisManager redisManager = new RedisManager(meterManager);
-	private static ConfigManager configManager = new ConfigManager(redisManager);
+	private static final BackendManager backendManager = new BackendManager();
+	private static final MeterManager meterManager = new MeterManager();
+	private static final ConfigManager configManager = new ConfigManager();
+	private static final Map<RedisURI, AbstractRedisClient> clients = new HashMap<>();
+	private static final Map<AbstractRedisClient, GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>>> pools = new HashMap<>();
 
 	public NonRegisteringDriver() {
 		// Needed for Class.forName().newInstance()
@@ -63,18 +73,20 @@ public class NonRegisteringDriver implements Driver {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
 		config.getRedis().setUri(matcher.group(1));
+		AbstractRedisClient redisClient = getClient(config);
+		StatefulRedisModulesConnection<String, String> connection = connection(redisClient);
 		try {
-			config = configManager.getConfig(config);
+			config = configManager.getConfig(connection, config);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}
 		MeterRegistry meterRegistry = meterManager.getRegistry(config);
-		AbstractRedisClient redisClient = redisManager.getClient(config);
 		Connection backendConnection = backendManager.connect(config, info);
 		RowSetFactory rowSetFactory = new SidecarRowSetFactory();
 		ResultSetCodec codec = ResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize()).build();
-		GenericObjectPool<StatefulConnection<String, ResultSet>> pool = redisManager.getConnectionPool(config, codec);
-		ResultSetCache cache = new StringResultSetCache(config, meterRegistry, pool, sync(redisClient));
+		GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool = getConnectionPool(redisClient,
+				codec, config);
+		ResultSetCache cache = new ResultSetCacheImpl(config, meterRegistry, pool);
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);
 	}
 
@@ -90,16 +102,68 @@ public class NonRegisteringDriver implements Driver {
 		return propsMapper.readPropertiesAs(properties, propsSchema, Config.class);
 	}
 
-	private static Function<StatefulConnection<String, ResultSet>, RedisStringCommands<String, ResultSet>> sync(
-			AbstractRedisClient redisClient) {
-		if (redisClient instanceof RedisClusterClient) {
-			return c -> ((StatefulRedisClusterConnection<String, ResultSet>) c).sync();
+	@SuppressWarnings("deprecation")
+	private RedisURI uri(Redis config) {
+		RedisURI redisURI = RedisURI.create(config.getUri());
+		redisURI.setVerifyPeer(!config.isInsecure());
+		if (config.isTls()) {
+			redisURI.setSsl(config.isTls());
 		}
-		return c -> ((StatefulRedisConnection<String, ResultSet>) c).sync();
+		if (config.getUsername() != null) {
+			redisURI.setUsername(config.getUsername());
+		}
+		if (config.getPassword() != null) {
+			redisURI.setPassword(config.getPassword());
+		}
+		return redisURI;
 	}
 
-	public static boolean isEmpty(String string) {
-		return string == null || string.isEmpty();
+	private AbstractRedisClient getClient(Config config) {
+		Redis redis = config.getRedis();
+		RedisURI uri = uri(redis);
+		if (clients.containsKey(uri)) {
+			return clients.get(uri);
+		}
+		Builder builder = ClientResources.builder();
+		if (config.getMetrics().isLettuce()) {
+			builder = builder.commandLatencyRecorder(
+					new MicrometerCommandLatencyRecorder(meterManager.getRegistry(config), MicrometerOptions.create()));
+		}
+		ClientResources resources = builder.build();
+		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(resources, uri)
+				: RedisModulesClient.create(resources, uri);
+		clients.put(uri, client);
+		return client;
+	}
+
+	private GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> getConnectionPool(
+			AbstractRedisClient client, RedisCodec<String, ResultSet> codec, Config config) {
+		return pools.computeIfAbsent(client, c -> pool(client, codec, config.getRedis().getPool()));
+	}
+
+	private GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool(AbstractRedisClient client,
+			RedisCodec<String, ResultSet> codec, Pool config) {
+		return ConnectionPoolSupport.createGenericObjectPool(
+				() -> client instanceof RedisModulesClusterClient ? ((RedisModulesClusterClient) client).connect(codec)
+						: ((RedisModulesClient) client).connect(codec),
+				poolConfig(config));
+	}
+
+	private GenericObjectPoolConfig<StatefulRedisModulesConnection<String, ResultSet>> poolConfig(Pool pool) {
+		GenericObjectPoolConfig<StatefulRedisModulesConnection<String, ResultSet>> config = new GenericObjectPoolConfig<>();
+		config.setMaxTotal(pool.getMaxActive());
+		config.setMaxIdle(pool.getMaxIdle());
+		config.setMinIdle(pool.getMinIdle());
+		config.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
+		config.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
+		return config;
+	}
+
+	private StatefulRedisModulesConnection<String, String> connection(AbstractRedisClient client) {
+		if (client instanceof RedisModulesClusterClient) {
+			return ((RedisModulesClusterClient) client).connect();
+		}
+		return ((RedisModulesClient) client).connect();
 	}
 
 	@Override
@@ -142,7 +206,13 @@ public class NonRegisteringDriver implements Driver {
 	public void clear() {
 		configManager.close();
 		meterManager.clear();
-		redisManager.clear();
+		pools.forEach((k, v) -> v.close());
+		pools.clear();
+		clients.forEach((k, v) -> {
+			v.shutdown();
+			v.getResources().shutdown();
+		});
+		clients.clear();
 	}
 
 }

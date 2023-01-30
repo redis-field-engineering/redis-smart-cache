@@ -1,4 +1,4 @@
-package com.redis.sidecar.codec.column;
+package com.redis.sidecar.codec;
 
 import java.sql.Date;
 import java.sql.ResultSet;

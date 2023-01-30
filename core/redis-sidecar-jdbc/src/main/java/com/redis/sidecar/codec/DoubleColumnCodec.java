@@ -1,4 +1,4 @@
-package com.redis.sidecar.codec.column;
+package com.redis.sidecar.codec;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;

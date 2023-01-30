@@ -375,7 +375,6 @@ public class CachedRowSetWriter implements TransactionalWriter, Serializable {
                 *  and we have not changed(inserted, updated or deleted)
                 *  that is fine.
                 **/
-                int icolCount = crs.getMetaData().getColumnCount();
                 status.add(rows, SyncResolver.NO_ROW_CONFLICT);
 
                 this.crsResolve.moveToInsertRow();
@@ -507,7 +506,6 @@ public class CachedRowSetWriter implements TransactionalWriter, Serializable {
 
             ResultSet rs = null;
             rs = pstmt.executeQuery();
-            ResultSetMetaData rsmd = rs.getMetaData();
 
             if (rs.next()) {
                 if (rs.next()) {
@@ -1385,7 +1383,7 @@ public class CachedRowSetWriter implements TransactionalWriter, Serializable {
               }
           }
 
-        int id = pStmt.executeUpdate();
+        pStmt.executeUpdate();
       }
 
 

@@ -15,35 +15,22 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.json.SetMode;
 
-import io.lettuce.core.RedisURI;
-
 public class ConfigManager implements AutoCloseable {
 
 	private static final Logger log = Logger.getLogger(ConfigManager.class.getName());
 
-	private final RedisManager redisManager;
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final Map<String, ScheduledFuture<?>> futures = new HashMap<>();
-	private final Map<RedisURI, Map<String, Config>> configs = new HashMap<>();
+	private final Map<String, Config> configs = new HashMap<>();
 
-	public ConfigManager(RedisManager redisManager) {
-		this.redisManager = redisManager;
-	}
-
-	public synchronized Config getConfig(Config config) throws JsonProcessingException {
+	public synchronized Config getConfig(StatefulRedisModulesConnection<String, String> connection, Config config)
+			throws JsonProcessingException {
 		String key = key(config);
-		RedisURI uri = config.getRedis().uri();
-		if (configs.containsKey(uri)) {
-			Map<String, Config> keys = configs.get(uri);
-			if (keys.containsKey(key)) {
-				return keys.get(key);
-			}
-		} else {
-			configs.put(uri, new HashMap<>());
+		if (configs.containsKey(key)) {
+			return configs.get(key);
 		}
-		configs.get(uri).put(key, config);
-		StatefulRedisModulesConnection<String, String> connection = redisManager.connection(config);
+		configs.put(key, config);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		connection.sync().jsonSet(key, "$", json, SetMode.NX);
 		ObjectReader reader = mapper.readerForUpdating(config);

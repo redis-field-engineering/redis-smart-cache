@@ -7,6 +7,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
+import org.apache.commons.pool2.impl.GenericObjectPool;
+
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.sidecar.Config.Rule;
 
 import io.lettuce.core.internal.LettuceAssert;
@@ -14,9 +17,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
-abstract class AbstractResultSetCache implements ResultSetCache {
+public class ResultSetCacheImpl implements ResultSetCache {
 
-	private static final Logger log = Logger.getLogger(AbstractResultSetCache.class.getName());
+	private static final Logger log = Logger.getLogger(ResultSetCacheImpl.class.getName());
 
 	private static final String METER_PREFIX = "cache.";
 	private static final String METER_GETS = METER_PREFIX + "gets";
@@ -29,14 +32,19 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 	private final Config config;
 	private final String keyspace;
 
-	protected AbstractResultSetCache(Config config, MeterRegistry meterRegistry) {
+	private final GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool;
+
+	protected ResultSetCacheImpl(Config config, MeterRegistry meterRegistry,
+			GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool) {
 		LettuceAssert.notNull(config, "Config must not be null");
+		LettuceAssert.notNull(pool, "Connection pool must not be null");
 		this.getTimer = meterRegistry.timer(METER_GETS);
 		this.putTimer = meterRegistry.timer(METER_PUTS);
 		this.missCounter = meterRegistry.counter(METER_GETS, "result", "miss");
 		this.hitCounter = meterRegistry.counter(METER_GETS, "result", "hit");
 		this.config = config;
 		this.keyspace = config.getRedis().key("cache");
+		this.pool = pool;
 	}
 
 	@Override
@@ -57,6 +65,12 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		return Optional.of(resultSet);
 	}
 
+	protected ResultSet doGet(String key) throws Exception {
+		try (StatefulRedisModulesConnection<String, ResultSet> connection = pool.borrowObject()) {
+			return connection.sync().get(key);
+		}
+	}
+
 	protected String key(String sql) {
 		return config.getRedis().key(keyspace, crc(sql));
 	}
@@ -66,8 +80,6 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		crc.update(string.getBytes(StandardCharsets.UTF_8));
 		return String.valueOf(crc.getValue());
 	}
-
-	protected abstract ResultSet doGet(String key) throws Exception;
 
 	@Override
 	public void put(String sql, long ttl, ResultSet resultSet) {
@@ -82,6 +94,12 @@ abstract class AbstractResultSetCache implements ResultSetCache {
 		}
 	}
 
-	protected abstract ResultSet doPut(String key, long ttl, ResultSet resultSet) throws Exception;
+	protected ResultSet doPut(String key, long ttl, ResultSet resultSet) throws Exception {
+		try (StatefulRedisModulesConnection<String, ResultSet> connection = pool.borrowObject()) {
+			connection.sync().setex(key, ttl, resultSet);
+		}
+		return resultSet;
+
+	}
 
 }

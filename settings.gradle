@@ -29,19 +29,15 @@ projects {
             id 'org.kordamp.gradle.java-project'
         }
         dirs(['core', 'demo']) {
+            id 'java-library'
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
         }
         path(':redis-sidecar-jdbc') {
-            id 'java-library'
-            id 'java-library-distribution'
             id 'com.github.johnrengelman.shadow'
         }
         path(':redis-sidecar-test') {
             id 'me.champeau.jmh'
-        }
-        dir('demo') {
-            id 'java'
         }
     }
 }

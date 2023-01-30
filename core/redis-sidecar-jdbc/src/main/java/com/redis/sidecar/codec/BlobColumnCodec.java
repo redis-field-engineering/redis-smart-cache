@@ -1,4 +1,4 @@
-package com.redis.sidecar.codec.column;
+package com.redis.sidecar.codec;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -6,7 +6,7 @@ import java.sql.Blob;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import com.redis.sidecar.codec.ResultSetCodec;
+import com.redis.sidecar.ResultSetCodec;
 
 import io.netty.buffer.ByteBuf;
 

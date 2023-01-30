@@ -12,8 +12,6 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import com.redis.sidecar.codec.ResultSetCodec;
-import com.redis.sidecar.codec.SerializedResultSetCodec;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
 import com.redis.sidecar.test.RowSetBuilder;
 

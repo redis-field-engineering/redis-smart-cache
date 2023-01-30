@@ -1,10 +1,11 @@
-dependencies {
+	dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
     implementation 'org.apache.commons:commons-pool2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
     implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRtsVersion
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
+    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
 }
 
 bootJar {
@@ -15,6 +16,8 @@ jar {
     enabled = true
     archiveClassifier = ''
 }
+
+jar.finalizedBy shadowJar
 
 shadowJar {
    archiveClassifier.set('')
@@ -29,5 +32,3 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 }
 
 tasks.shadowJar.dependsOn tasks.relocateShadowJar
-
-jar.finalizedBy shadowJar
