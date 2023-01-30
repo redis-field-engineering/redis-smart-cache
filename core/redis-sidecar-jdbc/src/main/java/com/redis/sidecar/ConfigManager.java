@@ -19,6 +19,8 @@ public class ConfigManager implements AutoCloseable {
 
 	private static final Logger log = Logger.getLogger(ConfigManager.class.getName());
 
+	private static final String JSON_ROOT = "$";
+
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final Map<String, ScheduledFuture<?>> futures = new HashMap<>();
@@ -31,7 +33,7 @@ public class ConfigManager implements AutoCloseable {
 		}
 		configs.put(key, config);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
-		connection.sync().jsonSet(key, "$", json, SetMode.NX);
+		connection.sync().jsonSet(key, JSON_ROOT, json, SetMode.NX);
 		ObjectReader reader = mapper.readerForUpdating(config);
 		read(connection, key, reader);
 		long refreshRateMillis = config.getRefreshRate() * 1000;

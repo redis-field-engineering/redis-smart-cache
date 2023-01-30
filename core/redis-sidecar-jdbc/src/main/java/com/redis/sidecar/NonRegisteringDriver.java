@@ -31,6 +31,7 @@ import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 import com.redis.sidecar.Config.Pool;
 import com.redis.sidecar.Config.Redis;
+import com.redis.sidecar.codec.ResultSetCodec;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;

@@ -7,6 +7,8 @@ import java.util.List;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
+import com.redis.sidecar.codec.ResultSetCodec;
+
 import io.lettuce.core.internal.LettuceAssert;
 
 public class Config {

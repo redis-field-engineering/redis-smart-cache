@@ -1,4 +1,4 @@
-package com.redis.sidecar;
+package com.redis.sidecar.codec;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -13,18 +13,6 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
-import com.redis.sidecar.codec.BigDecimalColumnCodec;
-import com.redis.sidecar.codec.BinaryColumnCodec;
-import com.redis.sidecar.codec.BlobColumnCodec;
-import com.redis.sidecar.codec.BooleanColumnCodec;
-import com.redis.sidecar.codec.DateColumnCodec;
-import com.redis.sidecar.codec.DoubleColumnCodec;
-import com.redis.sidecar.codec.FloatColumnCodec;
-import com.redis.sidecar.codec.IntegerColumnCodec;
-import com.redis.sidecar.codec.LongColumnCodec;
-import com.redis.sidecar.codec.StringColumnCodec;
-import com.redis.sidecar.codec.TimeColumnCodec;
-import com.redis.sidecar.codec.TimestampColumnCodec;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
 import io.lettuce.core.codec.RedisCodec;

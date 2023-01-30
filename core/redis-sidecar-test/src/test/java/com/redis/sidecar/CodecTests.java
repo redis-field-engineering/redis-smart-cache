@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
+import com.redis.sidecar.codec.ResultSetCodec;
+import com.redis.sidecar.codec.SerializedResultSetCodec;
 import com.redis.sidecar.test.RowSetBuilder;
 
 @TestInstance(Lifecycle.PER_CLASS)

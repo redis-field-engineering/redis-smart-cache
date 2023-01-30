@@ -3,8 +3,6 @@ package com.redis.sidecar.codec;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import com.redis.sidecar.ResultSetCodec;
-
 import io.netty.buffer.ByteBuf;
 
 public class StringColumnCodec extends NullableColumnCodec<String> {

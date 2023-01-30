@@ -6,8 +6,6 @@ import java.sql.Blob;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import com.redis.sidecar.ResultSetCodec;
-
 import io.netty.buffer.ByteBuf;
 
 public class BlobColumnCodec extends NullableColumnCodec<Blob> {
