@@ -29,21 +29,18 @@ public class ResultSetCacheImpl implements ResultSetCache {
 	private final Timer putTimer;
 	private final Counter missCounter;
 	private final Counter hitCounter;
-	private final Config config;
 	private final String keyspace;
 
 	private final GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool;
 
-	protected ResultSetCacheImpl(Config config, MeterRegistry meterRegistry,
-			GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool) {
-		LettuceAssert.notNull(config, "Config must not be null");
+	protected ResultSetCacheImpl(MeterRegistry meterRegistry,
+			GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool, String keyspace) {
 		LettuceAssert.notNull(pool, "Connection pool must not be null");
 		this.getTimer = meterRegistry.timer(METER_GETS);
 		this.putTimer = meterRegistry.timer(METER_PUTS);
 		this.missCounter = meterRegistry.counter(METER_GETS, "result", "miss");
 		this.hitCounter = meterRegistry.counter(METER_GETS, "result", "hit");
-		this.config = config;
-		this.keyspace = config.getRedis().key("cache");
+		this.keyspace = keyspace;
 		this.pool = pool;
 	}
 
@@ -72,7 +69,7 @@ public class ResultSetCacheImpl implements ResultSetCache {
 	}
 
 	protected String key(String sql) {
-		return config.getRedis().key(keyspace, crc(sql));
+		return keyspace + ":" + crc(sql);
 	}
 
 	private final String crc(String string) {

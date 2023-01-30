@@ -1,5 +1,6 @@
 package com.redis.sidecar;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -26,14 +27,12 @@ class ConfigManagerTests extends AbstractTestcontainersRedisTestBase {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testDriver(RedisTestContext redis) throws Exception {
-		Config config = new Config();
-		config.getRedis().setUri(redis.getRedisURI());
-		config.getRedis().setCluster(redis.isCluster());
-		config.setRefreshRate(1);
+		BootstrapConfig bootstrap = new BootstrapConfig();
+		bootstrap.getRedis().setCluster(redis.isCluster());
 		try (StatefulRedisModulesConnection<String, String> connection = redis.getConnection();
 				ConfigManager configManager = new ConfigManager()) {
-			String key = config.getRedis().key("config");
-			configManager.getConfig(key, connection, config);
+			String key = bootstrap.getRedis().key("config");
+			Config config = configManager.fetchConfig(connection, key, Duration.ofSeconds(1), new Config());
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));

@@ -1,5 +1,6 @@
 package com.redis.sidecar;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -24,26 +25,26 @@ public class ConfigManager implements AutoCloseable {
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final Map<String, ScheduledFuture<?>> futures = new HashMap<>();
-	private final Map<String, Config> configs = new HashMap<>();
+	private final Map<String, Object> configs = new HashMap<>();
 
-	public synchronized Config getConfig(String key, StatefulRedisModulesConnection<String, String> connection,
-			Config config) throws JsonProcessingException {
+	@SuppressWarnings("unchecked")
+	public synchronized <T> T fetchConfig(StatefulRedisModulesConnection<String, String> connection, String key,
+			Duration refreshRate, T config) throws JsonProcessingException {
 		if (configs.containsKey(key)) {
-			return configs.get(key);
+			return (T) configs.get(key);
 		}
 		configs.put(key, config);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		connection.sync().jsonSet(key, JSON_ROOT, json, SetMode.NX);
 		ObjectReader reader = mapper.readerForUpdating(config);
 		read(connection, key, reader);
-		long refreshRateMillis = config.getRefreshRate() * 1000;
 		futures.put(key, executor.scheduleAtFixedRate(() -> {
 			try {
 				read(connection, key, reader);
 			} catch (JsonProcessingException e) {
 				log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key), e);
 			}
-		}, refreshRateMillis, refreshRateMillis, TimeUnit.MILLISECONDS));
+		}, refreshRate.toMillis(), refreshRate.toMillis(), TimeUnit.MILLISECONDS));
 		return config;
 	}
 

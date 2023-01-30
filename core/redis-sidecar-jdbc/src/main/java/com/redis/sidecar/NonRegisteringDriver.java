@@ -19,7 +19,6 @@ import javax.sql.rowset.RowSetFactory;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
@@ -27,10 +26,9 @@ import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
-import com.redis.micrometer.RedisTimeSeriesConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
-import com.redis.sidecar.Config.Pool;
-import com.redis.sidecar.Config.Redis;
+import com.redis.sidecar.BootstrapConfig.Redis;
+import com.redis.sidecar.BootstrapConfig.Redis.Pool;
 import com.redis.sidecar.codec.ResultSetCodec;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
 
@@ -56,46 +54,9 @@ public class NonRegisteringDriver implements Driver {
 
 	private static final Map<String, Driver> drivers = new HashMap<>();
 	private static final ConfigManager configManager = new ConfigManager();
-	private static final Map<RedisURI, AbstractRedisClient> clients = new HashMap<>();
+	private static final Map<String, AbstractRedisClient> clients = new HashMap<>();
 	private static final Map<AbstractRedisClient, GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>>> pools = new HashMap<>();
 	private static final Map<String, MeterRegistry> registries = new HashMap<>();
-
-	private MeterRegistry getRegistry(Config config) {
-		String uri = config.getRedis().getUri();
-		if (registries.containsKey(uri)) {
-			return registries.get(uri);
-		}
-		MeterRegistry registry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
-
-			@Override
-			public String get(String key) {
-				return null;
-			}
-
-			@Override
-			public String uri() {
-				return config.getRedis().getUri();
-			}
-
-			@Override
-			public boolean cluster() {
-				return config.getRedis().isCluster();
-			}
-
-			@Override
-			public String keyspace() {
-				return config.getRedis().key("metrics");
-			}
-
-			@Override
-			public Duration step() {
-				return Duration.ofSeconds(config.getMetrics().getStep());
-			}
-
-		}, Clock.SYSTEM);
-		registries.put(uri, registry);
-		return registry;
-	}
 
 	public NonRegisteringDriver() {
 		// Needed for Class.forName().newInstance()
@@ -103,9 +64,9 @@ public class NonRegisteringDriver implements Driver {
 
 	@Override
 	public Connection connect(String url, Properties info) throws SQLException {
-		Config config;
+		final BootstrapConfig bootstrap;
 		try {
-			config = config(info);
+			bootstrap = loadConfig(info, BootstrapConfig.class);
 		} catch (IOException e) {
 			throw new SQLException("Could not load config", e);
 		}
@@ -113,26 +74,35 @@ public class NonRegisteringDriver implements Driver {
 		if (!matcher.find()) {
 			throw new SQLException("Invalid connection URL: " + url);
 		}
-		config.getRedis().setUri(matcher.group(1));
-		AbstractRedisClient redisClient = getClient(config);
-		StatefulRedisModulesConnection<String, String> connection = connection(redisClient);
-		String configKey = config.getRedis().key("config");
+		RedisURI redisURI = redisURI(matcher.group(1), bootstrap.getRedis());
+		MeterRegistryConfig registryConfig = registryConfig(redisURI, bootstrap);
+		MeterRegistry meterRegistry = registries.computeIfAbsent(url,
+				u -> new RedisTimeSeriesMeterRegistry(registryConfig, Clock.SYSTEM));
+		AbstractRedisClient client = clients.computeIfAbsent(url, u -> client(redisURI, bootstrap, meterRegistry));
+		StatefulRedisModulesConnection<String, String> connection = connection(client);
+		final Config config;
 		try {
-			config = configManager.getConfig(configKey, connection, config);
-		} catch (JsonProcessingException e) {
+			config = configManager.fetchConfig(connection, bootstrap.getRedis().key("config"),
+					Duration.ofSeconds(bootstrap.getRefreshRate()), loadConfig(info, Config.class));
+		} catch (IOException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}
-		MeterRegistry meterRegistry = getRegistry(config);
-		Connection backendConnection = connect(config, info);
+		Connection backendConnection = connect(bootstrap, info);
 		RowSetFactory rowSetFactory = new SidecarRowSetFactory();
 		ResultSetCodec codec = ResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize()).build();
-		GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool = getConnectionPool(redisClient,
-				codec, config);
-		ResultSetCache cache = new ResultSetCacheImpl(config, meterRegistry, pool);
+		Pool poolConfig = bootstrap.getRedis().getPool();
+		GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool = pools.computeIfAbsent(client,
+				c -> pool(client, codec, poolConfig));
+		ResultSetCache cache = new ResultSetCacheImpl(meterRegistry, pool, bootstrap.getRedis().key("cache"));
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);
 	}
 
-	private Connection connect(Config config, Properties info) throws SQLException {
+	private MeterRegistryConfig registryConfig(RedisURI redisURI, BootstrapConfig config) {
+		return new MeterRegistryConfig(redisURI, config.getRedis().isCluster(), config.getRedis().key("metrics"),
+				Duration.ofSeconds(config.getMetrics().getStep()));
+	}
+
+	private Connection connect(BootstrapConfig config, Properties info) throws SQLException {
 		String className = config.getDriver().getClassName();
 		if (className == null || className.isEmpty()) {
 			throw new SQLException("No backend driver class specified");
@@ -155,7 +125,7 @@ public class NonRegisteringDriver implements Driver {
 		return driver.connect(url, info);
 	}
 
-	private Config config(Properties info) throws IOException {
+	private <T> T loadConfig(Properties info, Class<T> type) throws IOException {
 		Properties properties = new Properties();
 		properties.putAll(System.getenv());
 		properties.putAll(System.getProperties());
@@ -164,46 +134,34 @@ public class NonRegisteringDriver implements Driver {
 		propsMapper.setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE);
 		propsMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 		JavaPropsSchema propsSchema = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
-		return propsMapper.readPropertiesAs(properties, propsSchema, Config.class);
+		return propsMapper.readPropertiesAs(properties, propsSchema, type);
 	}
 
 	@SuppressWarnings("deprecation")
-	private RedisURI uri(Redis config) {
-		RedisURI redisURI = RedisURI.create(config.getUri());
-		redisURI.setVerifyPeer(!config.isInsecure());
-		if (config.isTls()) {
-			redisURI.setSsl(config.isTls());
+	private RedisURI redisURI(String uri, Redis redis) {
+		RedisURI redisURI = RedisURI.create(uri);
+		redisURI.setVerifyPeer(!redis.isInsecure());
+		if (redis.isTls()) {
+			redisURI.setSsl(redis.isTls());
 		}
-		if (config.getUsername() != null) {
-			redisURI.setUsername(config.getUsername());
+		if (redis.getUsername() != null) {
+			redisURI.setUsername(redis.getUsername());
 		}
-		if (config.getPassword() != null) {
-			redisURI.setPassword(config.getPassword());
+		if (redis.getPassword() != null) {
+			redisURI.setPassword(redis.getPassword());
 		}
 		return redisURI;
 	}
 
-	private AbstractRedisClient getClient(Config config) {
-		Redis redis = config.getRedis();
-		RedisURI uri = uri(redis);
-		if (clients.containsKey(uri)) {
-			return clients.get(uri);
-		}
+	private AbstractRedisClient client(RedisURI uri, BootstrapConfig config, MeterRegistry meterRegistry) {
 		Builder builder = ClientResources.builder();
 		if (config.getMetrics().isLettuce()) {
-			builder = builder.commandLatencyRecorder(
-					new MicrometerCommandLatencyRecorder(getRegistry(config), MicrometerOptions.create()));
+			builder.commandLatencyRecorder(
+					new MicrometerCommandLatencyRecorder(meterRegistry, MicrometerOptions.create()));
 		}
 		ClientResources resources = builder.build();
-		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(resources, uri)
+		return config.getRedis().isCluster() ? RedisModulesClusterClient.create(resources, uri)
 				: RedisModulesClient.create(resources, uri);
-		clients.put(uri, client);
-		return client;
-	}
-
-	private GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> getConnectionPool(
-			AbstractRedisClient client, RedisCodec<String, ResultSet> codec, Config config) {
-		return pools.computeIfAbsent(client, c -> pool(client, codec, config.getRedis().getPool()));
 	}
 
 	private GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool(AbstractRedisClient client,
