@@ -54,15 +54,8 @@ announce:
     message: '🏍️ Redis Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
-  redis-sidecar-jdbc:
-    artifacts:
-      - path: core/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip
-        transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'
   redis-sidecar-demo:
     type: SINGLE_JAR
-    artifacts:
-      - path: demo/redis-sidecar-demo/build/libs/redis-sidecar-demo-{{projectVersion}}.jar
-        transform: '{{distributionName}}-{{projectEffectiveVersion}}.jar'
     executable:
       name: 'redis-sidecar-demo-launcher'
     docker:
