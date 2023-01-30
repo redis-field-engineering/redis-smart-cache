@@ -60,6 +60,7 @@ public class ConfigManager implements AutoCloseable {
 	public void close() {
 		futures.forEach((k, v) -> v.cancel(false));
 		futures.clear();
+		configs.clear();
 	}
 
 }

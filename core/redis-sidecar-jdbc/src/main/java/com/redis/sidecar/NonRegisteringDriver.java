@@ -269,6 +269,7 @@ public class NonRegisteringDriver implements Driver {
 	}
 
 	public void clear() {
+		drivers.clear();
 		configManager.close();
 		registries.forEach((k, v) -> v.close());
 		registries.clear();
