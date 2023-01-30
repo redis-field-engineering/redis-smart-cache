@@ -27,6 +27,8 @@ import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.micrometer.RedisTimeSeriesConfig;
+import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
 import com.redis.sidecar.Config.Pool;
 import com.redis.sidecar.Config.Redis;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
@@ -39,6 +41,7 @@ import io.lettuce.core.metrics.MicrometerOptions;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.ClientResources.Builder;
 import io.lettuce.core.support.ConnectionPoolSupport;
+import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class NonRegisteringDriver implements Driver {
@@ -50,11 +53,48 @@ public class NonRegisteringDriver implements Driver {
 	private static final String PROPERTY_PREFIX = "sidecar";
 	private static final String PROPERTY_DRIVER_PREFIX = PROPERTY_PREFIX + ".driver";
 
-	private static final BackendManager backendManager = new BackendManager();
-	private static final MeterManager meterManager = new MeterManager();
+	private static final Map<String, Driver> drivers = new HashMap<>();
 	private static final ConfigManager configManager = new ConfigManager();
 	private static final Map<RedisURI, AbstractRedisClient> clients = new HashMap<>();
 	private static final Map<AbstractRedisClient, GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>>> pools = new HashMap<>();
+	private static final Map<String, MeterRegistry> registries = new HashMap<>();
+
+	private MeterRegistry getRegistry(Config config) {
+		String uri = config.getRedis().getUri();
+		if (registries.containsKey(uri)) {
+			return registries.get(uri);
+		}
+		MeterRegistry registry = new RedisTimeSeriesMeterRegistry(new RedisTimeSeriesConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public String uri() {
+				return config.getRedis().getUri();
+			}
+
+			@Override
+			public boolean cluster() {
+				return config.getRedis().isCluster();
+			}
+
+			@Override
+			public String keyspace() {
+				return config.getRedis().key("metrics");
+			}
+
+			@Override
+			public Duration step() {
+				return Duration.ofSeconds(config.getMetrics().getStep());
+			}
+
+		}, Clock.SYSTEM);
+		registries.put(uri, registry);
+		return registry;
+	}
 
 	public NonRegisteringDriver() {
 		// Needed for Class.forName().newInstance()
@@ -75,13 +115,14 @@ public class NonRegisteringDriver implements Driver {
 		config.getRedis().setUri(matcher.group(1));
 		AbstractRedisClient redisClient = getClient(config);
 		StatefulRedisModulesConnection<String, String> connection = connection(redisClient);
+		String configKey = config.getRedis().key("config");
 		try {
-			config = configManager.getConfig(connection, config);
+			config = configManager.getConfig(configKey, connection, config);
 		} catch (JsonProcessingException e) {
 			throw new SQLException("Could not initialize config object", e);
 		}
-		MeterRegistry meterRegistry = meterManager.getRegistry(config);
-		Connection backendConnection = backendManager.connect(config, info);
+		MeterRegistry meterRegistry = getRegistry(config);
+		Connection backendConnection = connect(config, info);
 		RowSetFactory rowSetFactory = new SidecarRowSetFactory();
 		ResultSetCodec codec = ResultSetCodec.builder().maxByteBufferCapacity(config.getBufferSize()).build();
 		GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool = getConnectionPool(redisClient,
@@ -90,7 +131,30 @@ public class NonRegisteringDriver implements Driver {
 		return new SidecarConnection(backendConnection, config, cache, rowSetFactory, meterRegistry);
 	}
 
-	public static Config config(Properties info) throws IOException {
+	private Connection connect(Config config, Properties info) throws SQLException {
+		String className = config.getDriver().getClassName();
+		if (className == null || className.isEmpty()) {
+			throw new SQLException("No backend driver class specified");
+		}
+		String url = config.getDriver().getUrl();
+		if (url == null || url.isEmpty()) {
+			throw new SQLException("No backend URL specified");
+		}
+		Driver driver;
+		if (drivers.containsKey(className)) {
+			driver = drivers.get(className);
+		} else {
+			try {
+				driver = (Driver) Class.forName(className).getConstructor().newInstance();
+			} catch (Exception e) {
+				throw new SQLException("Cannot initialize backend driver '" + className + "'", e);
+			}
+			drivers.put(className, driver);
+		}
+		return driver.connect(url, info);
+	}
+
+	private Config config(Properties info) throws IOException {
 		Properties properties = new Properties();
 		properties.putAll(System.getenv());
 		properties.putAll(System.getProperties());
@@ -127,7 +191,7 @@ public class NonRegisteringDriver implements Driver {
 		Builder builder = ClientResources.builder();
 		if (config.getMetrics().isLettuce()) {
 			builder = builder.commandLatencyRecorder(
-					new MicrometerCommandLatencyRecorder(meterManager.getRegistry(config), MicrometerOptions.create()));
+					new MicrometerCommandLatencyRecorder(getRegistry(config), MicrometerOptions.create()));
 		}
 		ClientResources resources = builder.build();
 		AbstractRedisClient client = redis.isCluster() ? RedisModulesClusterClient.create(resources, uri)
@@ -205,7 +269,8 @@ public class NonRegisteringDriver implements Driver {
 
 	public void clear() {
 		configManager.close();
-		meterManager.clear();
+		registries.forEach((k, v) -> v.close());
+		registries.clear();
 		pools.forEach((k, v) -> v.close());
 		pools.clear();
 		clients.forEach((k, v) -> {

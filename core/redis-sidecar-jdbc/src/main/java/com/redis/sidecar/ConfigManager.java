@@ -24,9 +24,8 @@ public class ConfigManager implements AutoCloseable {
 	private final Map<String, ScheduledFuture<?>> futures = new HashMap<>();
 	private final Map<String, Config> configs = new HashMap<>();
 
-	public synchronized Config getConfig(StatefulRedisModulesConnection<String, String> connection, Config config)
-			throws JsonProcessingException {
-		String key = key(config);
+	public synchronized Config getConfig(String key, StatefulRedisModulesConnection<String, String> connection,
+			Config config) throws JsonProcessingException {
 		if (configs.containsKey(key)) {
 			return configs.get(key);
 		}
@@ -44,10 +43,6 @@ public class ConfigManager implements AutoCloseable {
 			}
 		}, refreshRateMillis, refreshRateMillis, TimeUnit.MILLISECONDS));
 		return config;
-	}
-
-	public String key(Config config) {
-		return config.getRedis().key("config");
 	}
 
 	private void read(StatefulRedisModulesConnection<String, String> connection, String key, ObjectReader reader)

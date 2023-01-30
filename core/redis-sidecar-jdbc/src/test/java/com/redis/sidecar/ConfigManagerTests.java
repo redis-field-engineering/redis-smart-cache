@@ -32,8 +32,8 @@ class ConfigManagerTests extends AbstractTestcontainersRedisTestBase {
 		config.setRefreshRate(1);
 		try (StatefulRedisModulesConnection<String, String> connection = redis.getConnection();
 				ConfigManager configManager = new ConfigManager()) {
-			String key = configManager.key(config);
-			configManager.getConfig(connection, config);
+			String key = config.getRedis().key("config");
+			configManager.getConfig(key, connection, config);
 			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
 			int bufferSize = 123456890;
 			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
