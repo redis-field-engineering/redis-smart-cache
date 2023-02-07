@@ -12,7 +12,7 @@ public class SqlParserBenchmark {
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
 	public void trinoParser() {
-		PARSER.getTables(SQL);
+		PARSER.extractTables(SQL);
 	}
 
 }

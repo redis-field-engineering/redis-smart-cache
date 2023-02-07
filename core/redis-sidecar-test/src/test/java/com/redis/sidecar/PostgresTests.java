@@ -68,9 +68,8 @@ class PostgresTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testCallableStatementParams(RedisTestContext redis) throws SQLException {
+	void testCallableStatementParams(RedisTestContext redis) throws Exception {
 		String runFunction = "{ ? = call hello( ? ) }";
-
 		try (Connection connection = connection(POSTGRESQL, redis);
 				Statement statement = connection.createStatement();
 				CallableStatement callableStatement = connection.prepareCall(runFunction)) {
@@ -83,10 +82,8 @@ class PostgresTests extends AbstractSidecarTests {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testCallableStatementRefCursor(RedisTestContext redis) throws SQLException {
-
+	void testCallableStatementRefCursor(RedisTestContext redis) throws Exception {
 		String runFunction = "{? = call getUsers()}";
-
 		try (Connection connection = connection(POSTGRESQL, redis);
 				Statement statement = connection.createStatement();
 				CallableStatement cs = connection.prepareCall(runFunction)) {

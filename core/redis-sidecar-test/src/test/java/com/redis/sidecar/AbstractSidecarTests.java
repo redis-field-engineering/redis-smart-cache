@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
@@ -36,8 +37,10 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	private final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
+	private final PropertiesMapper propsMapper = new PropertiesMapper();
 
 	private SidecarDriver sidecarDriver;
+	private Duration testTimeout = Duration.ofHours(1);
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
@@ -74,13 +77,15 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
-	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis) throws SQLException {
-		Properties info = new Properties();
-		info.put("sidecar.buffer-size", String.valueOf(BUFFER_SIZE));
-		info.put("sidecar.metrics.publish-interval", "1");
-		info.put("sidecar.redis.cluster", String.valueOf(redis.isCluster()));
-		info.put("sidecar.driver.class-name", database.getDriverClassName());
-		info.put("sidecar.driver.url", database.getJdbcUrl());
+	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
+			throws SQLException, IOException {
+		BootstrapConfig config = new BootstrapConfig();
+		config.getRedis().setCodecBufferSize(BUFFER_SIZE);
+		config.getRedis().setCluster(redis.isCluster());
+		config.getDriver().setClassName(database.getDriverClassName());
+		config.getDriver().setUrl(database.getJdbcUrl());
+		config.setConfigStep(3600);
+		Properties info = propsMapper.write(config);
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());
 		return sidecarDriver.connect("jdbc:" + redis.getRedisURI(), info);
@@ -93,12 +98,12 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected void testSimpleStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
-			throws SQLException {
+			throws Exception {
 		test(databaseContainer, redis, c -> c.createStatement().executeQuery(sql));
 	}
 
 	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			String sql) throws SQLException {
+			String sql) throws Exception {
 		test(databaseContainer, redis, c -> {
 			Statement statement = c.createStatement();
 			statement.execute(sql);
@@ -107,7 +112,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
-			Object... parameters) throws SQLException {
+			Object... parameters) throws Exception {
 		test(databaseContainer, redis, c -> {
 			PreparedStatement statement = c.prepareStatement(sql);
 			for (int index = 0; index < parameters.length; index++) {
@@ -118,7 +123,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
-			Object... parameters) throws SQLException {
+			Object... parameters) throws Exception {
 		test(databaseContainer, redis, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			for (int index = 0; index < parameters.length; index++) {
@@ -129,7 +134,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			String sql, Object... parameters) throws SQLException {
+			String sql, Object... parameters) throws Exception {
 		test(databaseContainer, redis, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			statement.execute();
@@ -138,11 +143,11 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			StatementExecutor executor) throws SQLException {
+			StatementExecutor executor) throws Exception {
 		try (Connection databaseConnection = connection(databaseContainer);
 				Connection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
-			Awaitility.await().until(() -> {
+			Awaitility.await().timeout(testTimeout).until(() -> {
 				try {
 					executor.execute(connection);
 				} catch (Exception e) {
@@ -155,7 +160,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	}
 
 	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
-			throws SQLException {
+			throws Exception {
 		try (Connection connection = connection(databaseContainer, redis)) {
 			Statement statement = connection.createStatement();
 			statement.execute(sql);
