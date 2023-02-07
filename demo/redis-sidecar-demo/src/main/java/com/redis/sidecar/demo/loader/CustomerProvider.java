@@ -4,14 +4,14 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import com.github.javafaker.Faker;
-import com.redis.sidecar.demo.Config.Loader;
+import com.redis.sidecar.demo.SidecarDemoConfig.DemoConfig;
 
 public class CustomerProvider implements RowProvider {
-	
+
 	private final Faker faker = new Faker();
 
 	@Override
-	public void set(PreparedStatement statement, Loader config, int index) throws SQLException {
+	public void set(PreparedStatement statement, DemoConfig config, int index) throws SQLException {
 		int columnIndex = 1;
 		statement.setInt(columnIndex++, index + 1);
 		statement.setString(columnIndex++, faker.company().name());

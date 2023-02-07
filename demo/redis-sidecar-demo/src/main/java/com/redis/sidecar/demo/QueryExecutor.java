@@ -1,11 +1,13 @@
 package com.redis.sidecar.demo;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -19,11 +21,11 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import com.redis.sidecar.PropertiesMapper;
 import com.redis.sidecar.SidecarDriver;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
@@ -37,36 +39,34 @@ public class QueryExecutor implements AutoCloseable {
 
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
-	private final Config config;
+	private final SidecarDemoConfig config;
 	private final List<QueryTask> tasks = new ArrayList<>();
+	private final PropertiesMapper propsMapper = new PropertiesMapper();
 
 	private ProgressBar progressBar;
 
-	public QueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, Config config) {
+	public QueryExecutor(RedisURI redisURI, DataSourceProperties dataSourceProperties, SidecarDemoConfig config) {
 		this.redisURI = redisURI;
 		this.dataSourceProperties = dataSourceProperties;
 		this.config = config;
 	}
 
-	public void execute() throws InterruptedException, ExecutionException {
-		if (config.isFlush()) {
-			try (RedisClient client = RedisClient.create(redisURI)) {
-				client.connect().sync().flushall();
-			}
-		}
+	public void execute() throws InterruptedException, ExecutionException, IOException {
 		HikariConfig hikariConfig = new HikariConfig();
 		hikariConfig.setJdbcUrl("jdbc:" + redisURI.toString());
 		hikariConfig.setDriverClassName(SidecarDriver.class.getName());
-		hikariConfig.addDataSourceProperty("sidecar.driver.url", dataSourceProperties.determineUrl());
-		hikariConfig.addDataSourceProperty("sidecar.driver.class-name",
-				dataSourceProperties.determineDriverClassName());
-		hikariConfig.addDataSourceProperty("sidecar.metrics.step", "5");
+		config.getSidecar().getDriver().setUrl(dataSourceProperties.determineUrl());
+		config.getSidecar().getDriver().setClassName(dataSourceProperties.determineDriverClassName());
+		Properties props = propsMapper.write(config.getSidecar());
+		for (String propertyName : props.stringPropertyNames()) {
+			hikariConfig.addDataSourceProperty(propertyName, props.getProperty(propertyName));
+		}
 		hikariConfig.setUsername(dataSourceProperties.determineUsername());
 		hikariConfig.setPassword(dataSourceProperties.determinePassword());
 		try (HikariDataSource dataSource = new HikariDataSource(hikariConfig)) {
 			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-			executor.setCorePoolSize(config.getQueryThreads());
-			executor.setMaxPoolSize(config.getQueryThreads());
+			executor.setCorePoolSize(config.getDemo().getQueryThreads());
+			executor.setMaxPoolSize(config.getDemo().getQueryThreads());
 			executor.setThreadNamePrefix("query-task");
 			executor.initialize();
 			ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
@@ -74,8 +74,8 @@ public class QueryExecutor implements AutoCloseable {
 			progressBarBuilder.showSpeed();
 			progressBar = progressBarBuilder.build();
 			List<Future<Integer>> futures = new ArrayList<>();
-			for (int index = 0; index < config.getQueryThreads(); index++) {
-				QueryTask task = new QueryTask(dataSource, config.getLoader().getOrders(), progressBar);
+			for (int index = 0; index < config.getDemo().getQueryThreads(); index++) {
+				QueryTask task = new QueryTask(dataSource, config.getDemo().getOrders(), progressBar);
 				tasks.add(task);
 				futures.add(executor.submit(task));
 			}

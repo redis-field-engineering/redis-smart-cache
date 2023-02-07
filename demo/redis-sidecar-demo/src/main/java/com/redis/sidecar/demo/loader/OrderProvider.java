@@ -2,12 +2,13 @@ package com.redis.sidecar.demo.loader;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 import com.github.javafaker.Faker;
-import com.redis.sidecar.demo.Config.Loader;
+import com.redis.sidecar.demo.SidecarDemoConfig.DemoConfig;
 
 public class OrderProvider implements RowProvider {
 
@@ -17,7 +18,7 @@ public class OrderProvider implements RowProvider {
 	private final Faker faker = new Faker();
 
 	@Override
-	public void set(PreparedStatement statement, Loader config, int index) throws SQLException {
+	public void set(PreparedStatement statement, DemoConfig config, int index) throws SQLException {
 		Date orderDate = faker.date().past(750, 1, TimeUnit.DAYS);
 		Calendar requiredDate = Calendar.getInstance();
 		requiredDate.setTime(orderDate);
@@ -27,11 +28,18 @@ public class OrderProvider implements RowProvider {
 		int customerNumber = faker.random().nextInt(1, config.getCustomers());
 		int columnIndex = 1;
 		statement.setInt(columnIndex++, index + 1);
-		statement.setDate(columnIndex++, RowProvider.sqlDate(orderDate));
-		statement.setDate(columnIndex++, RowProvider.sqlDate(requiredDate.getTime()));
-		statement.setDate(columnIndex++, RowProvider.sqlDate(shippedDate));
+		statement.setDate(columnIndex++, sqlDate(orderDate));
+		statement.setDate(columnIndex++, sqlDate(requiredDate.getTime()));
+		statement.setDate(columnIndex++, sqlDate(shippedDate));
 		statement.setString(columnIndex++, status);
 		statement.setInt(columnIndex, customerNumber);
+	}
+
+	private java.sql.Date sqlDate(Date date) {
+		if (date == null) {
+			return null;
+		}
+		return java.sql.Date.valueOf(date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
 	}
 
 }

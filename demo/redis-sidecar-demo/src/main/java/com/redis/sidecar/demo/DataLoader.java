@@ -13,13 +13,14 @@ import javax.sql.DataSource;
 
 import org.springframework.stereotype.Component;
 
-import com.redis.sidecar.demo.Config.Loader;
 import com.redis.sidecar.demo.loader.CustomerProvider;
 import com.redis.sidecar.demo.loader.OrderDetailsProvider;
 import com.redis.sidecar.demo.loader.OrderProvider;
 import com.redis.sidecar.demo.loader.ProductProvider;
 import com.redis.sidecar.demo.loader.RowProvider;
 
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
 
@@ -40,20 +41,28 @@ public class DataLoader {
 	private static final String[] ORDERDETAILS_COLUMNS = { "orderNumber", "productCode", "quantityOrdered",
 			"orderLineNumber", "priceEach" };
 
-	private final Loader config;
+	private final RedisURI redisURI;
+	private final SidecarDemoConfig config;
 	private final DataSource dataSource;
 
-	public DataLoader(Config config, DataSource dataSource) {
-		this.config = config.getLoader();
+	public DataLoader(RedisURI redisURI, SidecarDemoConfig config, DataSource dataSource) {
+		this.redisURI = redisURI;
+		this.config = config;
 		this.dataSource = dataSource;
 	}
 
 	public void execute() throws SQLException {
+		if (config.getDemo().isFlush()) {
+			try (RedisClient client = RedisClient.create(redisURI)) {
+				client.connect().sync().flushall();
+			}
+		}
 		try (Connection connection = dataSource.getConnection()) {
-			load(connection, CUSTOMERS, CUSTOMER_COLUMNS, new CustomerProvider(), config.getCustomers());
-			load(connection, PRODUCTS, PRODUCT_COLUMNS, new ProductProvider(), config.getProducts());
-			load(connection, ORDERS, ORDER_COLUMNS, new OrderProvider(), config.getOrders());
-			load(connection, ORDERDETAILS, ORDERDETAILS_COLUMNS, new OrderDetailsProvider(), config.getOrderdetails());
+			load(connection, CUSTOMERS, CUSTOMER_COLUMNS, new CustomerProvider(), config.getDemo().getCustomers());
+			load(connection, PRODUCTS, PRODUCT_COLUMNS, new ProductProvider(), config.getDemo().getProducts());
+			load(connection, ORDERS, ORDER_COLUMNS, new OrderProvider(), config.getDemo().getOrders());
+			load(connection, ORDERDETAILS, ORDERDETAILS_COLUMNS, new OrderDetailsProvider(),
+					config.getDemo().getOrderdetails());
 		}
 	}
 
@@ -80,14 +89,14 @@ public class DataLoader {
 				Stream.of(columns).map(n -> "?").collect(Collectors.joining(",", "(", ")")));
 		PreparedStatement preparedStatement = connection.prepareStatement(insertSQL);
 		for (int index = start; index < end; index++) {
-			rowProvider.set(preparedStatement, config, index);
+			rowProvider.set(preparedStatement, config.getDemo(), index);
 			preparedStatement.addBatch();
-			if (index > 0 && index % config.getBatch() == 0) {
+			if (index > 0 && index % config.getDemo().getBatchSize() == 0) {
 				preparedStatement.executeBatch();
 				connection.commit();
 				preparedStatement.close();
 				preparedStatement = preparedStatement.getConnection().prepareStatement(insertSQL);
-				progressBar.stepBy(config.getBatch());
+				progressBar.stepBy(config.getDemo().getBatchSize());
 			}
 		}
 		preparedStatement.executeBatch();
