@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.sql.rowset.CachedRowSet;
 
@@ -26,6 +27,7 @@ public class SidecarStatement implements Statement {
 	private String sql;
 	private Optional<ResultSet> resultSet = Optional.empty();
 	private long ttl = RuleConfig.TTL_NO_CACHE;
+	private Set<String> tableNames;
 
 	public SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry) {
 		this.connection = connection;
@@ -366,6 +368,14 @@ public class SidecarStatement implements Statement {
 	@Override
 	public boolean isCloseOnCompletion() throws SQLException {
 		return statement.isCloseOnCompletion();
+	}
+
+	public Set<String> getTableNames() {
+		if (tableNames == null) {
+			tableNames = connection.getSqlParser().extractTableNames(sql);
+		}
+		return tableNames;
+
 	}
 
 }

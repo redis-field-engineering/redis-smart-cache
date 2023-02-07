@@ -5,26 +5,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.redis.sidecar.SidecarStatement;
 
 public class TableRule extends AbstractRule {
 
-	private final Function<SidecarStatement, Set<String>> tableNamesExtractor;
 	private final Predicate<Set<String>> predicate;
 
-	public TableRule(Predicate<Set<String>> predicate, Function<SidecarStatement, Set<String>> tableNamesExtractor,
-			Consumer<SidecarStatement> action) {
+	public TableRule(Predicate<Set<String>> predicate, Consumer<SidecarStatement> action) {
 		super(action);
-		this.tableNamesExtractor = tableNamesExtractor;
 		this.predicate = predicate;
 	}
 
 	@Override
-	public boolean evaluate(SidecarStatement facts) {
-		return predicate.test(tableNamesExtractor.apply(facts));
+	public boolean evaluate(SidecarStatement statement) {
+		return predicate.test(statement.getTableNames());
 	}
 
 	public static class ContainsAnyPredicate implements Predicate<Set<String>> {

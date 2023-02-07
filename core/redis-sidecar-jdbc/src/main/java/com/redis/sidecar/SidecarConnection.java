@@ -25,6 +25,7 @@ import io.lettuce.core.internal.LettuceAssert;
 
 public class SidecarConnection implements Connection {
 
+	private final SqlParser sqlParser = new SqlParser();
 	private final Connection connection;
 	private final ConnectionContext context;
 
@@ -334,4 +335,7 @@ public class SidecarConnection implements Connection {
 		context.getRuleSession().fire(sidecarStatement);
 	}
 
+	public SqlParser getSqlParser() {
+		return sqlParser;
+	}
 }
