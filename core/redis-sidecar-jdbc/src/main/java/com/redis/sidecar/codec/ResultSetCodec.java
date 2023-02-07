@@ -223,7 +223,7 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	public static Builder builder() throws SQLException {
+	public static Builder builder() {
 		return new Builder();
 	}
 

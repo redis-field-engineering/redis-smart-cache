@@ -5,36 +5,27 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.List;
 import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.Config.Rule;
+import com.redis.sidecar.RulesConfig.RuleConfig;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.trino.sql.parser.ParsingException;
-import io.trino.sql.tree.QualifiedName;
-import io.trino.sql.tree.Table;
 
 public class SidecarStatement implements Statement {
 
-	private static final Logger log = Logger.getLogger(SidecarStatement.class.getName());
 	private static final String QUERY_TIMER_ID = "queries";
 	private static final String PARAMETER_SEPARATOR = ":";
 
-	private final SqlParser parser = new SqlParser();
 	private final SidecarConnection connection;
-	private final Statement statement;
+	protected final Statement statement;
 	private final Timer queryTimer;
 
 	private String sql;
-	private long ttl = Rule.TTL_NO_CACHE;
 	private Optional<ResultSet> resultSet = Optional.empty();
+	private long ttl = RuleConfig.TTL_NO_CACHE;
 
 	public SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry) {
 		this.connection = connection;
@@ -50,6 +41,14 @@ public class SidecarStatement implements Statement {
 
 	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
 		return stringBuilder.append(PARAMETER_SEPARATOR).append(parameter);
+	}
+
+	public void setTtl(long ttl) {
+		this.ttl = ttl;
+	}
+
+	public String getSql() {
+		return sql;
 	}
 
 	@Override
@@ -134,7 +133,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	private boolean isCachingEnabled() {
-		return ttl != Rule.TTL_NO_CACHE;
+		return ttl != RuleConfig.TTL_NO_CACHE;
 	}
 
 	protected String key() {
@@ -142,25 +141,9 @@ public class SidecarStatement implements Statement {
 	}
 
 	private Optional<ResultSet> getCachedResultSet() {
-		String key = key();
-		List<String> tables;
-		try {
-			tables = parser.getTables(sql).map(Table::getName).map(QualifiedName::toString)
-					.collect(Collectors.toList());
-		} catch (ParsingException e) {
-			log.log(Level.FINE, String.format("Could not parse SQL: %s", sql), e);
-			return Optional.empty();
-		}
-		if (tables.isEmpty()) {
-			return Optional.empty();
-		}
-		for (Rule rule : connection.getConfig().getRules()) {
-			if (rule.getTable() == null || rule.getTable().isEmpty() || tables.contains(rule.getTable())) {
-				ttl = rule.getTtl();
-			}
-		}
+		connection.evaluateRules(this);
 		if (isCachingEnabled()) {
-			resultSet = connection.getCache().get(key);
+			resultSet = connection.getCache().get(key());
 			return resultSet;
 		}
 		return Optional.empty();

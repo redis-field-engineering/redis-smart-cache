@@ -5,180 +5,80 @@ import java.time.Duration;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
+import com.redis.sidecar.codec.ResultSetCodec;
+
+import io.lettuce.core.SslVerifyMode;
+
 public class BootstrapConfig {
 
-	public static final Duration DEFAULT_REFRESH_RATE = Duration.ofSeconds(10);
-	public static final Duration DEFAULT_METRICS_STEP = Duration.ofMinutes(1);
+	public static final String DEFAULT_KEYSPACE = "sidecar";
+	public static final String DEFAULT_KEY_SEPARATOR = ":";
+	public static final Duration DEFAULT_CONFIG_STEP = Duration.ofSeconds(10);
+	public static final Duration DEFAULT_METRICS_STEP = Duration.ofSeconds(60);
 
-	private long refreshRate = DEFAULT_REFRESH_RATE.toSeconds();
-	private Driver driver = new Driver();
-	private Redis redis = new Redis();
-	private Metrics metrics = new Metrics();
+	private RedisConfig redis = new RedisConfig();
+	private DriverConfig driver = new DriverConfig();
+	private long configStep = DEFAULT_CONFIG_STEP.toSeconds();
+	private long metricsStep = DEFAULT_METRICS_STEP.toSeconds();
 
-	public Metrics getMetrics() {
-		return metrics;
+	public String key(String id) {
+		return redis.key(id);
 	}
 
-	public void setMetrics(Metrics metrics) {
-		this.metrics = metrics;
-	}
-
-	public long getRefreshRate() {
-		return refreshRate;
-	}
-
-	public void setRefreshRate(long refreshRate) {
-		this.refreshRate = refreshRate;
-	}
-
-	public Driver getDriver() {
-		return driver;
-	}
-
-	public void setDriver(Driver driver) {
-		this.driver = driver;
-	}
-
-	public Redis getRedis() {
+	public RedisConfig getRedis() {
 		return redis;
 	}
 
-	public void setRedis(Redis redis) {
+	public void setRedis(RedisConfig redis) {
 		this.redis = redis;
 	}
 
-	public static class Driver {
-
-		private String className;
-		private String url;
-
-		public String getClassName() {
-			return className;
-		}
-
-		public void setClassName(String className) {
-			this.className = className;
-		}
-
-		public String getUrl() {
-			return url;
-		}
-
-		public void setUrl(String url) {
-			this.url = url;
-		}
-
+	/**
+	 * 
+	 * @return metrics step duration in seconds
+	 */
+	public long getMetricsStep() {
+		return metricsStep;
 	}
 
-	public static class Redis {
+	public void setMetricsStep(long seconds) {
+		this.metricsStep = seconds;
+	}
 
-		public static class Pool {
+	/**
+	 * 
+	 * @return config refresh step duration in seconds
+	 */
+	public long getConfigStep() {
+		return configStep;
+	}
 
-			public static final int DEFAULT_MAX_IDLE = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
-			public static final int DEFAULT_MIN_IDLE = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
-			public static final int DEFAULT_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
-			public static final Duration DEFAULT_MAX_WAIT = BaseObjectPoolConfig.DEFAULT_MAX_WAIT;
-			public static final Duration DEFAULT_TIME_BETWEEN_EVICTION_RUNS = BaseObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
+	public void setConfigStep(long seconds) {
+		this.configStep = seconds;
+	}
 
-			/**
-			 * Maximum number of "idle" connections in the pool. Use a negative value to
-			 * indicate an unlimited number of idle connections.
-			 */
-			private int maxIdle = DEFAULT_MAX_IDLE;
+	public DriverConfig getDriver() {
+		return driver;
+	}
 
-			/**
-			 * Target for the minimum number of idle connections to maintain in the pool.
-			 * This setting only has an effect if both it and time between eviction runs are
-			 * positive.
-			 */
-			private int minIdle = DEFAULT_MIN_IDLE;
+	public void setDriver(DriverConfig driver) {
+		this.driver = driver;
+	}
 
-			/**
-			 * Maximum number of connections that can be allocated by the pool at a given
-			 * time. Use a negative value for no limit.
-			 */
-			private int maxActive = DEFAULT_MAX_TOTAL;
+	public static class RedisConfig {
 
-			/**
-			 * Maximum amount of time a connection allocation should block before throwing
-			 * an exception when the pool is exhausted. Use a negative value to block
-			 * indefinitely.
-			 */
-			private long maxWait = DEFAULT_MAX_WAIT.toMillis();
-
-			/**
-			 * Time between runs of the idle object evictor thread. When positive, the idle
-			 * object evictor thread starts, otherwise no idle object eviction is performed.
-			 */
-			private long timeBetweenEvictionRuns = DEFAULT_TIME_BETWEEN_EVICTION_RUNS.toMillis();
-
-			public int getMaxIdle() {
-				return this.maxIdle;
-			}
-
-			public void setMaxIdle(int maxIdle) {
-				this.maxIdle = maxIdle;
-			}
-
-			public int getMinIdle() {
-				return this.minIdle;
-			}
-
-			public void setMinIdle(int minIdle) {
-				this.minIdle = minIdle;
-			}
-
-			public int getMaxActive() {
-				return this.maxActive;
-			}
-
-			public void setMaxActive(int maxActive) {
-				this.maxActive = maxActive;
-			}
-
-			public long getMaxWait() {
-				return this.maxWait;
-			}
-
-			public void setMaxWait(long maxWait) {
-				this.maxWait = maxWait;
-			}
-
-			public long getTimeBetweenEvictionRuns() {
-				return this.timeBetweenEvictionRuns;
-			}
-
-			public void setTimeBetweenEvictionRuns(long timeBetweenEvictionRuns) {
-				this.timeBetweenEvictionRuns = timeBetweenEvictionRuns;
-			}
-
-		}
-
-		public static final String DEFAULT_KEYSPACE = "sidecar";
-		public static final String DEFAULT_KEY_SEPARATOR = ":";
-
+		private String uri;
 		private boolean tls;
-		private boolean insecure;
+		private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
 		private boolean cluster;
 		private String username;
-		private String password;
+		private char[] password;
 		private String keyspace = DEFAULT_KEYSPACE;
 		private String keySeparator = DEFAULT_KEY_SEPARATOR;
-		private Pool pool = new Pool();
-
-		public boolean isTls() {
-			return tls;
-		}
-
-		public void setTls(boolean tls) {
-			this.tls = tls;
-		}
+		private int codecBufferSize = ResultSetCodec.DEFAULT_BYTE_BUFFER_CAPACITY;
+		private PoolConfig pool = new PoolConfig();
 
 		public String key(String id) {
-			return key(keyspace, id);
-		}
-
-		public String key(String keyspace, String id) {
 			return keyspace + keySeparator + id;
 		}
 
@@ -188,6 +88,22 @@ public class BootstrapConfig {
 
 		public void setKeyspace(String keyspace) {
 			this.keyspace = keyspace;
+		}
+
+		public String getUri() {
+			return uri;
+		}
+
+		public void setUri(String uri) {
+			this.uri = uri;
+		}
+
+		public boolean isTls() {
+			return tls;
+		}
+
+		public void setTls(boolean tls) {
+			this.tls = tls;
 		}
 
 		public String getKeySeparator() {
@@ -206,20 +122,20 @@ public class BootstrapConfig {
 			this.username = username;
 		}
 
-		public String getPassword() {
+		public char[] getPassword() {
 			return password;
 		}
 
-		public void setPassword(String password) {
+		public void setPassword(char[] password) {
 			this.password = password;
 		}
 
-		public boolean isInsecure() {
-			return insecure;
+		public SslVerifyMode getTlsVerify() {
+			return tlsVerify;
 		}
 
-		public void setInsecure(boolean insecure) {
-			this.insecure = insecure;
+		public void setTlsVerify(SslVerifyMode sslVerifyMode) {
+			this.tlsVerify = sslVerifyMode;
 		}
 
 		public boolean isCluster() {
@@ -230,35 +146,128 @@ public class BootstrapConfig {
 			this.cluster = cluster;
 		}
 
-		public Pool getPool() {
+		/**
+		 * 
+		 * @return max byte buffer capacity in bytes
+		 */
+		public int getCodecBufferSize() {
+			return codecBufferSize;
+		}
+
+		public void setCodecBufferSize(int sizeInBytes) {
+			this.codecBufferSize = sizeInBytes;
+		}
+
+		public PoolConfig getPool() {
 			return pool;
 		}
 
-		public void setPool(Pool pool) {
+		public void setPool(PoolConfig pool) {
 			this.pool = pool;
+		}
+	}
+
+	public static class PoolConfig {
+
+		public static final int DEFAULT_MAX_IDLE = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
+		public static final int DEFAULT_MIN_IDLE = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
+		public static final int DEFAULT_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
+		public static final Duration DEFAULT_MAX_WAIT = BaseObjectPoolConfig.DEFAULT_MAX_WAIT;
+		public static final Duration DEFAULT_TIME_BETWEEN_EVICTION_RUNS = BaseObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
+
+		/**
+		 * Maximum number of "idle" connections in the pool. Use a negative value to
+		 * indicate an unlimited number of idle connections.
+		 */
+		private int maxIdle = DEFAULT_MAX_IDLE;
+
+		/**
+		 * Target for the minimum number of idle connections to maintain in the pool.
+		 * This setting only has an effect if both it and time between eviction runs are
+		 * positive.
+		 */
+		private int minIdle = DEFAULT_MIN_IDLE;
+
+		/**
+		 * Maximum number of connections that can be allocated by the pool at a given
+		 * time. Use a negative value for no limit.
+		 */
+		private int maxActive = DEFAULT_MAX_TOTAL;
+
+		/**
+		 * Maximum amount of time a connection allocation should block before throwing
+		 * an exception when the pool is exhausted. Use a negative value to block
+		 * indefinitely.
+		 */
+		private long maxWait = DEFAULT_MAX_WAIT.toMillis();
+
+		/**
+		 * Time between runs of the idle object evictor thread. When positive, the idle
+		 * object evictor thread starts, otherwise no idle object eviction is performed.
+		 */
+		private long timeBetweenEvictionRuns = DEFAULT_TIME_BETWEEN_EVICTION_RUNS.toMillis();
+
+		public int getMaxIdle() {
+			return this.maxIdle;
+		}
+
+		public void setMaxIdle(int maxIdle) {
+			this.maxIdle = maxIdle;
+		}
+
+		public int getMinIdle() {
+			return this.minIdle;
+		}
+
+		public void setMinIdle(int minIdle) {
+			this.minIdle = minIdle;
+		}
+
+		public int getMaxActive() {
+			return this.maxActive;
+		}
+
+		public void setMaxActive(int maxActive) {
+			this.maxActive = maxActive;
+		}
+
+		public long getMaxWait() {
+			return this.maxWait;
+		}
+
+		public void setMaxWait(long maxWait) {
+			this.maxWait = maxWait;
+		}
+
+		public long getTimeBetweenEvictionRuns() {
+			return this.timeBetweenEvictionRuns;
+		}
+
+		public void setTimeBetweenEvictionRuns(long timeBetweenEvictionRuns) {
+			this.timeBetweenEvictionRuns = timeBetweenEvictionRuns;
 		}
 
 	}
 
-	public static class Metrics {
+	public static class DriverConfig {
 
-		private long step = DEFAULT_METRICS_STEP.toSeconds();
-		private boolean lettuce;
+		private String className;
+		private String url;
 
-		public boolean isLettuce() {
-			return lettuce;
+		public String getClassName() {
+			return className;
 		}
 
-		public void setLettuce(boolean commandLatencyEnabled) {
-			this.lettuce = commandLatencyEnabled;
+		public void setClassName(String className) {
+			this.className = className;
 		}
 
-		public long getStep() {
-			return step;
+		public String getUrl() {
+			return url;
 		}
 
-		public void setStep(long step) {
-			this.step = step;
+		public void setUrl(String url) {
+			this.url = url;
 		}
 
 	}

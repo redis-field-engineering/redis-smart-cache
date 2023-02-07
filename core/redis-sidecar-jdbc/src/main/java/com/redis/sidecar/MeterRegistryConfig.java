@@ -1,23 +1,22 @@
 package com.redis.sidecar;
 
 import java.time.Duration;
+import java.util.Objects;
 
 import com.redis.micrometer.RedisTimeSeriesConfig;
 
-import io.lettuce.core.RedisURI;
-
 public class MeterRegistryConfig implements RedisTimeSeriesConfig {
 
-	private final RedisURI uri;
+	private final String uri;
 	private final boolean cluster;
 	private final String keyspace;
 	private final Duration step;
 
-	public MeterRegistryConfig(RedisURI uri, boolean cluster, String keyspace, Duration step) {
-		this.uri = uri;
-		this.cluster = cluster;
-		this.keyspace = keyspace;
-		this.step = step;
+	public MeterRegistryConfig(BootstrapConfig bootstrap) {
+		this.uri = bootstrap.getRedis().getUri();
+		this.cluster = bootstrap.getRedis().isCluster();
+		this.keyspace = bootstrap.key("metrics");
+		this.step = Duration.ofSeconds(bootstrap.getMetricsStep());
 	}
 
 	@Override
@@ -27,7 +26,7 @@ public class MeterRegistryConfig implements RedisTimeSeriesConfig {
 
 	@Override
 	public String uri() {
-		return uri.toString();
+		return uri;
 	}
 
 	@Override
@@ -43,6 +42,23 @@ public class MeterRegistryConfig implements RedisTimeSeriesConfig {
 	@Override
 	public Duration step() {
 		return step;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(keyspace, uri);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		MeterRegistryConfig other = (MeterRegistryConfig) obj;
+		return Objects.equals(keyspace, other.keyspace) && Objects.equals(uri, other.uri);
 	}
 
 }

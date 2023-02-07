@@ -1,12 +1,15 @@
 package com.redis.sidecar;
 
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import io.trino.sql.parser.ParsingException;
 import io.trino.sql.parser.ParsingOptions;
 import io.trino.sql.tree.AstVisitor;
 import io.trino.sql.tree.Node;
+import io.trino.sql.tree.QualifiedName;
 import io.trino.sql.tree.Table;
 
 public class SqlParser {
@@ -43,8 +46,12 @@ public class SqlParser {
 		};
 	}
 
-	public Stream<Table> getTables(String sql) throws ParsingException {
+	public Stream<Table> extractTables(String sql) throws ParsingException {
 		return parser.createStatement(sql, options).accept(DepthFirstVisitor.by(extractTables()), null);
+	}
+
+	public Set<String> extractTableNames(String sql) {
+		return extractTables(sql).map(Table::getName).map(QualifiedName::toString).collect(Collectors.toSet());
 	}
 
 }
