@@ -8,6 +8,7 @@
 :artifact-id:     redis-sidecar-jdbc
 :codecov-token:   y0NMn7uIJ0
 :grafana-dir:     demo/redis-sidecar-demo/grafana
+:icons:           font
 
 ++++
 <p align="center">
@@ -30,15 +31,15 @@ image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/b
 Implemented as a wrapper around your backend database's JDBC driver, {product-name} can cache
 slow, repeated queries from Redis, bypassing expensive database calls and greatly
 improving response times.
- 
+
 == Table of Contents
 
-* link:#background[Background]
-* link:#quick-start[Quick start]
-* link:#installation[Installation]
-* link:#Usage[Usage]
-* link:#Support[Support]
-* link:#License[License]
+* <<Background>>
+* <<Quick start>>
+* <<Installation>>
+* <<Usage>>
+* <<Support>>
+* <<License>>
 
 == Background
 
@@ -128,86 +129,178 @@ The next step is to configure {product-name}, as described below.
 
 == Usage
 
-=== Configuration
-
-Here's how to configure {product-name}.
 First, ensure that your application is using {product-name} as its JDBC driver:
 
-Driver class name:: `com.redis.sidecar.SidecarDriver`
+`com.redis.sidecar.SidecarDriver`
 
-Next, set your JDBC URI to the URI of your Redis instance.
-For example:
-
-JDBC URL:: `jdbc:redis://cache.redis.cloud:6379`
+Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:`.
+For example `jdbc:redis://cache.redis.cloud:6379`
 
 See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax] for all of the possible URI parameters you can use here.
 
-Once connected, {product-name} reads its configuration from a Redis JSON document located in Redis at the key `sidecar:config`.
+Next step is providing bootstrap configuration. 
 
-If that document does not yet exist, you can populate it at startup by setting the following JDBC properties:
+=== Bootstrap Configuration
+
+Bootstrap configuration contains the information {product-name} needs to connect to Redis and the backend database and is specified using the following JDBC properties:
 
 ==== Backend database
-`sidecar.driver.class-name`:: Class name of the backend database JDBC driver
 
-`sidecar.driver.url`:: JDBC URL for the backend database
+===== `sidecar.driver.class-name`
+Class name of the backend database JDBC driver (*required*)
 
-You can also include any property your backend JDBC driver requires, like `username` or `password`.
-These will be passed to the backend JDBC driver as is.
+===== `sidecar.driver.url`
+JDBC URL for the backend database (*required*). You can also include any property your backend JDBC driver requires, like `username` or `password`. These will be passed to the backend JDBC driver as is.
 
 ==== Redis
 To further configure how {product-name} connects to Redis, set the following properties:
 
-`sidecar.redis.uri`:: Redis URI.
-See the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce Redis URI] for syntax for what's permitted here.
+===== `sidecar.redis.cluster`
+Set to `true` for Redis Cluster connections (default: `false`).
 
-`sidecar.redis.cluster`:: Set to `true` for Redis Cluster connections (default: `false`).
+===== `sidecar.redis.tls`
+Establish a secure TLS connection.
 
-`sidecar.redis.tls`:: Establish a secure TLS connection.
+===== `sidecar.redis.tls-verify`
+TLS verification mode: `NONE` (default) no verification at all, `CA` verify the CA and certificate without verifying that the hostname matches, `FULL` full certificate verification.
 
-`sidecar.redis.insecure`:: Allow insecure TLS connection by skipping cert validation.
+===== `sidecar.redis.username`
+Authenticate using the provided username. Overrides username in Redis URI. Requires password.
 
-`sidecar.redis.username`:: Authenticate using the provided username.
-Overrides username in Redis URI.
-Requires password.
+===== `sidecar.redis.password`
+Authenticate using the provided password. Overrides password in Redis URI.
 
-`sidecar.redis.password`:: Authenticate using the provided password.
-Overrides password in Redis URI.
+===== `sidecar.redis.keyspace`
+Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics. (default: `sidecar`)
 
-`sidecar.redis.keyspace`:: Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics. (default: `sidecar`)
+===== `sidecar.redis.key-separator`
+Delimiter to use between key elements (default: `:`).
 
-`sidecar.redis.key-separator`:: Delimiter to use between key elements (default: `:`).
+===== `sidecar.redis.pool.max-active`
+Maximum number of connections that can be allocated by the pool at a given time (default: `8`). Use a negative value for no limit.
 
-`sidecar.redis.pool.max-active`:: Maximum number of connections that can be allocated by the pool at a given time (default: `8`).
-Use a negative value for no limit.
+===== `sidecar.redis.pool.max-idle`
+Maximum number of "idle" connections in the pool (default: `8`). Use a negative value to indicate an unlimited number of idle connections.
 
-`sidecar.redis.pool.max-idle`:: Maximum number of "idle" connections in the pool (default: `8`).
-Use a negative value to indicate an unlimited number of idle connections.
+===== `sidecar.redis.pool.min-idle`
+Target for the minimum number of idle connections to maintain in the pool (default: `0`). This setting only has an effect if both it and time between eviction runs are positive.
 
-`sidecar.redis.pool.min-idle`:: Target for the minimum number of idle connections to maintain in the pool (default: `0`).
-This setting only has an effect if both it and time between eviction runs are positive.
+===== `sidecar.redis.pool.max-wait`
+Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`). Use a negative value to block indefinitely.
 
-`sidecar.redis.pool.max-wait`:: Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`).
-Use a negative value to block indefinitely.
-
-`sidecar.redis.pool.time-between-eviction-runs`:: Time in milliseconds between runs of the idle object evictor thread (default: `-1`).
+===== `sidecar.redis.pool.time-between-eviction-runs`
+Time in milliseconds between runs of the idle object evictor thread (default: `-1`).
 When positive, the idle object evictor thread starts; otherwise no idle object eviction is performed.
 
-`sidecar.redis.buffer-size`:: Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
+===== `sidecar.redis.codec-buffer-size`
+Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
 
-==== Rules
+==== Additional components
 
+===== `sidecar.metrics-step`
+Metrics publishing interval in seconds (default: `60`)
+
+[[config_step]]
+===== `sidecar.config-step`
+Rule config refresh interval in seconds (default: `10`)
+
+=== Rules
 {product-name} uses rules to determine how SQL queries are cached.
+Rule configuration is stored in a Redis JSON document located at the key `sidecar:config` and can be modified at runtime.
+{product-name} will dynamically update to reflect changes made to the JSON document (see <<config_step>> above to change the refresh rate). 
 
-Rules are processed in order and consist of *criteria* (conditions) and *actions* (results):
+Here is the default rule configuration:
+[source,json]
+----
+{
+  "rules": [
+    {
+      "tables": null,
+      "tablesAny": null,
+      "tablesAll": null,
+      "regex": null,
+      "ttl": 3600
+    }
+  ]
+}
+----
 
-* Criteria
+Rules are processed in order and consist of *criteria* (conditions) and *actions* (results). Only the first rule with matching criteria will be considered, and its action applied.
 
-`table`:: matches if given name is present in the query tables (default: `null`).
-Use null (empty) value to match all tables. 
+==== Criteria
 
-* Action
+===== `tables`
+Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
 
-`ttl`:: Key expiration duration in seconds (default: `3600`). Use `0` for no caching, `-1` for no expiration.
+==== `tablesAny`
+Triggers if any of the given tables shows up in the SQL query.
+
+==== `tablesAll`
+Triggers if all the given tables show up in the SQL query.
+
+==== `regex`
+Triggers if regular expression matches the SQL query.
+
+==== Action
+
+===== `ttl`
+Sets the time-to-live (in seconds) for the corresponding cache entry (default: `3600`).
+Use `0` for no caching, `-1` for no expiration.
+
+==== Examples
+
+===== `SELECT * FROM customer, product, order` 
+[cols="6a,^1"]
+|==========================
+|
+[source,json]
+----
+{ "tables": ["order", "product"] }
+----
+|icon:close[role=red]
+|
+[source,json]
+----
+{ "tables": ["order", "product", "customer"] }
+----
+|icon:check[role=green]
+|
+[source,json]
+----
+{ "tablesAny": ["transaction"] }
+----
+|icon:close[role=red]
+|
+[source,json]
+----
+{ "tablesAny": ["transaction", "order"] }
+----
+|icon:check[role=green]
+|
+[source,json]
+----
+{ "tablesAll": ["transaction", "order", "product"] }
+----
+|icon:close[role=red]
+|
+[source,json]
+----
+{ "tablesAll": ["order", "product"] }
+----
+|icon:check[role=green]
+|
+[source,json]
+----
+{ "regex": "SELECT \* FROM trans.*" }
+----
+|icon:close[role=red]
+|
+[source,json]
+----
+{ "regex": "SELECT \* FROM cust.*" }
+----
+|icon:check[role=green]
+|==========================
 
 == Support
 
