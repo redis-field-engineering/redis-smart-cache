@@ -5,9 +5,9 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 
-import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -26,17 +26,17 @@ class ConfigManagerTests extends AbstractTestcontainersRedisTestBase {
 
 	@ParameterizedTest
 	@RedisTestContextsSource
-	void testDriver(RedisTestContext redis) throws Exception {
-		BootstrapConfig bootstrap = new BootstrapConfig();
-		bootstrap.getRedis().setCluster(redis.isCluster());
-		try (StatefulRedisModulesConnection<String, String> connection = redis.getConnection();
-				ConfigManager configManager = new ConfigManager()) {
-			String key = bootstrap.getRedis().key("config");
-			Config config = configManager.fetchConfig(connection, key, Duration.ofSeconds(1), new Config());
-			Awaitility.await().until(() -> redis.sync().jsonGet(key) != null);
-			int bufferSize = 123456890;
-			redis.sync().jsonSet(key, ".bufferSize", String.valueOf(bufferSize));
-			Awaitility.await().until(() -> config.getBufferSize() == bufferSize);
+	void configUpdated(RedisTestContext redis) throws Exception {
+		try (ConfigManager<RulesConfig> configManager = new ConfigManager<>(redis.getConnection(),
+				Duration.ofMillis(100))) {
+			String key = "testUpdate";
+			RulesConfig config = new RulesConfig();
+			configManager.register(key, config);
+			Assertions.assertNotNull(redis.sync().jsonGet(key));
+			long ttl = 123;
+			redis.sync().jsonSet(key, ".rules[0].ttl", String.valueOf(ttl));
+			Awaitility.await().timeout(Duration.ofMillis(300))
+					.until(() -> config.getRules().size() == 1 && config.getRules().get(0).getTtl() == ttl);
 		}
 	}
 
