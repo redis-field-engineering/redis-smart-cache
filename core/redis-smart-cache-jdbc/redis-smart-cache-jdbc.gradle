@@ -30,7 +30,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocatio
 
 task relocateShadowJar(type: ConfigureShadowRelocation) {
     target = tasks.shadowJar
-    prefix = "com.redis.sidecar.shaded"
+    prefix = "com.redis.smartcache.shaded"
 }
 
 tasks.shadowJar.dependsOn tasks.relocateShadowJar

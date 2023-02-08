@@ -9,9 +9,9 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=
       - MYSQL_ALLOW_EMPTY_PASSWORD=true
-      - MYSQL_USER=smart
-      - MYSQL_PASSWORD=smart
-      - MYSQL_DATABASE=smart
+      - MYSQL_USER=smartcache
+      - MYSQL_PASSWORD=smartcache
+      - MYSQL_DATABASE=smartcache
     volumes:
       - "./conf.d:/etc/mysql/conf.d:ro"
 
@@ -31,7 +31,7 @@ services:
       
   redis-smart-cache-demo:
     image: fieldengineering/redis-demo-smart-cache
-    hostname: smart-cache
+    hostname: smartcache
     build: .
     restart: on-failure
     depends_on:
@@ -41,4 +41,4 @@ services:
       - 8080:8080
     environment:
       - SPRING_REDIS_HOST=redis
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql/smart
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql/smartcache

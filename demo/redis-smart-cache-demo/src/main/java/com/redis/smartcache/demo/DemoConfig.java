@@ -1,0 +1,99 @@
+package com.redis.smartcache.demo;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import com.redis.smartcache.BootstrapConfig;
+
+@Configuration
+@ConfigurationProperties(prefix = "")
+public class DemoConfig {
+
+	private BootstrapConfig smartcache = new BootstrapConfig();
+	private DataConfig demo = new DataConfig();
+
+	public BootstrapConfig getSmartcache() {
+		return smartcache;
+	}
+
+	public void setSmartcache(BootstrapConfig config) {
+		this.smartcache = config;
+	}
+
+	public DataConfig getDemo() {
+		return demo;
+	}
+
+	public void setDemo(DataConfig demo) {
+		this.demo = demo;
+	}
+
+	public static class DataConfig {
+
+		private boolean flush;
+		private int queryThreads;
+		private int batchSize;
+		private int customers;
+		private int products;
+		private int orders;
+		private int orderdetails;
+
+		public int getCustomers() {
+			return customers;
+		}
+
+		public void setCustomers(int customers) {
+			this.customers = customers;
+		}
+
+		public int getProducts() {
+			return products;
+		}
+
+		public void setProducts(int products) {
+			this.products = products;
+		}
+
+		public int getOrders() {
+			return orders;
+		}
+
+		public void setOrders(int orders) {
+			this.orders = orders;
+		}
+
+		public int getOrderdetails() {
+			return orderdetails;
+		}
+
+		public void setOrderdetails(int orderdetails) {
+			this.orderdetails = orderdetails;
+		}
+
+		public int getBatchSize() {
+			return batchSize;
+		}
+
+		public void setBatchSize(int batchSize) {
+			this.batchSize = batchSize;
+		}
+
+		public int getQueryThreads() {
+			return queryThreads;
+		}
+
+		public void setQueryThreads(int queryThreads) {
+			this.queryThreads = queryThreads;
+		}
+
+		public boolean isFlush() {
+			return flush;
+		}
+
+		public void setFlush(boolean flush) {
+			this.flush = flush;
+		}
+
+	}
+
+}

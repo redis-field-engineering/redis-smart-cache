@@ -1,0 +1,34 @@
+package com.redis.smartcache;
+
+import java.io.IOException;
+import java.util.Properties;
+
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+public class PropsMapper {
+
+	private final JavaPropsSchema schema = JavaPropsSchema.emptySchema().withPrefix(Driver.PREFIX);
+	private final JavaPropsMapper mapper = JavaPropsMapper.builder()
+			.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).serializationInclusion(Include.NON_NULL)
+			.addModule(new JavaTimeModule()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+			.disable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS).build();
+
+	public <T> T read(Properties info, Class<T> type) throws IOException {
+		Properties properties = new Properties();
+		properties.putAll(System.getenv());
+		properties.putAll(System.getProperties());
+		properties.putAll(info);
+		return mapper.readPropertiesAs(properties, schema, type);
+	}
+
+	public Properties write(Object config) throws IOException {
+		return mapper.writeValueAsProperties(config, schema);
+	}
+
+}

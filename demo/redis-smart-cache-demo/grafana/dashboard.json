@@ -152,7 +152,7 @@
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "keyName": "sidecar:metrics:queries:mean",
+          "keyName": "smartcache:metrics:queries:mean",
           "query": "",
           "refId": "A",
           "type": "timeSeries"
@@ -246,7 +246,7 @@
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "keyName": "sidecar:metrics:cache:gets:count",
+          "keyName": "smartcache:metrics:cache:gets:count",
           "query": "",
           "refId": "A",
           "type": "timeSeries"

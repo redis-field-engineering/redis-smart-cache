@@ -7,9 +7,9 @@ on:
 jobs:
   earlyaccess:
     name: 'Benchmark'
-    if: github.repository == 'redis-field-engineering/redis-sidecar' && startsWith(github.event.head_commit.message, 'Releasing version') != true
+    if: github.repository == 'redis-field-engineering/redis-smart-cache' && startsWith(github.event.head_commit.message, 'Releasing version') != true
     uses: redis-field-engineering/redis-github-workflows/.github/workflows/benchmark.yml@main
     with:
-      jmh-results-path: core/redis-sidecar-test/build/results/jmh/results.txt
+      jmh-results-path: core/redis-smart-cache-test/build/results/jmh/results.txt
     secrets:
       github-token: ${{ secrets.GIT_ACCESS_TOKEN }}

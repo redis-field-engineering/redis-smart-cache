@@ -7,6 +7,7 @@
 :product-name:    Redis Smart Cache
 :artifact-id:     redis-smart-cache-jdbc
 :codecov-token:   y0NMn7uIJ0
+:property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
 :icons:           font
 
@@ -131,7 +132,7 @@ The next step is to configure {product-name}, as described below.
 
 First, ensure that your application is using {product-name} as its JDBC driver:
 
-`com.redis.sidecar.SidecarDriver`
+`com.redis.smartcache.Driver`
 
 Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:` for example:
 ----
@@ -209,14 +210,14 @@ Allowed values are defined on a property-by-property basis, refer to the specifi
 
 ==== Backend database
 
-===== `sidecar.driver.class-name`
+===== `{property-prefix}.driver.class-name`
 
 * Type: `string`
 * *Required*
 
 Class name of the backend database JDBC driver, for example `oracle.jdbc.OracleDriver`.
 
-===== `sidecar.driver.url`
+===== `{property-prefix}.driver.url`
 
 * Type: `string`
 * *Required*
@@ -232,21 +233,21 @@ These will be passed to the backend JDBC driver as is.
 
 To further configure how {product-name} connects to Redis, set the following properties:
 
-===== `sidecar.redis.cluster`
+===== `{property-prefix}.redis.cluster`
 
 * Type: `boolean`
 * Default value: `false`
 
 Connect to a Redis Cluster.
 
-===== `sidecar.redis.tls`
+===== `{property-prefix}.redis.tls`
 
 * Type: `boolean`
 * Default value: `false`
 
 Establish a secure TLS connection.
 
-===== `sidecar.redis.tls-verify`
+===== `{property-prefix}.redis.tls-verify`
 
 * Type: `string`
 * Allowed values: `NONE`, `CA`, `FULL`
@@ -257,7 +258,7 @@ When set to `NONE`, no verification is performed.
 In `CA` mode the Certificate Authority and certificate are verified but not that the hostname matches.
 Use `FULL` mode for full certificate verification.
 
-===== `sidecar.redis.username`
+===== `{property-prefix}.redis.username`
 
 * Type: `string`
 
@@ -265,28 +266,28 @@ Authenticate using the provided username.
 Overrides username in Redis URI.
 Requires password.
 
-===== `sidecar.redis.password`
+===== `{property-prefix}.redis.password`
 
 * Type: `string`
 
 Authenticate using the provided password.
 Overrides password in Redis URI.
 
-===== `sidecar.redis.keyspace`
+===== `{property-prefix}.redis.keyspace`
 
 * Type: `string`
-* Default value: `sidecar`
+* Default value: `{property-prefix}`
 
 Prefix for all Redis keys used by {product-name}, such as cache entries, configuration, and metrics.
 
-===== `sidecar.redis.key-separator`
+===== `{property-prefix}.redis.key-separator`
 
 * Type: `string`
 * Default value: `:`
 
 Delimiter to use between key elements.
 
-===== `sidecar.redis.pool.size`
+===== `{property-prefix}.redis.pool.size`
 
 * Type: `integer`
 * Default value: `8`
@@ -294,7 +295,7 @@ Delimiter to use between key elements.
 Maximum number of connections that can be allocated by the pool at a given time.
 Use a negative value for no limit.
 
-===== `sidecar.redis.codec-buffer-size`
+===== `{property-prefix}.redis.codec-buffer-size`
 
 * Type: `data size`
 * Default value: `10MB`
@@ -303,7 +304,7 @@ Maximum capacity of the buffer used to encode a result set.
  
 ==== Additional components
 
-===== `sidecar.metrics-step`
+===== `{property-prefix}.metrics-step`
 
 * Type: `duration`
 * Default value: `60s`
@@ -311,7 +312,7 @@ Maximum capacity of the buffer used to encode a result set.
 Metrics publishing interval.
 
 [[config_step]]
-===== `sidecar.config-step`
+===== `{property-prefix}.config-step`
 
 * Type: `duration`
 * Default value: `10s`
@@ -320,7 +321,7 @@ Rule config refresh interval.
 
 === Rules
 {product-name} uses rules to determine how SQL queries are cached.
-Rule configuration is stored in a Redis JSON document located at the key `sidecar:config` and can be modified at runtime.
+Rule configuration is stored in a Redis JSON document located at the key `{property-prefix}:config` and can be modified at runtime.
 {product-name} will dynamically update to reflect changes made to the JSON document (see <<config_step>> above to change the refresh rate). 
 
 Here is the default rule configuration:
