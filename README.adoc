@@ -91,7 +91,7 @@ image::{grafana-dir}/redis-datasource.png[Redis Datasource,width=600]
 
 Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
-image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=300]
+image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=200]
 
 Next, click `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
 
@@ -99,7 +99,7 @@ At the bottom of the page, select the Redis datasource that you just created and
 
 You should see the following dashboard:
 
-image::{grafana-dir}/dashboard.png[Dashboard,width=600]
+image::{grafana-dir}/dashboard.png[Dashboard,width=800]
 
 After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
 
@@ -133,76 +133,190 @@ First, ensure that your application is using {product-name} as its JDBC driver:
 
 `com.redis.sidecar.SidecarDriver`
 
-Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:`.
-For example `jdbc:redis://cache.redis.cloud:6379`
+Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:` for example:
+----
+jdbc:redis://cache.redis.cloud:6379
+----
 
 See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax] for all of the possible URI parameters you can use here.
 
-Next step is providing bootstrap configuration. 
+Next step is providing bootstrap configuration.
 
 === Bootstrap Configuration
 
-Bootstrap configuration contains the information {product-name} needs to connect to Redis and the backend database and is specified using the following JDBC properties:
+Bootstrap configuration contains the information necessary to connect to Redis and the backend database and is specified using JDBC properties.
+
+==== Property value types
+
+{product-name} JDBC properties support different value types.
+
+===== `boolean`
+
+The properties of type boolean support two values, `true` or `false`.
+
+===== `data size`
+
+The properties of type data size support values that describe an amount of data, measured in byte-based units.
+These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
+For example, the value `6MB` describes six megabytes.
+
+The data size type supports the following units:
+
+* B: Bytes
+* kB: Kilobytes
+* MB: Megabytes
+* GB: Gigabytes
+
+===== `double`
+
+The properties of type double support numerical values including decimals, such as `1.6`.
+Double type values can be negative, if supported by the specific property.
+
+===== `duration`
+
+The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
+For example, the value `7m` describes seven minutes.
+
+The duration type supports the following units:
+
+* ns: Nanoseconds
+* us: Microseconds
+* ms: Milliseconds
+* s: Seconds
+* m: Minutes
+* h: Hours
+* d: Days
+
+A duration of 0 is treated as zero regardless of the unit that follows.
+For example, 0s and 0m both mean the same thing.
+
+Properties of type duration also support decimal values, such as `2.25d`.
+These are handled as a fractional value of the specified unit.
+For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
+
+===== `integer`
+
+The properties of type integer support whole numeric values, such as `5` and `1000`.
+Negative values are supported as well, for example `-7`.
+Integer type values must be whole numbers, decimal values such as 2.5 are not supported.
+
+Some integer type properties enforce their own minimum and maximum values.
+
+===== `string`
+
+The properties of type string support a set of values that consist of a sequence of characters.
+Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
 
 ==== Backend database
 
 ===== `sidecar.driver.class-name`
-Class name of the backend database JDBC driver (*required*)
+
+* Type: `string`
+* *Required*
+
+Class name of the backend database JDBC driver, for example `oracle.jdbc.OracleDriver`.
 
 ===== `sidecar.driver.url`
-JDBC URL for the backend database (*required*). You can also include any property your backend JDBC driver requires, like `username` or `password`. These will be passed to the backend JDBC driver as is.
+
+* Type: `string`
+* *Required*
+
+JDBC URL for the backend database, for example `jdbc:oracle:thin:@myhost:1521:orcl`.
+
+===== Additional properties
+
+You can also include any property your backend JDBC driver requires, like `username` or `password`.
+These will be passed to the backend JDBC driver as is.
 
 ==== Redis
+
 To further configure how {product-name} connects to Redis, set the following properties:
 
 ===== `sidecar.redis.cluster`
-Set to `true` for Redis Cluster connections (default: `false`).
+
+* Type: `boolean`
+* Default value: `false`
+
+Connect to a Redis Cluster.
 
 ===== `sidecar.redis.tls`
+
+* Type: `boolean`
+* Default value: `false`
+
 Establish a secure TLS connection.
 
 ===== `sidecar.redis.tls-verify`
-TLS verification mode: `NONE` (default) no verification at all, `CA` verify the CA and certificate without verifying that the hostname matches, `FULL` full certificate verification.
+
+* Type: `string`
+* Allowed values: `NONE`, `CA`, `FULL`
+* Default value: `NONE`
+
+TLS verification mode.
+When set to `NONE`, no verification is performed.
+In `CA` mode the Certificate Authority and certificate are verified but not that the hostname matches.
+Use `FULL` mode for full certificate verification.
 
 ===== `sidecar.redis.username`
-Authenticate using the provided username. Overrides username in Redis URI. Requires password.
+
+* Type: `string`
+
+Authenticate using the provided username.
+Overrides username in Redis URI.
+Requires password.
 
 ===== `sidecar.redis.password`
-Authenticate using the provided password. Overrides password in Redis URI.
+
+* Type: `string`
+
+Authenticate using the provided password.
+Overrides password in Redis URI.
 
 ===== `sidecar.redis.keyspace`
-Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics. (default: `sidecar`)
+
+* Type: `string`
+* Default value: `sidecar`
+
+Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics.
 
 ===== `sidecar.redis.key-separator`
-Delimiter to use between key elements (default: `:`).
 
-===== `sidecar.redis.pool.max-active`
-Maximum number of connections that can be allocated by the pool at a given time (default: `8`). Use a negative value for no limit.
+* Type: `string`
+* Default value: `:`
 
-===== `sidecar.redis.pool.max-idle`
-Maximum number of "idle" connections in the pool (default: `8`). Use a negative value to indicate an unlimited number of idle connections.
+Delimiter to use between key elements.
 
-===== `sidecar.redis.pool.min-idle`
-Target for the minimum number of idle connections to maintain in the pool (default: `0`). This setting only has an effect if both it and time between eviction runs are positive.
+===== `sidecar.redis.pool.size`
 
-===== `sidecar.redis.pool.max-wait`
-Maximum amount of time in milliseconds a connection allocation should block before throwing an exception when the pool is exhausted (default: `-1`). Use a negative value to block indefinitely.
+* Type: `integer`
+* Default value: `8`
 
-===== `sidecar.redis.pool.time-between-eviction-runs`
-Time in milliseconds between runs of the idle object evictor thread (default: `-1`).
-When positive, the idle object evictor thread starts; otherwise no idle object eviction is performed.
+Maximum number of connections that can be allocated by the pool at a given time.
+Use a negative value for no limit.
 
 ===== `sidecar.redis.codec-buffer-size`
-Maximum capacity, in MB, of the buffer used to encode a result set (default: `100`).
 
+* Type: `data size`
+* Default value: `10MB`
+
+Maximum capacity of the buffer used to encode a result set.
+ 
 ==== Additional components
 
 ===== `sidecar.metrics-step`
-Metrics publishing interval in seconds (default: `60`)
+
+* Type: `duration`
+* Default value: `60s`
+
+Metrics publishing interval.
 
 [[config_step]]
 ===== `sidecar.config-step`
-Rule config refresh interval in seconds (default: `10`)
+
+* Type: `duration`
+* Default value: `10s`
+
+Rule config refresh interval.
 
 === Rules
 {product-name} uses rules to determine how SQL queries are cached.
@@ -225,33 +339,34 @@ Here is the default rule configuration:
 }
 ----
 
-Rules are processed in order and consist of *criteria* (conditions) and *actions* (results). Only the first rule with matching criteria will be considered, and its action applied.
+This default configuration contains a single passthrough rule where all SQL query results will be assigned a TTL of 3600 seconds.
+
+Rules are processed in order and consist of *criteria* (conditions) and *actions* (results).
+Only the first rule with matching criteria will be considered, and its action applied.
 
 ==== Criteria
 
-===== `tables`
-Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
+`tables`:: Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
 
-==== `tablesAny`
-Triggers if any of the given tables shows up in the SQL query.
+`tablesAny`:: Triggers if any of the given tables shows up in the SQL query.
 
-==== `tablesAll`
-Triggers if all the given tables show up in the SQL query.
+`tablesAll`:: Triggers if all the given tables show up in the SQL query.
 
-==== `regex`
-Triggers if regular expression matches the SQL query.
+`regex`:: Triggers if regular expression matches the SQL query.
 
 ==== Action
 
-===== `ttl`
-Sets the time-to-live (in seconds) for the corresponding cache entry (default: `3600`).
-Use `0` for no caching, `-1` for no expiration.
+`ttl`:: Sets the time-to-live (in seconds) for the corresponding cache entry (default: `3600`).
+[horizontal]
+`0`:::: No caching
+`-1`:::: No expiration
 
 ==== Examples
 
 ===== `SELECT * FROM customer, product, order` 
-[cols="6a,^1"]
+[cols="6a,^1",options="header"]
 |==========================
+|Criteria|Match
 |
 [source,json]
 ----
