@@ -19,14 +19,12 @@ public class NonRegisteringDriver implements Driver {
 
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
+	private static final String PROPERTY_DRIVER_PREFIX = PropsMapper.PROPERTY_PREFIX + ".driver";
 
 	private static final Map<String, Driver> drivers = new HashMap<>();
-
-	private static final String PROPERTY_DRIVER_PREFIX = PropertiesMapper.PROPERTY_PREFIX + ".driver";
-
 	private static final Map<ContextId, ConnectionContext> contexts = new HashMap<>();
 
-	private final PropertiesMapper propsMapper = new PropertiesMapper();
+	private final PropsMapper propsMapper = new PropsMapper();
 
 	public NonRegisteringDriver() {
 		// Needed for Class.forName().newInstance()

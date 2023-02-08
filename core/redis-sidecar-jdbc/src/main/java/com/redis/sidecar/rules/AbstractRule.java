@@ -1,20 +1,30 @@
 package com.redis.sidecar.rules;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 
-import com.redis.sidecar.SidecarStatement;
+public abstract class AbstractRule<L, R> implements Rule<L, R> {
 
-public abstract class AbstractRule implements Rule {
+	private final Consumer<R> action;
+	private final Function<L, Control> control;
 
-	private final Consumer<SidecarStatement> action;
+	protected AbstractRule(Consumer<R> action) {
+		this(action, l -> Control.STOP);
+	}
 
-	protected AbstractRule(Consumer<SidecarStatement> statementConsumer) {
-		this.action = statementConsumer;
+	protected AbstractRule(Consumer<R> action, Function<L, Control> control) {
+		this.action = action;
+		this.control = control;
 	}
 
 	@Override
-	public void execute(SidecarStatement statement) {
-		this.action.accept(statement);
+	public Consumer<R> getAction() {
+		return action;
+	}
+
+	@Override
+	public Function<L, Control> getControl() {
+		return control;
 	}
 
 }

@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.sql.SQLException;
 
 import javax.sql.rowset.CachedRowSet;
-import javax.sql.rowset.RowSetFactory;
 
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Param;
@@ -27,7 +26,6 @@ public class CodecExecutionPlan {
 	@Param({ "10", "100", "1000" })
 	private int rows;
 
-	private RowSetFactory rowSetFactory;
 	private ResultSetCodec codec;
 	private SerializedResultSetCodec serializedCodec;
 	private ByteBuffer byteBuffer;
@@ -35,10 +33,9 @@ public class CodecExecutionPlan {
 	private CachedRowSet rowSet;
 
 	@Setup(Level.Trial)
-	public void setUpTrial() throws SQLException {
-		this.rowSetFactory = new SidecarRowSetFactory();
+	public void setUpTrial() {
 		this.codec = ResultSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
-		this.serializedCodec = new SerializedResultSetCodec(rowSetFactory, BYTE_BUFFER_CAPACITY);
+		this.serializedCodec = new SerializedResultSetCodec(new SidecarRowSetFactory(), BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)

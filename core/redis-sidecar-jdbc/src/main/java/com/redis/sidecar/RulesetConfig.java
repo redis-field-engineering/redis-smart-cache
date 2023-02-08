@@ -2,17 +2,22 @@ package com.redis.sidecar;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
-import io.lettuce.core.internal.LettuceAssert;
+public class RulesetConfig {
 
-public class RulesConfig {
+	public static final String PROPERTY_RULESET = "ruleset";
 
-	public static final String PROPERTY_RULES = "rules";
+	private List<RuleConfig> rules;
 
-	private List<RuleConfig> rules = Arrays.asList(RuleConfig.builder().build());
+	public RulesetConfig() {
+		this(RuleConfig.passthrough().build());
+	}
+
+	public RulesetConfig(RuleConfig... rules) {
+		this.rules = Arrays.asList(rules);
+	}
 
 	private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
@@ -31,23 +36,25 @@ public class RulesConfig {
 	}
 
 	public void setRules(List<RuleConfig> rules) {
-		support.firePropertyChange(PROPERTY_RULES, this.rules, rules);
+		support.firePropertyChange(PROPERTY_RULESET, this.rules, rules);
 		this.rules = rules;
+	}
+
+	public static RulesetConfig of(RuleConfig... rules) {
+		return new RulesetConfig(rules);
 	}
 
 	public static class RuleConfig {
 
-		public static final long TTL_NO_CACHE = 0;
-		public static final long TTL_NO_EXPIRATION = -1;
-		public static final Duration DEFAULT_TTL = Duration.ofHours(1);
+		public static final long DEFAULT_TTL = 3600;
 
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
-		private List<String> tables;
-		private List<String> tablesAny;
-		private List<String> tablesAll;
+		private String[] tables;
+		private String[] tablesAny;
+		private String[] tablesAll;
 		private String regex;
-		private long ttl = DEFAULT_TTL.toSeconds();
+		private long ttl = DEFAULT_TTL;
 
 		public RuleConfig() {
 		}
@@ -57,7 +64,7 @@ public class RulesConfig {
 			this.tablesAny = builder.tablesAny;
 			this.tablesAll = builder.tablesAll;
 			this.regex = builder.regex;
-			this.ttl = builder.ttl.toSeconds();
+			this.ttl = builder.ttl;
 		}
 
 		public void addPropertyChangeListener(PropertyChangeListener listener) {
@@ -77,29 +84,29 @@ public class RulesConfig {
 			this.regex = regex;
 		}
 
-		public List<String> getTables() {
+		public String[] getTables() {
 			return tables;
 		}
 
-		public void setTables(List<String> tables) {
+		public void setTables(String... tables) {
 			support.firePropertyChange("tables", this.tables, tables);
 			this.tables = tables;
 		}
 
-		public List<String> getTablesAny() {
+		public String[] getTablesAny() {
 			return tablesAny;
 		}
 
-		public void setTablesAny(List<String> tablesAny) {
+		public void setTablesAny(String... tablesAny) {
 			support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
 			this.tablesAny = tablesAny;
 		}
 
-		public List<String> getTablesAll() {
+		public String[] getTablesAll() {
 			return tablesAll;
 		}
 
-		public void setTablesAll(List<String> tablesAll) {
+		public void setTablesAll(String... tablesAll) {
 			support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
 			this.tablesAll = tablesAll;
 		}
@@ -124,44 +131,46 @@ public class RulesConfig {
 					+ regex + ", ttl=" + ttl + "]";
 		}
 
-		public static Builder builder() {
+		public static Builder tables(String... tables) {
+			Builder builder = new Builder();
+			builder.tables = tables;
+			return builder;
+		}
+
+		public static Builder tablesAny(String... tables) {
+			Builder builder = new Builder();
+			builder.tablesAny = tables;
+			return builder;
+		}
+
+		public static Builder tablesAll(String... tables) {
+			Builder builder = new Builder();
+			builder.tablesAll = tables;
+			return builder;
+		}
+
+		public static Builder regex(String regex) {
+			Builder builder = new Builder();
+			builder.regex = regex;
+			return builder;
+		}
+
+		public static Builder passthrough() {
 			return new Builder();
 		}
 
 		public static final class Builder {
 
-			private List<String> tables;
-			private List<String> tablesAny;
-			private List<String> tablesAll;
+			private String[] tables;
+			private String[] tablesAny;
+			private String[] tablesAll;
 			private String regex;
-			private Duration ttl = DEFAULT_TTL;
+			private long ttl = DEFAULT_TTL;
 
 			private Builder() {
 			}
 
-			public Builder tables(List<String> tables) {
-				this.tables = tables;
-				return this;
-			}
-
-			public Builder tablesAny(List<String> tablesAny) {
-				this.tablesAny = tablesAny;
-				return this;
-			}
-
-			public Builder tablesAll(List<String> tablesAll) {
-				this.tablesAll = tablesAll;
-				return this;
-			}
-
-			public Builder regex(String regex) {
-				this.regex = regex;
-				return this;
-			}
-
-			public Builder ttl(Duration ttl) {
-				LettuceAssert.notNull(ttl, "TTL must not be null");
-				LettuceAssert.isTrue(!ttl.isNegative(), "TTL must be zero or greater");
+			public Builder ttl(long ttl) {
 				this.ttl = ttl;
 				return this;
 			}

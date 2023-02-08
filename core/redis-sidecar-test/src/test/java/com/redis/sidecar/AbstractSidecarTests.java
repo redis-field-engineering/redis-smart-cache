@@ -37,7 +37,7 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 
 	private final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
-	private final PropertiesMapper propsMapper = new PropertiesMapper();
+	private final PropsMapper propsMapper = new PropsMapper();
 
 	private SidecarDriver sidecarDriver;
 	private Duration testTimeout = Duration.ofHours(1);
@@ -80,11 +80,11 @@ public abstract class AbstractSidecarTests extends AbstractTestcontainersRedisTe
 	protected Connection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException, IOException {
 		BootstrapConfig config = new BootstrapConfig();
-		config.getRedis().setCodecBufferSize(BUFFER_SIZE);
+		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
 		config.getRedis().setCluster(redis.isCluster());
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
-		config.setConfigStep(3600);
+		config.setConfigStep(Duration.ofHours(1));
 		Properties info = propsMapper.write(config);
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());

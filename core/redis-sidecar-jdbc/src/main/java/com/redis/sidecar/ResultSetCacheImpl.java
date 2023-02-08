@@ -10,7 +10,6 @@ import java.util.zip.CRC32;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.sidecar.RulesConfig.RuleConfig;
 
 import io.lettuce.core.internal.LettuceAssert;
 import io.micrometer.core.instrument.Counter;
@@ -80,9 +79,6 @@ public class ResultSetCacheImpl implements ResultSetCache {
 
 	@Override
 	public void put(String sql, long ttl, ResultSet resultSet) {
-		if (ttl == RuleConfig.TTL_NO_CACHE) {
-			return;
-		}
 		String key = key(sql);
 		try {
 			putTimer.recordCallable(() -> doPut(key, ttl, resultSet));

@@ -22,9 +22,9 @@ import io.netty.buffer.Unpooled;
 
 public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 
-	public static final int DEFAULT_BYTE_BUFFER_CAPACITY = 10000000; // 10 MB
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 	public static final String EMPTY_STRING = "";
+	public static final int DEFAULT_BYTE_BUFFER_CAPACITY = 10000000;
 
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
@@ -232,8 +232,8 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		private final RowSetFactory rowSetFactory = new SidecarRowSetFactory();
 		private int maxByteBufferCapacity = DEFAULT_BYTE_BUFFER_CAPACITY;
 
-		public Builder maxByteBufferCapacity(int capacity) {
-			this.maxByteBufferCapacity = capacity;
+		public Builder maxByteBufferCapacity(int size) {
+			this.maxByteBufferCapacity = size;
 			return this;
 		}
 

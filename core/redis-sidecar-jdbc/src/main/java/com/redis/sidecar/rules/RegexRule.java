@@ -2,29 +2,26 @@ package com.redis.sidecar.rules;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import com.redis.sidecar.SidecarStatement;
+public class RegexRule<L, R> extends AbstractRule<L, R> {
 
-public class RegexRule extends AbstractRule {
+	private final Predicate<L> condition;
 
-	private final Function<SidecarStatement, String> stringExtractor;
-	private final Pattern pattern;
-
-	public RegexRule(Pattern pattern, Function<SidecarStatement, String> stringExtractor,
-			Consumer<SidecarStatement> action) {
-		super(action);
-		this.stringExtractor = stringExtractor;
-		this.pattern = pattern;
+	public RegexRule(Pattern pattern, Function<L, String> stringExtractor, Consumer<R> action) {
+		this(pattern, stringExtractor, action, Rule.stop());
 	}
 
-	public Pattern getPattern() {
-		return pattern;
+	public RegexRule(Pattern pattern, Function<L, String> stringExtractor, Consumer<R> action,
+			Function<L, Control> control) {
+		super(action, control);
+		this.condition = f -> pattern.matcher(stringExtractor.apply(f)).matches();
 	}
 
 	@Override
-	public boolean evaluate(SidecarStatement facts) {
-		return pattern.matcher(stringExtractor.apply(facts)).matches();
+	public Predicate<L> getCondition() {
+		return condition;
 	}
 
 }

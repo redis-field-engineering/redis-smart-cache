@@ -1,22 +1,25 @@
 package com.redis.sidecar.rules;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
-import com.redis.sidecar.SidecarStatement;
+public class PredicateRule<L, R> extends AbstractRule<L, R> {
 
-public class PredicateRule extends AbstractRule {
+	private final Predicate<L> predicate;
 
-	private final Predicate<SidecarStatement> predicate;
+	public PredicateRule(Predicate<L> predicate, Consumer<R> action) {
+		this(predicate, action, Rule.stop());
+	}
 
-	public PredicateRule(Predicate<SidecarStatement> predicate, Consumer<SidecarStatement> action) {
-		super(action);
+	public PredicateRule(Predicate<L> predicate, Consumer<R> action, Function<L, Control> control) {
+		super(action, control);
 		this.predicate = predicate;
 	}
 
 	@Override
-	public boolean evaluate(SidecarStatement statement) {
-		return predicate.test(statement);
+	public Predicate<L> getCondition() {
+		return predicate;
 	}
 
 }

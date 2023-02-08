@@ -5,29 +5,54 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 import javax.sql.rowset.CachedRowSet;
 
-import com.redis.sidecar.RulesConfig.RuleConfig;
-
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 public class SidecarStatement implements Statement {
 
 	private static final String QUERY_TIMER_ID = "queries";
 	private static final String PARAMETER_SEPARATOR = ":";
+	public static final long TTL_NO_CACHE = 0;
+	public static final long TTL_NO_EXPIRATION = -1;
 
 	private final SidecarConnection connection;
 	protected final Statement statement;
 	private final Timer queryTimer;
-
+	private long ttl = TTL_NO_CACHE;
 	private String sql;
-	private Optional<ResultSet> resultSet = Optional.empty();
-	private long ttl = RuleConfig.TTL_NO_CACHE;
 	private Set<String> tableNames;
+	private Optional<ResultSet> resultSet = Optional.empty();
+
+	public Set<String> getTableNames() {
+		if (tableNames == null) {
+			tableNames = connection.getSqlParser().extractTableNames(sql);
+		}
+		return tableNames;
+	}
+
+	public void setSql(String sql) {
+		this.sql = sql;
+	}
+
+	public void setTableNames(String... tableNames) {
+		setTableNames(new HashSet<>(Arrays.asList(tableNames)));
+	}
+
+	public void setTableNames(Set<String> tableNames) {
+		this.tableNames = tableNames;
+	}
+
+	public SidecarStatement(SidecarConnection connection, Statement statement) {
+		this(connection, statement, new SimpleMeterRegistry());
+	}
 
 	public SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry) {
 		this.connection = connection;
@@ -38,19 +63,19 @@ public class SidecarStatement implements Statement {
 	protected SidecarStatement(SidecarConnection connection, Statement statement, MeterRegistry meterRegistry,
 			String sql) {
 		this(connection, statement, meterRegistry);
-		this.sql = sql;
+		setSql(sql);
 	}
 
-	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
-		return stringBuilder.append(PARAMETER_SEPARATOR).append(parameter);
-	}
-
-	public void setTtl(long ttl) {
-		this.ttl = ttl;
+	public long getTtl() {
+		return ttl;
 	}
 
 	public String getSql() {
 		return sql;
+	}
+
+	protected final StringBuilder appendParameter(StringBuilder stringBuilder, String parameter) {
+		return stringBuilder.append(PARAMETER_SEPARATOR).append(parameter);
 	}
 
 	@Override
@@ -69,7 +94,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected boolean execute(String sql, Executable executable) throws SQLException {
-		this.sql = sql;
+		setSql(sql);
 		return execute(executable);
 	}
 
@@ -99,7 +124,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	protected ResultSet executeQuery(String sql, QueryExecutable executable) throws SQLException {
-		this.sql = sql;
+		setSql(sql);
 		return executeQuery(executable);
 	}
 
@@ -135,7 +160,7 @@ public class SidecarStatement implements Statement {
 	}
 
 	private boolean isCachingEnabled() {
-		return ttl != RuleConfig.TTL_NO_CACHE;
+		return ttl != TTL_NO_CACHE;
 	}
 
 	protected String key() {
@@ -145,7 +170,7 @@ public class SidecarStatement implements Statement {
 	private Optional<ResultSet> getCachedResultSet() {
 		connection.evaluateRules(this);
 		if (isCachingEnabled()) {
-			resultSet = connection.getCache().get(key());
+			this.resultSet = connection.getCache().get(key());
 			return resultSet;
 		}
 		return Optional.empty();
@@ -370,12 +395,8 @@ public class SidecarStatement implements Statement {
 		return statement.isCloseOnCompletion();
 	}
 
-	public Set<String> getTableNames() {
-		if (tableNames == null) {
-			tableNames = connection.getSqlParser().extractTableNames(sql);
-		}
-		return tableNames;
-
+	public void setTtl(long ttl) {
+		this.ttl = ttl;
 	}
 
 }

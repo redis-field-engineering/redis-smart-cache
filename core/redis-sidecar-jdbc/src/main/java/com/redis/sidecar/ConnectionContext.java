@@ -1,7 +1,6 @@
 package com.redis.sidecar;
 
 import java.sql.ResultSet;
-import java.time.Duration;
 import java.util.function.Supplier;
 
 import javax.sql.rowset.RowSetFactory;
@@ -15,12 +14,11 @@ import com.redis.lettucemod.cluster.RedisModulesClusterClient;
 import com.redis.lettucemod.util.ClientBuilder;
 import com.redis.lettucemod.util.RedisURIBuilder;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
-import com.redis.sidecar.BootstrapConfig.PoolConfig;
 import com.redis.sidecar.BootstrapConfig.RedisConfig;
 import com.redis.sidecar.codec.ResultSetCodec;
 import com.redis.sidecar.rowset.SidecarRowSetFactory;
-import com.redis.sidecar.rules.RuleSession;
 
+import io.airlift.units.DataSize;
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.codec.RedisCodec;
@@ -33,8 +31,8 @@ public class ConnectionContext {
 
 	private final BootstrapConfig bootstrapConfig;
 	private AbstractRedisClient redisClient;
-	private ConfigManager<RulesConfig> configManager;
-	private RuleSession ruleSession;
+	private ConfigManager<RulesetConfig> configManager;
+	private StatementRuleSession ruleSession;
 	private GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> connectionPool;
 	private MeterRegistry meterRegistry;
 	private ResultSetCache cache;
@@ -48,12 +46,11 @@ public class ConnectionContext {
 		return bootstrapConfig;
 	}
 
-	public ConfigManager<RulesConfig> getConfigManager() {
+	public ConfigManager<RulesetConfig> getConfigManager() {
 		synchronized (bootstrapConfig) {
 			if (configManager == null) {
 				StatefulRedisModulesConnection<String, String> connection = connectionSupplier(StringCodec.UTF8).get();
-				Duration refreshRate = Duration.ofSeconds(bootstrapConfig.getConfigStep());
-				configManager = new ConfigManager<>(connection, refreshRate);
+				configManager = new ConfigManager<>(connection, bootstrapConfig.getConfigStep());
 			}
 		}
 		return configManager;
@@ -82,23 +79,15 @@ public class ConnectionContext {
 	public GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> getConnectionPool() {
 		synchronized (bootstrapConfig) {
 			if (connectionPool == null) {
-				int bufferSize = bootstrapConfig.getRedis().getCodecBufferSize();
-				ResultSetCodec codec = ResultSetCodec.builder().maxByteBufferCapacity(bufferSize).build();
-				connectionPool = ConnectionPoolSupport.createGenericObjectPool(connectionSupplier(codec), poolConfig());
+				DataSize bufferSize = bootstrapConfig.getRedis().getCodecBufferSize();
+				ResultSetCodec codec = ResultSetCodec.builder()
+						.maxByteBufferCapacity(Math.toIntExact(bufferSize.toBytes())).build();
+				GenericObjectPoolConfig<StatefulRedisModulesConnection<String, ResultSet>> poolConfig = new GenericObjectPoolConfig<>();
+				poolConfig.setMaxTotal(bootstrapConfig.getRedis().getPoolSize());
+				connectionPool = ConnectionPoolSupport.createGenericObjectPool(connectionSupplier(codec), poolConfig);
 			}
 		}
 		return connectionPool;
-	}
-
-	private <K, V> GenericObjectPoolConfig<StatefulRedisModulesConnection<K, V>> poolConfig() {
-		PoolConfig pool = bootstrapConfig.getRedis().getPool();
-		GenericObjectPoolConfig<StatefulRedisModulesConnection<K, V>> config = new GenericObjectPoolConfig<>();
-		config.setMaxTotal(pool.getMaxActive());
-		config.setMaxIdle(pool.getMaxIdle());
-		config.setMinIdle(pool.getMinIdle());
-		config.setTimeBetweenEvictionRuns(Duration.ofMillis(pool.getTimeBetweenEvictionRuns()));
-		config.setMaxWait(Duration.ofMillis(pool.getMaxWait()));
-		return config;
 	}
 
 	private <K, V> Supplier<StatefulRedisModulesConnection<K, V>> connectionSupplier(RedisCodec<K, V> codec) {
@@ -109,11 +98,11 @@ public class ConnectionContext {
 		return () -> ((RedisModulesClient) client).connect(codec);
 	}
 
-	public RuleSession getRuleSession() {
+	public StatementRuleSession getRuleSession() {
 		synchronized (bootstrapConfig) {
 			if (ruleSession == null) {
-				ruleSession = new RuleSession();
-				RulesConfig rulesConfig = new RulesConfig();
+				ruleSession = new StatementRuleSession();
+				RulesetConfig rulesConfig = new RulesetConfig();
 				ruleSession.updateRules(rulesConfig.getRules());
 				rulesConfig.addPropertyChangeListener(ruleSession);
 				getConfigManager().register(bootstrapConfig.key("config"), rulesConfig);

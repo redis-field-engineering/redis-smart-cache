@@ -4,11 +4,14 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
 
+import org.awaitility.Awaitility;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 
 import com.redis.testcontainers.RedisServer;
@@ -42,6 +45,22 @@ class SidecarDriverTests extends AbstractTestcontainersRedisTestBase {
 		Assert.assertEquals(2, infos.length);
 		Assert.assertEquals("sidecar.driver.url", infos[0].name);
 		Assert.assertEquals("sidecar.driver.class-name", infos[1].name);
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void configUpdated(RedisTestContext redis) throws Exception {
+		try (ConfigManager<RulesetConfig> configManager = new ConfigManager<>(redis.getConnection(),
+				Duration.ofMillis(100))) {
+			String key = "testUpdate";
+			RulesetConfig config = new RulesetConfig();
+			configManager.register(key, config);
+			Assertions.assertNotNull(redis.sync().jsonGet(key));
+			long ttl = 123;
+			redis.sync().jsonSet(key, ".rules[0].ttl", String.valueOf(ttl));
+			Awaitility.await().timeout(Duration.ofMillis(300))
+					.until(() -> config.getRules().size() == 1 && config.getRules().get(0).getTtl() == ttl);
+		}
 	}
 
 }

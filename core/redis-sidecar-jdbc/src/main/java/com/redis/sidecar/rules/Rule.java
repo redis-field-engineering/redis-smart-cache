@@ -1,20 +1,23 @@
 package com.redis.sidecar.rules;
 
-import com.redis.sidecar.SidecarStatement;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
-public interface Rule {
+public interface Rule<L, R> {
 
-	/**
-	 * 
-	 * @param statement the statement needed for evaluating rule conditions
-	 * @return true if rule should be executed
-	 */
-	boolean evaluate(SidecarStatement statement);
+	public enum Control {
+		STOP, CONTINUE
+	}
 
-	/**
-	 * 
-	 * @param statement executes the rule by modifying the given statement
-	 */
-	void execute(SidecarStatement statement);
+	static <L> Function<L, Control> stop() {
+		return l -> Control.STOP;
+	}
+
+	Predicate<L> getCondition();
+
+	Consumer<R> getAction();
+
+	Function<L, Control> getControl();
 
 }

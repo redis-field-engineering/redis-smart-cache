@@ -21,7 +21,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import com.redis.sidecar.PropertiesMapper;
+import com.redis.sidecar.PropsMapper;
 import com.redis.sidecar.SidecarDriver;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -41,7 +41,7 @@ public class QueryExecutor implements AutoCloseable {
 	private final DataSourceProperties dataSourceProperties;
 	private final SidecarDemoConfig config;
 	private final List<QueryTask> tasks = new ArrayList<>();
-	private final PropertiesMapper propsMapper = new PropertiesMapper();
+	private final PropsMapper propsMapper = new PropsMapper();
 
 	private ProgressBar progressBar;
 

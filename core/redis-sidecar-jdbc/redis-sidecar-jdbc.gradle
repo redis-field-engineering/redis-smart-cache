@@ -3,8 +3,10 @@
     implementation 'org.apache.commons:commons-pool2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
     implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRtsVersion
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
+    api group: 'io.airlift', name: 'units', version: airliftVersion
     testImplementation 'org.slf4j:slf4j-simple'
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
 }

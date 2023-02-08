@@ -16,7 +16,7 @@ public class MeterRegistryConfig implements RedisTimeSeriesConfig {
 		this.uri = bootstrap.getRedis().getUri();
 		this.cluster = bootstrap.getRedis().isCluster();
 		this.keyspace = bootstrap.key("metrics");
-		this.step = Duration.ofSeconds(bootstrap.getMetricsStep());
+		this.step = bootstrap.getMetricsStep();
 	}
 
 	@Override

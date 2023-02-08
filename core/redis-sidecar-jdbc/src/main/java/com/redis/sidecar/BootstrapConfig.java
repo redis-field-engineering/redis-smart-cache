@@ -1,12 +1,11 @@
 package com.redis.sidecar;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Objects;
 
-import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
-import com.redis.sidecar.codec.ResultSetCodec;
-
+import io.airlift.units.DataSize;
+import io.airlift.units.DataSize.Unit;
 import io.lettuce.core.SslVerifyMode;
 
 public class BootstrapConfig {
@@ -15,55 +14,13 @@ public class BootstrapConfig {
 	public static final String DEFAULT_KEY_SEPARATOR = ":";
 	public static final Duration DEFAULT_CONFIG_STEP = Duration.ofSeconds(10);
 	public static final Duration DEFAULT_METRICS_STEP = Duration.ofSeconds(60);
+	public static final int DEFAULT_POOL_SIZE = 8;
+	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
 	private RedisConfig redis = new RedisConfig();
 	private DriverConfig driver = new DriverConfig();
-	private long configStep = DEFAULT_CONFIG_STEP.toSeconds();
-	private long metricsStep = DEFAULT_METRICS_STEP.toSeconds();
-
-	public String key(String id) {
-		return redis.key(id);
-	}
-
-	public RedisConfig getRedis() {
-		return redis;
-	}
-
-	public void setRedis(RedisConfig redis) {
-		this.redis = redis;
-	}
-
-	/**
-	 * 
-	 * @return metrics step duration in seconds
-	 */
-	public long getMetricsStep() {
-		return metricsStep;
-	}
-
-	public void setMetricsStep(long seconds) {
-		this.metricsStep = seconds;
-	}
-
-	/**
-	 * 
-	 * @return config refresh step duration in seconds
-	 */
-	public long getConfigStep() {
-		return configStep;
-	}
-
-	public void setConfigStep(long seconds) {
-		this.configStep = seconds;
-	}
-
-	public DriverConfig getDriver() {
-		return driver;
-	}
-
-	public void setDriver(DriverConfig driver) {
-		this.driver = driver;
-	}
+	private Duration configStep = DEFAULT_CONFIG_STEP;
+	private Duration metricsStep = DEFAULT_METRICS_STEP;
 
 	public static class RedisConfig {
 
@@ -75,8 +32,8 @@ public class BootstrapConfig {
 		private char[] password;
 		private String keyspace = DEFAULT_KEYSPACE;
 		private String keySeparator = DEFAULT_KEY_SEPARATOR;
-		private int codecBufferSize = ResultSetCodec.DEFAULT_BYTE_BUFFER_CAPACITY;
-		private PoolConfig pool = new PoolConfig();
+		private DataSize codecBufferSize = DEFAULT_BYTE_BUFFER_CAPACITY;
+		private int poolSize = DEFAULT_POOL_SIZE;
 
 		public String key(String id) {
 			return keyspace + keySeparator + id;
@@ -150,101 +107,50 @@ public class BootstrapConfig {
 		 * 
 		 * @return max byte buffer capacity in bytes
 		 */
-		public int getCodecBufferSize() {
+		public DataSize getCodecBufferSize() {
 			return codecBufferSize;
 		}
 
-		public void setCodecBufferSize(int sizeInBytes) {
-			this.codecBufferSize = sizeInBytes;
+		public void setCodecBufferSize(DataSize size) {
+			this.codecBufferSize = size;
 		}
 
-		public PoolConfig getPool() {
-			return pool;
+		public void setCodecBufferSizeInBytes(long size) {
+			this.codecBufferSize = DataSize.ofBytes(size);
 		}
 
-		public void setPool(PoolConfig pool) {
-			this.pool = pool;
-		}
-	}
-
-	public static class PoolConfig {
-
-		public static final int DEFAULT_MAX_IDLE = GenericObjectPoolConfig.DEFAULT_MAX_IDLE;
-		public static final int DEFAULT_MIN_IDLE = GenericObjectPoolConfig.DEFAULT_MIN_IDLE;
-		public static final int DEFAULT_MAX_TOTAL = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
-		public static final Duration DEFAULT_MAX_WAIT = BaseObjectPoolConfig.DEFAULT_MAX_WAIT;
-		public static final Duration DEFAULT_TIME_BETWEEN_EVICTION_RUNS = BaseObjectPoolConfig.DEFAULT_TIME_BETWEEN_EVICTION_RUNS;
-
-		/**
-		 * Maximum number of "idle" connections in the pool. Use a negative value to
-		 * indicate an unlimited number of idle connections.
-		 */
-		private int maxIdle = DEFAULT_MAX_IDLE;
-
-		/**
-		 * Target for the minimum number of idle connections to maintain in the pool.
-		 * This setting only has an effect if both it and time between eviction runs are
-		 * positive.
-		 */
-		private int minIdle = DEFAULT_MIN_IDLE;
-
-		/**
-		 * Maximum number of connections that can be allocated by the pool at a given
-		 * time. Use a negative value for no limit.
-		 */
-		private int maxActive = DEFAULT_MAX_TOTAL;
-
-		/**
-		 * Maximum amount of time a connection allocation should block before throwing
-		 * an exception when the pool is exhausted. Use a negative value to block
-		 * indefinitely.
-		 */
-		private long maxWait = DEFAULT_MAX_WAIT.toMillis();
-
-		/**
-		 * Time between runs of the idle object evictor thread. When positive, the idle
-		 * object evictor thread starts, otherwise no idle object eviction is performed.
-		 */
-		private long timeBetweenEvictionRuns = DEFAULT_TIME_BETWEEN_EVICTION_RUNS.toMillis();
-
-		public int getMaxIdle() {
-			return this.maxIdle;
+		public int getPoolSize() {
+			return poolSize;
 		}
 
-		public void setMaxIdle(int maxIdle) {
-			this.maxIdle = maxIdle;
+		public void setPoolSize(int poolSize) {
+			this.poolSize = poolSize;
 		}
 
-		public int getMinIdle() {
-			return this.minIdle;
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + Arrays.hashCode(password);
+			result = prime * result + Objects.hash(cluster, codecBufferSize, keySeparator, keyspace, poolSize, tls,
+					tlsVerify, uri, username);
+			return result;
 		}
 
-		public void setMinIdle(int minIdle) {
-			this.minIdle = minIdle;
-		}
-
-		public int getMaxActive() {
-			return this.maxActive;
-		}
-
-		public void setMaxActive(int maxActive) {
-			this.maxActive = maxActive;
-		}
-
-		public long getMaxWait() {
-			return this.maxWait;
-		}
-
-		public void setMaxWait(long maxWait) {
-			this.maxWait = maxWait;
-		}
-
-		public long getTimeBetweenEvictionRuns() {
-			return this.timeBetweenEvictionRuns;
-		}
-
-		public void setTimeBetweenEvictionRuns(long timeBetweenEvictionRuns) {
-			this.timeBetweenEvictionRuns = timeBetweenEvictionRuns;
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			RedisConfig other = (RedisConfig) obj;
+			return cluster == other.cluster && Objects.equals(codecBufferSize, other.codecBufferSize)
+					&& Objects.equals(keySeparator, other.keySeparator) && Objects.equals(keyspace, other.keyspace)
+					&& Arrays.equals(password, other.password) && poolSize == other.poolSize && tls == other.tls
+					&& tlsVerify == other.tlsVerify && Objects.equals(uri, other.uri)
+					&& Objects.equals(username, other.username);
 		}
 
 	}
@@ -270,6 +176,85 @@ public class BootstrapConfig {
 			this.url = url;
 		}
 
+		@Override
+		public int hashCode() {
+			return Objects.hash(className, url);
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			DriverConfig other = (DriverConfig) obj;
+			return Objects.equals(className, other.className) && Objects.equals(url, other.url);
+		}
+
+	}
+
+	public String key(String id) {
+		return redis.key(id);
+	}
+
+	public RedisConfig getRedis() {
+		return redis;
+	}
+
+	public void setRedis(RedisConfig redis) {
+		this.redis = redis;
+	}
+
+	/**
+	 * 
+	 * @return metrics step duration in seconds
+	 */
+	public Duration getMetricsStep() {
+		return metricsStep;
+	}
+
+	public void setMetricsStep(Duration seconds) {
+		this.metricsStep = seconds;
+	}
+
+	/**
+	 * 
+	 * @return config refresh step duration in seconds
+	 */
+	public Duration getConfigStep() {
+		return configStep;
+	}
+
+	public void setConfigStep(Duration seconds) {
+		this.configStep = seconds;
+	}
+
+	public DriverConfig getDriver() {
+		return driver;
+	}
+
+	public void setDriver(DriverConfig driver) {
+		this.driver = driver;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(configStep, driver, metricsStep, redis);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		BootstrapConfig other = (BootstrapConfig) obj;
+		return Objects.equals(configStep, other.configStep) && Objects.equals(driver, other.driver)
+				&& Objects.equals(metricsStep, other.metricsStep) && Objects.equals(redis, other.redis);
 	}
 
 }
