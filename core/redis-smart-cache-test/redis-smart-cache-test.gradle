@@ -1,5 +1,5 @@
 dependencies {
-    implementation project(':redis-sidecar-jdbc')
+    implementation project(':redis-smart-cache-jdbc')
     testImplementation 'org.slf4j:slf4j-simple'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'

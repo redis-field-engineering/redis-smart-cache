@@ -1,9 +1,9 @@
 project:
-  name: redis-sidecar
+  name: redis-smart-cache
   description: JDBC Cache
   longDescription: JDBC driver that transparently caches SQL queries 
   links:
-    homepage: https://github.com/redis-field-engineering/redis-sidecar
+    homepage: https://github.com/redis-field-engineering/redis-smart-cache
   authors:
     - Julien Ruaux
   license: MIT
@@ -51,13 +51,13 @@ announce:
   slack:
     active: release
     channel: '#field-engineering-announcements'
-    message: '🏍️ Redis Sidecar {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '👓 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
-  redis-sidecar-demo:
+  redis-smart-cache-demo:
     type: SINGLE_JAR
     executable:
-      name: 'redis-sidecar-demo-launcher'
+      name: 'redis-smart-cache-demo-launcher'
     docker:
       active: RELEASE
       repository:
@@ -67,10 +67,10 @@ distributions:
           server: docker.io
           repositoryName: fieldengineering
       imageNames:
-        - 'fieldengineering/redis-demo-sidecar:{{tagName}}'
-        - 'fieldengineering/redis-demo-sidecar:latest'
+        - 'fieldengineering/redis-demo-smart-cache:{{tagName}}'
+        - 'fieldengineering/redis-demo-smart-cache:latest'
       labels:
-        'org.opencontainers.image.title': 'redis-demo-sidecar'
+        'org.opencontainers.image.title': 'redis-demo-smart-cache'
       buildx:
         enabled: true
         platforms:

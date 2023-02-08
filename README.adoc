@@ -1,18 +1,18 @@
 :linkattrs:
 :project-owner:   redis-field-engineering
-:project-name:    redis-sidecar
+:project-name:    redis-smart-cache
 :project-group:   com.redis
 :project-version: 0.1.1
 :project-url:     https://github.com/{project-owner}/{project-name}
 :product-name:    Redis Smart Cache
-:artifact-id:     redis-sidecar-jdbc
+:artifact-id:     redis-smart-cache-jdbc
 :codecov-token:   y0NMn7uIJ0
-:grafana-dir:     demo/redis-sidecar-demo/grafana
+:grafana-dir:     demo/redis-smart-cache-demo/grafana
 :icons:           font
 
 ++++
 <p align="center">
-  <img alt="Redis Sidecar" src=".github/images/redis-smart-cache-banner.png">
+  <img alt="Redis Smart Cache" src=".github/images/redis-smart-cache-banner.png">
 
   <p align="center">
     Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
@@ -93,7 +93,7 @@ Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
 image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=200]
 
-Next, click `Upload JSON file` and upload `{project-name}/demo/redis-sidecar-demo/grafana/dashboard.json`.
+Next, click `Upload JSON file` and upload `{project-name}/demo/redis-smart-cache-demo/grafana/dashboard.json`.
 
 At the bottom of the page, select the Redis datasource that you just created and click `Import`.
 
@@ -277,7 +277,7 @@ Overrides password in Redis URI.
 * Type: `string`
 * Default value: `sidecar`
 
-Prefix for all Redis keys used by Sidecar, such as cache entries, configuration, and metrics.
+Prefix for all Redis keys used by {product-name}, such as cache entries, configuration, and metrics.
 
 ===== `sidecar.redis.key-separator`
 

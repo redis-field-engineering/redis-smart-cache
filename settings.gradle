@@ -16,7 +16,7 @@ buildscript {
 
 apply plugin: 'org.kordamp.gradle.kordamp-parentbuild'
 
-rootProject.name = 'redis-sidecar'
+rootProject.name = 'redis-smart-cache'
 
 projects {
     directories = ['core', 'demo']
@@ -33,10 +33,10 @@ projects {
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
         }
-        path(':redis-sidecar-jdbc') {
+        path(':redis-smart-cache-jdbc') {
             id 'com.github.johnrengelman.shadow'
         }
-        path(':redis-sidecar-test') {
+        path(':redis-smart-cache-test') {
             id 'me.champeau.jmh'
         }
     }

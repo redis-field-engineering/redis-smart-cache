@@ -10,6 +10,6 @@ EXPOSE 8080
 
 RUN mkdir /app
 
-COPY --from=build /app/demo/redis-sidecar-demo/build/libs/redis-sidecar-demo-*.jar /app/redis-sidecar-demo.jar
+COPY --from=build /app/demo/redis-smart-cache-demo/build/libs/redis-smart-cache-demo-*.jar /app/redis-smart-cache-demo.jar
 
-ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app/redis-sidecar-demo.jar"]
+ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app/redis-smart-cache-demo.jar"]

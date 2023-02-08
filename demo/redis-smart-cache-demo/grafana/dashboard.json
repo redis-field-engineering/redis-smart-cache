@@ -52,7 +52,7 @@
       }
     ]
   },
-  "description": "Show database and cache metrics from Redis Sidecar",
+  "description": "Show database and cache metrics from Redis Smart Cache",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -269,7 +269,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Redis Sidecar",
+  "title": "Redis Smart Cache",
   "uid": "7B6csWTVk",
   "version": 1,
   "weekStart": ""
