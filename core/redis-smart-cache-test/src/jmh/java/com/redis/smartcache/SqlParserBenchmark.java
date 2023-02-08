@@ -4,8 +4,6 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
 
-import com.redis.smartcache.SmartCacheConnection;
-
 public class SqlParserBenchmark {
 
 	private static final SmartCacheConnection CONNECTION = new SmartCacheConnection(null);
