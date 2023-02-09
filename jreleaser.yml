@@ -51,7 +51,7 @@ announce:
   slack:
     active: release
     channel: '#field-engineering-announcements'
-    message: '👓 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '📈 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
   redis-smart-cache-demo:

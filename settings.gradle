@@ -43,5 +43,12 @@ projects {
 }
 
 enforce {
-    enabled = false
+    mergeStrategy = 'append'
+    rule(enforcer.rules.BanDuplicateClasses) { r ->
+        r.ignore('org.yaml.snakeyaml.*')
+    }
+    rule(enforcer.rules.ForceDependencies) { r ->
+        r.dependencies.addAll "org.checkerframework:checker-qual:$checkerVersion",
+            "com.redis:lettucemod:$lettucemodVersion"
+    }
 }
