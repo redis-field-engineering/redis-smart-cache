@@ -6,7 +6,6 @@
 :project-url:     https://github.com/{project-owner}/{project-name}
 :product-name:    Redis Smart Cache
 :artifact-id:     redis-smart-cache-jdbc
-:codecov-token:   y0NMn7uIJ0
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
 :icons:           font
@@ -25,7 +24,7 @@
 
 image:https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml/badge.svg["Build Status", link="https://github.com/{project-owner}/{project-name}/actions/workflows/early-access.yml"]
 image:https://img.shields.io/maven-central/v/{project-group}/{artifact-id}[Download, link="https://search.maven.org/#search|ga|1|{artifact-id}"]
-image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg?token={codecov-token}["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
+image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/badge.svg["Coverage", link="https://codecov.io/gh/{project-owner}/{project-name}"]
 
 {product-name} lets you add caching to your application without changing the code.
 
