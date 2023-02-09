@@ -363,7 +363,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 
 ==== Examples
 
-===== `SELECT * FROM customer, product, order` 
+===== `SELECT * FROM customer c, product p, order o` 
 [cols="6a,^1",options="header"]
 |==========================
 |Criteria|Match
@@ -406,13 +406,13 @@ Only the first rule with matching criteria will be considered, and its action ap
 |
 [source,json]
 ----
-{ "regex": "SELECT \* FROM trans.*" }
+{ "regex": "SELECT .+ FROM trans.*" }
 ----
 |image:cross.svg[Check,20]
 |
 [source,json]
 ----
-{ "regex": "SELECT \* FROM cust.*" }
+{ "regex": "SELECT .+ FROM cust.*" }
 ----
 |image:check.svg[Check,20]
 |==========================
