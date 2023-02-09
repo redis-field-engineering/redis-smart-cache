@@ -8,12 +8,11 @@
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
-
-:img:             .github/images
+:img: https://github.com/redis-field-engineering/redis-smart-cache/raw/master/.github/images
 
 ++++
 <p align="center">
-  <img alt="Redis Smart Cache" src="{img}/redis-smart-cache-banner.png">
+  <img alt="Redis Smart Cache" src="https://github.com/redis-field-engineering/redis-smart-cache/raw/master/.github/images/redis-smart-cache-banner.png">
 
   <p align="center">
     Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
@@ -379,7 +378,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tables": ["order", "product", "customer"] }
 ----
-|image:{img}/check.png[]
+|image:{img}/check.svg[]
 |
 [source,json]
 ----
