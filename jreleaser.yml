@@ -74,7 +74,7 @@ deploy:
 
 announce:
   slack:
-    active: NEVER
+    active: RELEASE
     channel: '#field-engineering-announcements'
     message: '📈 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
