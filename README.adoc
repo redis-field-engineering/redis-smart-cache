@@ -8,11 +8,11 @@
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
-:icons:           font
+:img:             .github/images
 
 ++++
 <p align="center">
-  <img alt="Redis Smart Cache" src=".github/images/redis-smart-cache-banner.png">
+  <img alt="Redis Smart Cache" src="{img}/redis-smart-cache-banner.png">
 
   <p align="center">
     Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
@@ -378,7 +378,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tables": ["order", "product", "customer"] }
 ----
-|icon:check[role=green]
+|image:{img}/check.png[]
 |
 [source,json]
 ----
@@ -390,7 +390,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tablesAny": ["transaction", "order"] }
 ----
-|icon:check[role=green]
+|image:{img}/check.png[]
 |
 [source,json]
 ----
@@ -402,7 +402,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tablesAll": ["order", "product"] }
 ----
-|icon:check[role=green]
+|image:{img}/check.png[]
 |
 [source,json]
 ----
@@ -414,7 +414,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "regex": "SELECT \* FROM cust.*" }
 ----
-|icon:check[role=green]
+|image:{img}/check.png[]
 |==========================
 
 == Support
