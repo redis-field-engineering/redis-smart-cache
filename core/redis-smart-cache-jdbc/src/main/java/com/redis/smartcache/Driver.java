@@ -62,7 +62,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	@Override
-	public SmartCacheConnection connect(String url, Properties info) throws SQLException {
+	public CachingConnection connect(String url, Properties info) throws SQLException {
 		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
 		if (!matcher.matches()) {
 			throw new SQLException("Invalid connection URL: " + url);
@@ -78,7 +78,7 @@ public class Driver implements java.sql.Driver {
 		Connection backendConnection = backendConnection(bootstrap, info);
 		ContextId contextId = ContextId.of(redisUri, bootstrap.getRedis().getKeyspace());
 		ConnectionContext context = contexts.computeIfAbsent(contextId, c -> new ConnectionContext(bootstrap));
-		return new SmartCacheConnection(backendConnection, context);
+		return new CachingConnection(backendConnection, context);
 	}
 
 	private Connection backendConnection(BootstrapConfig config, Properties info) throws SQLException {

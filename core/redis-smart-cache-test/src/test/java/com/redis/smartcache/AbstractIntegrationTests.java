@@ -77,7 +77,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
-	protected SmartCacheConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
+	protected CachingConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException, IOException {
 		BootstrapConfig config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
@@ -150,7 +150,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			StatementExecutor executor) throws Exception {
 		try (Connection databaseConnection = connection(databaseContainer);
-				SmartCacheConnection connection = connection(databaseContainer, redis)) {
+				CachingConnection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			Awaitility.await().timeout(testTimeout).until(() -> {
 				try {

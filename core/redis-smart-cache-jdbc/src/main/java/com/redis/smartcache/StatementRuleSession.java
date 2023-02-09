@@ -17,14 +17,14 @@ import com.redis.smartcache.rules.RegexRule;
 import com.redis.smartcache.rules.Rule;
 import com.redis.smartcache.rules.RuleSession;
 
-public class StatementRuleSession extends RuleSession<SmartCacheStatement, SmartCacheStatement>
+public class StatementRuleSession extends RuleSession<CachingStatement, CachingStatement>
 		implements PropertyChangeListener {
 
 	public StatementRuleSession() {
 		this(new ArrayList<>());
 	}
 
-	public StatementRuleSession(List<Rule<SmartCacheStatement, SmartCacheStatement>> rules) {
+	public StatementRuleSession(List<Rule<CachingStatement, CachingStatement>> rules) {
 		super(rules);
 	}
 
@@ -32,7 +32,7 @@ public class StatementRuleSession extends RuleSession<SmartCacheStatement, Smart
 		return new StatementRuleSession(rules(ruleset.getRules().toArray(RuleConfig[]::new)));
 	}
 
-	public void fire(SmartCacheStatement statement) {
+	public void fire(CachingStatement statement) {
 		super.fire(statement, statement);
 	}
 
@@ -53,28 +53,28 @@ public class StatementRuleSession extends RuleSession<SmartCacheStatement, Smart
 		}
 	}
 
-	private static List<Rule<SmartCacheStatement, SmartCacheStatement>> rules(RuleConfig... rules) {
+	private static List<Rule<CachingStatement, CachingStatement>> rules(RuleConfig... rules) {
 		return Stream.of(rules).map(StatementRuleSession::rule).collect(Collectors.toList());
 	}
 
-	private static Rule<SmartCacheStatement, SmartCacheStatement> rule(RuleConfig rule) {
-		Consumer<SmartCacheStatement> action = action(rule);
+	private static Rule<CachingStatement, CachingStatement> rule(RuleConfig rule) {
+		Consumer<CachingStatement> action = action(rule);
 		if (rule.getTables() != null) {
-			return CollectionRule.builder(SmartCacheStatement::getTableNames, action).exact(rule.getTables());
+			return CollectionRule.builder(CachingStatement::getTableNames, action).exact(rule.getTables());
 		}
 		if (rule.getTablesAll() != null) {
-			return CollectionRule.builder(SmartCacheStatement::getTableNames, action).all(rule.getTablesAll());
+			return CollectionRule.builder(CachingStatement::getTableNames, action).all(rule.getTablesAll());
 		}
 		if (rule.getTablesAny() != null) {
-			return CollectionRule.builder(SmartCacheStatement::getTableNames, action).any(rule.getTablesAny());
+			return CollectionRule.builder(CachingStatement::getTableNames, action).any(rule.getTablesAny());
 		}
 		if (rule.getRegex() != null) {
-			return new RegexRule<>(Pattern.compile(rule.getRegex()), SmartCacheStatement::getSql, action);
+			return new RegexRule<>(Pattern.compile(rule.getRegex()), CachingStatement::getSql, action);
 		}
 		return new PredicateRule<>(Predicates.alwaysTrue(), action);
 	}
 
-	private static Consumer<SmartCacheStatement> action(RuleConfig rule) {
+	private static Consumer<CachingStatement> action(RuleConfig rule) {
 		return s -> s.setTtl(rule.getTtl());
 	}
 

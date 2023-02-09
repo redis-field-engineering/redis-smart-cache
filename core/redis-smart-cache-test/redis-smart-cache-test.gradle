@@ -40,3 +40,7 @@ jmh {
 jmhJar {
     exclude('org/slf4j/impl/**')
 }
+
+tasks.bootJar.dependsOn ':redis-smart-cache-jdbc:shadowJar'
+tasks.bootJarMainClassName.dependsOn ':redis-smart-cache-jdbc:shadowJar'
+tasks.test.dependsOn ':redis-smart-cache-jdbc:shadowJar'

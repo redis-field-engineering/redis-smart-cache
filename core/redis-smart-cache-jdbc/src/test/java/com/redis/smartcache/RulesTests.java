@@ -16,12 +16,12 @@ class RulesTests {
 		long ttl = 123;
 		RuleConfig rule = RuleConfig.tables(PRODUCT, CUSTOMER, ORDER).ttl(ttl).build();
 		StatementRuleSession ruleSession = StatementRuleSession.of(RulesetConfig.of(rule));
-		SmartCacheStatement statement = statement(ttl, PRODUCT, CUSTOMER, ORDER);
+		CachingStatement statement = statement(ttl, PRODUCT, CUSTOMER, ORDER);
 		ruleSession.fire(statement);
 		Assertions.assertEquals(ttl, statement.getTtl());
-		statement = statement(SmartCacheStatement.TTL_NO_CACHE, PRODUCT, CUSTOMER);
+		statement = statement(CachingStatement.TTL_NO_CACHE, PRODUCT, CUSTOMER);
 		ruleSession.fire(statement);
-		Assertions.assertEquals(SmartCacheStatement.TTL_NO_CACHE, statement.getTtl());
+		Assertions.assertEquals(CachingStatement.TTL_NO_CACHE, statement.getTtl());
 	}
 
 	@Test
@@ -29,12 +29,12 @@ class RulesTests {
 		long ttl = 123;
 		RuleConfig rule = RuleConfig.tablesAny(PRODUCT, CUSTOMER).ttl(ttl).build();
 		StatementRuleSession ruleSession = StatementRuleSession.of(RulesetConfig.of(rule));
-		SmartCacheStatement statement = statement(ttl, PRODUCT);
+		CachingStatement statement = statement(ttl, PRODUCT);
 		ruleSession.fire(statement);
 		Assertions.assertEquals(ttl, statement.getTtl());
-		statement = statement(SmartCacheStatement.TTL_NO_CACHE, ORDER);
+		statement = statement(CachingStatement.TTL_NO_CACHE, ORDER);
 		ruleSession.fire(statement);
-		Assertions.assertEquals(SmartCacheStatement.TTL_NO_CACHE, statement.getTtl());
+		Assertions.assertEquals(CachingStatement.TTL_NO_CACHE, statement.getTtl());
 	}
 
 	@Test
@@ -42,12 +42,12 @@ class RulesTests {
 		long ttl = 123;
 		RuleConfig rule = RuleConfig.tablesAll(PRODUCT, CUSTOMER).ttl(ttl).build();
 		StatementRuleSession ruleSession = StatementRuleSession.of(RulesetConfig.of(rule));
-		SmartCacheStatement statement = statement(ttl, PRODUCT, CUSTOMER, ORDER);
+		CachingStatement statement = statement(ttl, PRODUCT, CUSTOMER, ORDER);
 		ruleSession.fire(statement);
 		Assertions.assertEquals(ttl, statement.getTtl());
-		statement = statement(SmartCacheStatement.TTL_NO_CACHE, ORDER);
+		statement = statement(CachingStatement.TTL_NO_CACHE, ORDER);
 		ruleSession.fire(statement);
-		Assertions.assertEquals(SmartCacheStatement.TTL_NO_CACHE, statement.getTtl());
+		Assertions.assertEquals(CachingStatement.TTL_NO_CACHE, statement.getTtl());
 	}
 
 	@Test
@@ -55,18 +55,18 @@ class RulesTests {
 		long ttl = 123;
 		RuleConfig rule = RuleConfig.regex("SELECT\\s+\\*\\s+FROM\\s+.*").ttl(ttl).build();
 		StatementRuleSession ruleSession = StatementRuleSession.of(RulesetConfig.of(rule));
-		SmartCacheStatement statement = new SmartCacheStatement(null, null);
+		CachingStatement statement = new CachingStatement(null, null);
 		statement.setSql("SELECT * FROM blah");
 		ruleSession.fire(statement);
 		Assertions.assertEquals(ttl, statement.getTtl());
-		statement = new SmartCacheStatement(null, null);
+		statement = new CachingStatement(null, null);
 		statement.setSql("SELECT COUNT(*) FROM blah");
 		ruleSession.fire(statement);
-		Assertions.assertEquals(SmartCacheStatement.TTL_NO_CACHE, statement.getTtl());
+		Assertions.assertEquals(CachingStatement.TTL_NO_CACHE, statement.getTtl());
 	}
 
-	private SmartCacheStatement statement(long ttl, String... tables) {
-		SmartCacheStatement statement = new SmartCacheStatement(null, null);
+	private CachingStatement statement(long ttl, String... tables) {
+		CachingStatement statement = new CachingStatement(null, null);
 		statement.setTtl(ttl);
 		statement.setTableNames(tables);
 		return statement;

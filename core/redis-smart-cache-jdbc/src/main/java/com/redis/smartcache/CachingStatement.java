@@ -16,14 +16,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
-public class SmartCacheStatement implements Statement {
+public class CachingStatement implements Statement {
 
 	private static final String QUERY_TIMER_ID = "queries";
 	private static final String PARAMETER_SEPARATOR = ":";
 	public static final long TTL_NO_CACHE = 0;
 	public static final long TTL_NO_EXPIRATION = -1;
 
-	private final SmartCacheConnection connection;
+	private final CachingConnection connection;
 	protected final Statement statement;
 	private final Timer queryTimer;
 	private long ttl = TTL_NO_CACHE;
@@ -31,17 +31,17 @@ public class SmartCacheStatement implements Statement {
 	private Set<String> tableNames;
 	private Optional<ResultSet> resultSet = Optional.empty();
 
-	public SmartCacheStatement(SmartCacheConnection connection, Statement statement) {
+	public CachingStatement(CachingConnection connection, Statement statement) {
 		this(connection, statement, new SimpleMeterRegistry());
 	}
 
-	public SmartCacheStatement(SmartCacheConnection connection, Statement statement, MeterRegistry meterRegistry) {
+	public CachingStatement(CachingConnection connection, Statement statement, MeterRegistry meterRegistry) {
 		this.connection = connection;
 		this.statement = statement;
 		this.queryTimer = meterRegistry.timer(QUERY_TIMER_ID);
 	}
 
-	protected SmartCacheStatement(SmartCacheConnection connection, Statement statement, MeterRegistry meterRegistry,
+	protected CachingStatement(CachingConnection connection, Statement statement, MeterRegistry meterRegistry,
 			String sql) {
 		this(connection, statement, meterRegistry);
 		setSql(sql);

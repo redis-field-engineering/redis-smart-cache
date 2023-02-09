@@ -23,11 +23,11 @@ import java.util.TreeMap;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class SmartCacheCallableStatement extends SmartCachePreparedStatement implements CallableStatement {
+public class CachingCallableStatement extends CachingPreparedStatement implements CallableStatement {
 
 	private final SortedMap<String, String> parameters = new TreeMap<>();
 
-	public SmartCacheCallableStatement(SmartCacheConnection connection, CallableStatement statement,
+	public CachingCallableStatement(CachingConnection connection, CallableStatement statement,
 			MeterRegistry meterRegistry, String sql) {
 		super(connection, statement, meterRegistry, sql);
 	}
