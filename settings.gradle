@@ -29,11 +29,12 @@ projects {
             id 'org.kordamp.gradle.java-project'
         }
         dirs(['core', 'demo']) {
-            id 'java-library'
+            id 'java'
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
         }
         path(':redis-smart-cache-jdbc') {
+            id 'java-library'
             id 'com.github.johnrengelman.shadow'
         }
         path(':redis-smart-cache-test') {
