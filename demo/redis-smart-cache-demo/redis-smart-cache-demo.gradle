@@ -1,5 +1,5 @@
 dependencies {
-	implementation project(':redis-smart-cache-jdbc')
+    implementation project(':redis-smart-cache-jdbc')
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation group: 'com.redis', name: 'spring-lettucemod', version: lettucemodVersion
 	implementation group: 'com.github.javafaker', name: 'javafaker', version: fakerVersion

@@ -22,6 +22,10 @@ jar {
 
 jar.finalizedBy shadowJar
 
+shadowJar {
+   archiveClassifier.set('')
+}
+
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
 task relocateShadowJar(type: ConfigureShadowRelocation) {
@@ -30,5 +34,3 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 }
 
 tasks.shadowJar.dependsOn tasks.relocateShadowJar
-tasks.distTar.dependsOn tasks.shadowJar
-tasks.distZip.dependsOn tasks.shadowJar

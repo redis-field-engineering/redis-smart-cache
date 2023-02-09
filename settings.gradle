@@ -34,7 +34,6 @@ projects {
             id 'io.spring.dependency-management'
         }
         path(':redis-smart-cache-jdbc') {
-            id 'java-library-distribution'
             id 'com.github.johnrengelman.shadow'
         }
         path(':redis-smart-cache-test') {
