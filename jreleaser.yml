@@ -85,6 +85,8 @@ distributions:
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.tar'
       - path: 'core/{{distributionName}}/build/distributions/{{distributionName}}-{{projectVersion}}.zip'
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.zip'
+      - path: 'core/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}-all.jar'
+        transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}-all.jar'        
   redis-smart-cache-demo:
     type: SINGLE_JAR
     executable:

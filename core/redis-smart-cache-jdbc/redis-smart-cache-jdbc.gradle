@@ -22,10 +22,6 @@ jar {
 
 jar.finalizedBy shadowJar
 
-shadowJar {
-   archiveClassifier.set('')
-}
-
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
 task relocateShadowJar(type: ConfigureShadowRelocation) {
