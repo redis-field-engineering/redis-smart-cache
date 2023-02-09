@@ -16,14 +16,13 @@ bootJar {
 }
 
 jar {
-    enabled = true
     archiveClassifier = ''
 }
 
 jar.finalizedBy shadowJar
 
 shadowJar {
-   archiveClassifier.set('')
+   archiveClassifier = ''
 }
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
