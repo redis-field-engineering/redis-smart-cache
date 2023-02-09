@@ -62,7 +62,7 @@ signing:
 deploy:
   maven:
     pomchecker:
-      version: 1.7.0
+      version: early-access
     nexus2:
       maven-central:
         active: RELEASE
@@ -74,7 +74,7 @@ deploy:
 
 announce:
   slack:
-    active: release
+    active: NEVER
     channel: '#field-engineering-announcements'
     message: '📈 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
