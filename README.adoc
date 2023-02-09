@@ -83,19 +83,21 @@ Password: `admin`
 
 In the Grafana UI, click http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
 
-In the filter box, enter `Redis` and click on the first entry (*Redis datasource*).
+In the filter box, enter `Redis` and click on the first entry (*Redis data source*).
 
 In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click `Save & test`.
 
-image:grafana-redis-datasource.png[Redis Datasource,width=600]
+image:grafana-redis-datasource.png[Redis Datasource,width=742]
 
 Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
-image:grafana-import-dashboard.png[Import Dashboard,width=200]
+image:grafana-import-dashboard.png[Import Dashboard,width=380]
 
 Next, click `Upload JSON file` and upload `{project-name}/demo/redis-smart-cache-demo/grafana/dashboard.json`.
 
 At the bottom of the page, select the Redis datasource that you just created and click `Import`.
+
+image:grafana-import-dashboard-datasource.png[Import Dashboard Data Source,width=725]
 
 You should see the following dashboard:
 
