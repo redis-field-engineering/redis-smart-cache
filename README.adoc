@@ -8,11 +8,11 @@
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
-:imagesdir:       .github/images
+:imagesdir:       src/media
 
 ++++
 <p align="center">
-  <img alt="Redis Smart Cache" src="https://github.com/redis-field-engineering/redis-smart-cache/raw/master/.github/images/redis-smart-cache-banner.png">
+  <img alt="Redis Smart Cache" src="https://github.com/redis-field-engineering/redis-smart-cache/raw/master/src/media/redis-smart-cache-banner.png">
 
   <p align="center">
     Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
@@ -87,11 +87,11 @@ In the filter box, enter `Redis` and click on the first entry (*Redis datasource
 
 In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click `Save & test`.
 
-image::{grafana-dir}/redis-datasource.png[Redis Datasource,width=600]
+image:grafana-redis-datasource.png[Redis Datasource,width=600]
 
 Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
-image::{grafana-dir}/import-dashboard.png[Import Dashboard,width=200]
+image:grafana-import-dashboard.png[Import Dashboard,width=200]
 
 Next, click `Upload JSON file` and upload `{project-name}/demo/redis-smart-cache-demo/grafana/dashboard.json`.
 
@@ -99,7 +99,7 @@ At the bottom of the page, select the Redis datasource that you just created and
 
 You should see the following dashboard:
 
-image::{grafana-dir}/dashboard.png[Dashboard,width=800]
+image:grafana-dashboard.png[Dashboard,width=800]
 
 After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
 
@@ -372,7 +372,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tables": ["order", "product"] }
 ----
-|icon:close[role=red]
+|image:cross.svg[Check,20]
 |
 [source,json]
 ----
@@ -384,37 +384,37 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tablesAny": ["transaction"] }
 ----
-|icon:close[role=red]
+|image:cross.svg[Check,20]
 |
 [source,json]
 ----
 { "tablesAny": ["transaction", "order"] }
 ----
-|image:{img}/check.png[]
+|image:check.svg[Check,20]
 |
 [source,json]
 ----
 { "tablesAll": ["transaction", "order", "product"] }
 ----
-|icon:close[role=red]
+|image:cross.svg[Check,20]
 |
 [source,json]
 ----
 { "tablesAll": ["order", "product"] }
 ----
-|image:{img}/check.png[]
+|image:check.svg[Check,20]
 |
 [source,json]
 ----
 { "regex": "SELECT \* FROM trans.*" }
 ----
-|icon:close[role=red]
+|image:cross.svg[Check,20]
 |
 [source,json]
 ----
 { "regex": "SELECT \* FROM cust.*" }
 ----
-|image:{img}/check.png[]
+|image:check.svg[Check,20]
 |==========================
 
 == Support
