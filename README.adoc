@@ -8,7 +8,7 @@
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
-:img: https://github.com/redis-field-engineering/redis-smart-cache/raw/master/.github/images
+:imagesdir:       .github/images
 
 ++++
 <p align="center">
@@ -378,7 +378,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 { "tables": ["order", "product", "customer"] }
 ----
-|image:{img}/check.svg[]
+|image:check.svg[Check,20]
 |
 [source,json]
 ----
