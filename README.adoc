@@ -8,12 +8,8 @@
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
-ifdef::env-github[]
-:img: https://github.com/redis-field-engineering/redis-smart-cache/raw/master/.github/images
-endif::[]
-ifndef::env-github[]
-:img: .github/images
-endif::[]
+
+:img:             .github/images
 
 ++++
 <p align="center">
