@@ -31,8 +31,8 @@ public class DemoConfig {
 	public static class DataConfig {
 
 		private boolean flush;
-		private int queryThreads;
-		private int batchSize;
+		private int threads;
+		private int batch;
 		private int customers;
 		private int products;
 		private int orders;
@@ -70,20 +70,20 @@ public class DemoConfig {
 			this.orderdetails = orderdetails;
 		}
 
-		public int getBatchSize() {
-			return batchSize;
+		public int getBatch() {
+			return batch;
 		}
 
-		public void setBatchSize(int batchSize) {
-			this.batchSize = batchSize;
+		public void setBatch(int size) {
+			this.batch = size;
 		}
 
-		public int getQueryThreads() {
-			return queryThreads;
+		public int getThreads() {
+			return threads;
 		}
 
-		public void setQueryThreads(int queryThreads) {
-			this.queryThreads = queryThreads;
+		public void setThreads(int threads) {
+			this.threads = threads;
 		}
 
 		public boolean isFlush() {

@@ -4,6 +4,7 @@ services:
   mysql:
     image: mysql:latest
     hostname: mysql
+    container_name: mysql
     ports:
       - 3306:3306
     environment:
@@ -18,6 +19,7 @@ services:
   grafana:
     image: grafana/grafana
     hostname: grafana
+    container_name: grafana
     ports:
       - 3000:3000
     environment:
@@ -26,12 +28,14 @@ services:
   redis:
     image: redis/redis-stack-server
     hostname: redis
+    container_name: redis
     ports:
       - 6379:6379
       
-  redis-smart-cache-demo:
+  demo:
     image: fieldengineering/redis-demo-smart-cache
     hostname: smartcache
+    container_name: smart-cache-demo
     build: .
     restart: on-failure
     depends_on:

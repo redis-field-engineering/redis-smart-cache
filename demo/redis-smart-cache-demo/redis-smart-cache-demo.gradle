@@ -12,3 +12,5 @@ dependencies {
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
+
+tasks.bootJar.dependsOn ':redis-smart-cache-jdbc:shadowJar'

@@ -65,8 +65,8 @@ public class QueryExecutor implements AutoCloseable {
 		hikariConfig.setPassword(dataSourceProperties.determinePassword());
 		try (HikariDataSource dataSource = new HikariDataSource(hikariConfig)) {
 			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-			executor.setCorePoolSize(config.getDemo().getQueryThreads());
-			executor.setMaxPoolSize(config.getDemo().getQueryThreads());
+			executor.setCorePoolSize(config.getDemo().getThreads());
+			executor.setMaxPoolSize(config.getDemo().getThreads());
 			executor.setThreadNamePrefix("query-task");
 			executor.initialize();
 			ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
@@ -74,7 +74,7 @@ public class QueryExecutor implements AutoCloseable {
 			progressBarBuilder.showSpeed();
 			progressBar = progressBarBuilder.build();
 			List<Future<Integer>> futures = new ArrayList<>();
-			for (int index = 0; index < config.getDemo().getQueryThreads(); index++) {
+			for (int index = 0; index < config.getDemo().getThreads(); index++) {
 				QueryTask task = new QueryTask(dataSource, config.getDemo().getOrders(), progressBar);
 				tasks.add(task);
 				futures.add(executor.submit(task));

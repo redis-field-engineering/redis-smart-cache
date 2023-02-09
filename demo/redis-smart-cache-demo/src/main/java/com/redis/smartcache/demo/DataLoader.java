@@ -91,12 +91,12 @@ public class DataLoader {
 		for (int index = start; index < end; index++) {
 			rowProvider.set(preparedStatement, config.getDemo(), index);
 			preparedStatement.addBatch();
-			if (index > 0 && index % config.getDemo().getBatchSize() == 0) {
+			if (index > 0 && index % config.getDemo().getBatch() == 0) {
 				preparedStatement.executeBatch();
 				connection.commit();
 				preparedStatement.close();
 				preparedStatement = preparedStatement.getConnection().prepareStatement(insertSQL);
-				progressBar.stepBy(config.getDemo().getBatchSize());
+				progressBar.stepBy(config.getDemo().getBatch());
 			}
 		}
 		preparedStatement.executeBatch();
