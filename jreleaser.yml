@@ -85,10 +85,13 @@ distributions:
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.jar'
   redis-smart-cache-demo:
     type: SINGLE_JAR
+    artifacts:
+      - path: 'demo/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar'
+        transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.jar'
     executable:
       name: 'redis-smart-cache-demo-launcher'
     docker:
-      active: RELEASE
+      active: ALWAYS
       repository:
         active: NEVER
       registries:
