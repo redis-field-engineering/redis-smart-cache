@@ -33,10 +33,9 @@ services:
       - 6379:6379
       
   demo:
-    image: fieldengineering/redis-demo-smart-cache
+    image: fieldengineering/demo-redis-smart-cache:early-access
     hostname: smartcache
-    container_name: smart-cache-demo
-    build: .
+    container_name: redis-smart-cache-demo
     restart: on-failure
     depends_on:
       - mysql
