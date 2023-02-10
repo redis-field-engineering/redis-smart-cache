@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':redis-smart-cache-jdbc')
+    testImplementation 'commons-codec:commons-codec'
     testImplementation 'org.slf4j:slf4j-simple'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
@@ -30,11 +31,11 @@ jar {
 
 jmh {
     fork = 1
-    iterations = 2
+    iterations = 1
     timeUnit = 'ms'
     warmup = '1s'
-    warmupForks = 1
-    warmupIterations = 1
+    warmupForks = 0
+    warmupIterations = 0
 }
 
 jmhJar {

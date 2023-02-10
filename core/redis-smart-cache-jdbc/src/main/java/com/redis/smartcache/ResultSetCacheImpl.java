@@ -1,11 +1,9 @@
 package com.redis.smartcache;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.CRC32;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
@@ -31,26 +29,22 @@ public class ResultSetCacheImpl implements ResultSetCache {
 	private final Timer putTimer;
 	private final Counter missCounter;
 	private final Counter hitCounter;
-	private final String keyPrefix;
 
 	private final GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool;
 
-	public ResultSetCacheImpl(MeterRegistry meterRegistry,
-			GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool, String keyPrefix) {
+	public ResultSetCacheImpl(GenericObjectPool<StatefulRedisModulesConnection<String, ResultSet>> pool,
+			MeterRegistry meterRegistry) {
 		LettuceAssert.notNull(meterRegistry, "Meter registry must not be null");
 		LettuceAssert.notNull(pool, "Connection pool must not be null");
-		LettuceAssert.notNull(keyPrefix, "Key prefix must not be null");
+		this.pool = pool;
 		this.getTimer = meterRegistry.timer(METER_GETS);
 		this.putTimer = meterRegistry.timer(METER_PUTS);
 		this.missCounter = meterRegistry.counter(METER_GETS, METER_RESULT_TAG, METER_MISS_TAG);
 		this.hitCounter = meterRegistry.counter(METER_GETS, METER_RESULT_TAG, METER_HIT_TAG);
-		this.keyPrefix = keyPrefix;
-		this.pool = pool;
 	}
 
 	@Override
-	public Optional<ResultSet> get(String sql) {
-		String key = key(sql);
+	public Optional<ResultSet> get(String key) {
 		ResultSet resultSet;
 		try {
 			resultSet = getTimer.recordCallable(() -> doGet(key));
@@ -72,19 +66,8 @@ public class ResultSetCacheImpl implements ResultSetCache {
 		}
 	}
 
-	protected String key(String sql) {
-		return keyPrefix + crc(sql);
-	}
-
-	private final String crc(String string) {
-		CRC32 crc = new CRC32();
-		crc.update(string.getBytes(StandardCharsets.UTF_8));
-		return String.valueOf(crc.getValue());
-	}
-
 	@Override
-	public void put(String sql, long ttl, ResultSet resultSet) {
-		String key = key(sql);
+	public void put(String key, long ttl, ResultSet resultSet) {
 		try {
 			putTimer.recordCallable(() -> doPut(key, ttl, resultSet));
 		} catch (Exception e) {

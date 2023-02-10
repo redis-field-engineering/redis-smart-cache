@@ -16,6 +16,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
+import com.redis.smartcache.BootstrapConfig;
+import com.redis.smartcache.SmartDriver;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
@@ -39,7 +41,7 @@ class PostgresTests extends AbstractIntegrationTests {
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
 		BootstrapConfig config = bootstrapConfig();
-		String cacheKeyPattern = config.key(Driver.CACHE_KEY_PREFIX, "*");
+		String cacheKeyPattern = config.key(SmartDriver.CACHE_KEY_PREFIX, "*");
 		List<String> keys = redis.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(1, keys.size());
 		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM employees");

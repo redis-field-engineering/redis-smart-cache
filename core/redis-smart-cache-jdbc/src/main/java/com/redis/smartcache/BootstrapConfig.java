@@ -11,8 +11,8 @@ public class BootstrapConfig {
 
 	private RedisConfig redis = new RedisConfig();
 	private DriverConfig driver = new DriverConfig();
-	private Duration configStep = Driver.DEFAULT_CONFIG_STEP;
-	private Duration metricsStep = Driver.DEFAULT_METRICS_STEP;
+	private Duration configStep = SmartDriver.DEFAULT_CONFIG_STEP;
+	private Duration metricsStep = SmartDriver.DEFAULT_METRICS_STEP;
 
 	public String key(String... ids) {
 		return redis.key(ids);
@@ -84,10 +84,10 @@ public class BootstrapConfig {
 		private boolean cluster;
 		private String username;
 		private char[] password;
-		private String keyspace = Driver.PREFIX;
-		private String keySeparator = Driver.DEFAULT_KEY_SEPARATOR;
-		private DataSize codecBufferSize = Driver.DEFAULT_BYTE_BUFFER_CAPACITY;
-		private int poolSize = Driver.DEFAULT_POOL_SIZE;
+		private String keyspace = SmartDriver.PREFIX;
+		private String keySeparator = SmartDriver.DEFAULT_KEY_SEPARATOR;
+		private DataSize codecBufferSize = SmartDriver.DEFAULT_BYTE_BUFFER_CAPACITY;
+		private int poolSize = SmartDriver.DEFAULT_POOL_SIZE;
 
 		public String key(String... ids) {
 			StringBuilder builder = new StringBuilder(keyspace);

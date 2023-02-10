@@ -126,9 +126,8 @@ public class ConnectionContext {
 	public ResultSetCache getCache() {
 		synchronized (bootstrapConfig) {
 			if (cache == null) {
-				// keyPrefix includes trailing key separator (":")
-				String keyPrefix = bootstrapConfig.key(Driver.CACHE_KEY_PREFIX, "");
-				cache = new ResultSetCacheImpl(getMeterRegistry(), getConnectionPool(), keyPrefix);
+				// TODO introduce a QueryExecutor like PgConnection does
+				cache = new ResultSetCacheImpl(getConnectionPool(), getMeterRegistry());
 			}
 		}
 		return cache;

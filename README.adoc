@@ -133,7 +133,7 @@ The next step is to configure {product-name}, as described below.
 
 First, ensure that your application is using {product-name} as its JDBC driver:
 
-`com.redis.smartcache.Driver`
+`com.redis.smartcache.SmartDriver`
 
 Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:` for example:
 ----

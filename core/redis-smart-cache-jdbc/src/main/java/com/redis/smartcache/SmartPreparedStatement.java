@@ -25,12 +25,12 @@ import java.util.TreeMap;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
-public class CachingPreparedStatement extends CachingStatement implements PreparedStatement {
+public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
 	private static final String METHOD_CANNOT_BE_USED = "Query methods that take a query string cannot be used on a PreparedStatement";
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 
-	protected CachingPreparedStatement(CachingConnection connection, PreparedStatement statement,
+	protected SmartPreparedStatement(SmartConnection connection, PreparedStatement statement,
 			MeterRegistry meterRegistry, String sql) {
 		super(connection, statement, meterRegistry, sql);
 	}

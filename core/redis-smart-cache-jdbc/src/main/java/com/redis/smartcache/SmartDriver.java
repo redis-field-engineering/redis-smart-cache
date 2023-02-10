@@ -3,6 +3,7 @@ package com.redis.smartcache;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
@@ -17,9 +18,9 @@ import java.util.regex.Pattern;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 
-public class Driver implements java.sql.Driver {
+public class SmartDriver implements Driver {
 
-	private static final Logger log = Logger.getLogger(Driver.class.getName());
+	private static final Logger log = Logger.getLogger(SmartDriver.class.getName());
 
 	public static final String PREFIX = "smartcache";
 	public static final String PROPERTY_PREFIX_DRIVER = PREFIX + ".driver";
@@ -34,14 +35,14 @@ public class Driver implements java.sql.Driver {
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 
-	private static final Map<String, java.sql.Driver> drivers = new HashMap<>();
+	private static final Map<String, Driver> drivers = new HashMap<>();
 	private static final Map<ContextId, ConnectionContext> contexts = new HashMap<>();
 
 	private final PropsMapper propsMapper = new PropsMapper();
 
 	static {
 		try {
-			DriverManager.registerDriver(new Driver());
+			DriverManager.registerDriver(new SmartDriver());
 		} catch (SQLException e) {
 			throw new SQLRuntimeException("Can't register driver");
 		}
@@ -57,12 +58,12 @@ public class Driver implements java.sql.Driver {
 
 	}
 
-	public Driver() {
+	public SmartDriver() {
 		// Needed for Class.forName().newInstance()
 	}
 
 	@Override
-	public CachingConnection connect(String url, Properties info) throws SQLException {
+	public SmartConnection connect(String url, Properties info) throws SQLException {
 		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
 		if (!matcher.matches()) {
 			throw new SQLException("Invalid connection URL: " + url);
@@ -78,7 +79,7 @@ public class Driver implements java.sql.Driver {
 		Connection backendConnection = backendConnection(bootstrap, info);
 		ContextId contextId = ContextId.of(redisUri, bootstrap.getRedis().getKeyspace());
 		ConnectionContext context = contexts.computeIfAbsent(contextId, c -> new ConnectionContext(bootstrap));
-		return new CachingConnection(backendConnection, context);
+		return new SmartConnection(backendConnection, context);
 	}
 
 	private Connection backendConnection(BootstrapConfig config, Properties info) throws SQLException {
@@ -90,7 +91,7 @@ public class Driver implements java.sql.Driver {
 		if (url == null || url.isEmpty()) {
 			throw new SQLException("No backend URL specified");
 		}
-		java.sql.Driver driver;
+		Driver driver;
 		try {
 			driver = driver(className);
 		} catch (Exception e) {
@@ -99,13 +100,13 @@ public class Driver implements java.sql.Driver {
 		return driver.connect(url, info);
 	}
 
-	private synchronized java.sql.Driver driver(String className)
+	private synchronized Driver driver(String className)
 			throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException,
 			NoSuchMethodException, SecurityException, ClassNotFoundException {
 		if (drivers.containsKey(className)) {
 			return drivers.get(className);
 		}
-		java.sql.Driver driver = (java.sql.Driver) Class.forName(className).getConstructor().newInstance();
+		Driver driver = (Driver) Class.forName(className).getConstructor().newInstance();
 		drivers.put(className, driver);
 		return driver;
 	}

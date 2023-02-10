@@ -13,13 +13,16 @@ import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 
+import com.redis.smartcache.ConfigManager;
+import com.redis.smartcache.SmartDriver;
+import com.redis.smartcache.RulesetConfig;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
 
-class DriverTests extends AbstractTestcontainersRedisTestBase {
+class SmartDriverTests extends AbstractTestcontainersRedisTestBase {
 
 	private final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
@@ -32,7 +35,7 @@ class DriverTests extends AbstractTestcontainersRedisTestBase {
 	@ParameterizedTest
 	@RedisTestContextsSource
 	void testDriver(RedisTestContext redis) throws SQLException, ClassNotFoundException {
-		Class.forName(Driver.class.getName());
+		Class.forName(SmartDriver.class.getName());
 		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());
 		Assert.assertNotNull(driver);
 		Assert.assertTrue(driver.getMajorVersion() >= 0);
@@ -42,8 +45,8 @@ class DriverTests extends AbstractTestcontainersRedisTestBase {
 		DriverPropertyInfo[] infos = driver.getPropertyInfo(null, new Properties());
 		Assert.assertNotNull(infos);
 		Assert.assertEquals(2, infos.length);
-		Assert.assertEquals(Driver.PROPERTY_PREFIX_DRIVER + ".url", infos[0].name);
-		Assert.assertEquals(Driver.PROPERTY_PREFIX_DRIVER + ".class-name", infos[1].name);
+		Assert.assertEquals(SmartDriver.PROPERTY_PREFIX_DRIVER + ".url", infos[0].name);
+		Assert.assertEquals(SmartDriver.PROPERTY_PREFIX_DRIVER + ".class-name", infos[1].name);
 	}
 
 	@ParameterizedTest

@@ -24,6 +24,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.smartcache.BootstrapConfig;
+import com.redis.smartcache.SmartConnection;
+import com.redis.smartcache.SmartDriver;
+import com.redis.smartcache.PropsMapper;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -39,7 +43,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
 	private final PropsMapper propsMapper = new PropsMapper();
 
-	private Driver driver;
+	private SmartDriver driver;
 	private Duration testTimeout = Duration.ofHours(1);
 
 	@Override
@@ -49,7 +53,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 
 	@BeforeAll
 	private void setupDriver() {
-		driver = new Driver();
+		driver = new SmartDriver();
 	}
 
 	@AfterAll
@@ -77,7 +81,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
 	}
 
-	protected CachingConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
+	protected SmartConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException, IOException {
 		BootstrapConfig config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
@@ -150,7 +154,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
 			StatementExecutor executor) throws Exception {
 		try (Connection databaseConnection = connection(databaseContainer);
-				CachingConnection connection = connection(databaseContainer, redis)) {
+				SmartConnection connection = connection(databaseContainer, redis)) {
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			Awaitility.await().timeout(testTimeout).until(() -> {
 				try {
@@ -158,7 +162,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
-				String keyPattern = connection.getContext().getBootstrapConfig().key(Driver.CACHE_KEY_PREFIX, "*");
+				String keyPattern = connection.getContext().getBootstrapConfig().key(SmartDriver.CACHE_KEY_PREFIX, "*");
 				return !redis.sync().keys(keyPattern).isEmpty();
 			});
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));

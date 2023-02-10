@@ -11,6 +11,10 @@ import java.util.Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.redis.smartcache.BootstrapConfig;
+import com.redis.smartcache.SmartDriver;
+import com.redis.smartcache.PropsMapper;
+import com.redis.smartcache.RulesetConfig;
 import com.redis.smartcache.RulesetConfig.RuleConfig;
 
 import io.airlift.units.DataSize;
@@ -18,14 +22,14 @@ import io.airlift.units.DataSize.Unit;
 
 class ConfigTests {
 
-	private static final String PROPERTY_CODEC_BUFFER_SIZE = Driver.PROPERTY_PREFIX_REDIS + ".codec-buffer-size";
+	private static final String PROPERTY_CODEC_BUFFER_SIZE = SmartDriver.PROPERTY_PREFIX_REDIS + ".codec-buffer-size";
 
 	@Test
 	void keyBuilder() {
 		BootstrapConfig config = new BootstrapConfig();
 		Assertions.assertEquals(
-				Driver.PREFIX + Driver.DEFAULT_KEY_SEPARATOR + Driver.CACHE_KEY_PREFIX + Driver.DEFAULT_KEY_SEPARATOR,
-				config.key(Driver.CACHE_KEY_PREFIX, ""));
+				SmartDriver.PREFIX + SmartDriver.DEFAULT_KEY_SEPARATOR + SmartDriver.CACHE_KEY_PREFIX + SmartDriver.DEFAULT_KEY_SEPARATOR,
+				config.key(SmartDriver.CACHE_KEY_PREFIX, ""));
 	}
 
 	@Test

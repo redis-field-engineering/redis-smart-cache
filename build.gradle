@@ -1,61 +1,61 @@
 config {
-	info {
-		description = 'Transparent SQL caching proxy'
-		inceptionYear = '2022'
-		tags = ['redis', 'caching', 'jdbc']
-
-		links {
-			website = "https://github.com/redis-field-engineering/${project.rootProject.name}"
-			issueTracker = "https://github.com/redis-field-engineering/${project.rootProject.name}/issues"
-			scm = "https://github.com/redis-field-engineering/${project.rootProject.name}.git"
-		}
-
-		scm {
-			url = "https://github.com/redis-field-engineering/${project.rootProject.name}"
-			connection = "scm:git:https://github.com/redis-field-engineering/${project.rootProject.name}.git"
-			developerConnection = "scm:git:git@github.com:redis-field-engineering/${project.rootProject.name}.git"
-		}
-
-		specification {
-			enabled = true
-		}
-
-		implementation {
-			enabled = true
-		}
-		
-		people {
+    info {
+        description = 'Transparent SQL caching proxy'
+        inceptionYear = '2022'
+        tags = ['redis', 'caching', 'jdbc']
+        
+        links {
+            website      = "https://github.com/redis-field-engineering/${project.rootProject.name}"
+            issueTracker = "https://github.com/redis-field-engineering/${project.rootProject.name}/issues"
+            scm          = "https://github.com/redis-field-engineering/${project.rootProject.name}.git"
+        }
+        
+        scm {
+            url                 = "https://github.com/redis-field-engineering/${project.rootProject.name}"
+            connection          = "scm:git:https://github.com/redis-field-engineering/${project.rootProject.name}.git"
+            developerConnection = "scm:git:git@github.com:redis-field-engineering/${project.rootProject.name}.git"
+        }
+        
+        specification {
+            enabled = true
+        }
+        
+        implementation {
+            enabled = true
+        }
+        
+        people {
             person {
                 id = 'jruaux'
                 name = 'Julien Ruaux'
                 roles = ['developer', 'author']
             }
         }
-	}
-	
+    }
+    
     docs {
-		javadoc {
-			options {
-				autoLinks {
-					enabled = false
-				}
-			}
-			aggregate {
-				enabled = false
-			}
-		}
-	}
+        javadoc {
+            options {
+                autoLinks {
+                    enabled = false
+                }
+            }
+            aggregate {
+                enabled = false
+            }
+        }
+    }
 
-	licensing {
-		enabled = false
-		licenses {
-			license {
-				id = 'MIT'
-			}
-		}
-	}
-	
-	coverage {
+    licensing {
+        enabled = false
+        licenses {
+            license {
+                id = 'MIT'
+            }
+        }
+    }
+    
+    coverage {
         jacoco {
             enabled = true
             toolVersion = jacocoVersion
@@ -64,33 +64,32 @@ config {
 }
 
 allprojects {
-	repositories {
-		mavenLocal()
-		gradlePluginPortal()
-	}
-
-	tasks.withType(GenerateModuleMetadata) {
-		enabled = false
-	}
-	
-	tasks.withType(JavaCompile) {
-        options.encoding = 'UTF-8'
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
     }
     
+    tasks.withType(GenerateModuleMetadata) {
+        enabled = false
+    }
+    
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
 }
 
 subprojects {
-	config {
-		info {
-			description = project.project_description
-		}
-	}
-	
-	license {
+    config {
+        info {
+            description = project.project_description
+        }
+    }
+    
+    license {
         exclude('build/**')
     }
-	
-	dependencies {
+    
+    dependencies {
         testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     }
     
@@ -100,12 +99,10 @@ subprojects {
     }
     
     configurations.all {
-		resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-			if (details.requested.name == 'lettuce-core' ) {
-				details.useVersion lettuceVersion
-			}
-		}
-	}
-
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.name == 'lettuce-core' ) {
+                details.useVersion lettuceVersion
+            }
+        }
+    }
 }
-   

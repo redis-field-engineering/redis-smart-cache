@@ -13,7 +13,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class PropsMapper {
 
-	private final JavaPropsSchema schema = JavaPropsSchema.emptySchema().withPrefix(Driver.PREFIX);
+	private final JavaPropsSchema schema = JavaPropsSchema.emptySchema().withPrefix(SmartDriver.PREFIX);
 	private final JavaPropsMapper mapper = JavaPropsMapper.builder()
 			.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).serializationInclusion(Include.NON_NULL)
 			.addModule(new JavaTimeModule()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
