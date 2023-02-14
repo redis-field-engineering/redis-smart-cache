@@ -53,6 +53,9 @@ public class Query {
 	}
 
 	public Stream<Table> getTables() throws ParsingException {
+		if (statement == null) {
+			return Stream.empty();
+		}
 		return statement.accept(DepthFirstVisitor.by(new TableVisitor()), null);
 	}
 

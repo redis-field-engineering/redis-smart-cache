@@ -25,17 +25,19 @@ import java.util.zip.CRC32;
 import javax.sql.rowset.RowSetFactory;
 
 import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.RowSetCache;
 import com.redis.smartcache.core.QueryRuleSession;
+import com.redis.smartcache.core.RowSetCache;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.trino.sql.parser.ParsingException;
 import io.trino.sql.parser.ParsingOptions;
 import io.trino.sql.parser.SqlParser;
 
 public class SmartConnection implements Connection {
 
+	private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
+
 	private final SqlParser parser = new SqlParser();
-	private final ParsingOptions options = new ParsingOptions();
 	private final Map<String, Query> queryCache = new HashMap<>();
 
 	private final Connection connection;
@@ -354,9 +356,18 @@ public class SmartConnection implements Connection {
 		if (queryCache.containsKey(key)) {
 			return queryCache.get(key);
 		}
-		Query query = new Query(key, sql, parser.createStatement(sql, options));
+		Query query = new Query(key, sql, parse(sql));
 		queryCache.put(key, query);
 		return query;
+	}
+
+	private io.trino.sql.tree.Statement parse(String sql) {
+		try {
+			return parser.createStatement(sql, PARSING_OPTIONS);
+		} catch (ParsingException e) {
+			// Fail gracefully
+			return null;
+		}
 	}
 
 	public static String crc32(String string) {
