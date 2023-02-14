@@ -16,13 +16,10 @@ import com.redis.smartcache.core.codec.SerializedResultSetCodec;
 import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
 
-import io.airlift.units.DataSize;
-import io.airlift.units.DataSize.Unit;
-
 @State(Scope.Benchmark)
 public class CodecExecutionPlan {
 
-	private static final DataSize BYTE_BUFFER_CAPACITY = DataSize.of(100, Unit.MEGABYTE);
+	private static final int BYTE_BUFFER_CAPACITY = 100;
 
 	@Param({ "10", "100" })
 	private int columns;
@@ -37,9 +34,9 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = RowSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
+		this.codec = RowSetCodec.builder().maxByteBufferCapacityMB(BYTE_BUFFER_CAPACITY).build();
 		this.serializedCodec = new SerializedResultSetCodec(new CachedRowSetFactory(),
-				Math.toIntExact(BYTE_BUFFER_CAPACITY.toBytes()));
+				BYTE_BUFFER_CAPACITY * 1024 * 1024);
 	}
 
 	@Setup(Level.Invocation)
