@@ -49,19 +49,27 @@ import io.lettuce.core.codec.RedisCodec;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
+/**
+ * The Java SQL framework allows for multiple database drivers. Each driver
+ * should supply a class that implements the Driver interface
+ * 
+ * The DriverManager will try to load as many drivers as it can find and then
+ * for any given connection request, it will ask each driver in turn to try to
+ * connect to the target URL.
+ * 
+ * It is strongly recommended that each Driver class should be small and
+ * standalone so that the Driver class can be loaded and queried without
+ * bringing in vast quantities of supporting code.
+ * 
+ * When a Driver class is loaded, it should create an instance of itself and
+ * register it with the DriverManager. This means that a user can load and
+ * register a driver by doing Class.forName("foo.bah.Driver")
+ */
 public class Driver implements java.sql.Driver {
 
 	private static Driver registeredDriver;
 	private static final Logger parentLogger = Logger.getLogger("com.redis.smartcache");
 	private static final Logger logger = Logger.getLogger("com.redis.smartcache.Driver");
-
-	static {
-		try {
-			register();
-		} catch (SQLException e) {
-			throw new ExceptionInInitializerError(e);
-		}
-	}
 
 	public static final String PROPERTY_PREFIX = "smartcache";
 	public static final String PROPERTY_PREFIX_DRIVER = PROPERTY_PREFIX + ".driver";
@@ -84,24 +92,10 @@ public class Driver implements java.sql.Driver {
 
 	static {
 		try {
-			DriverManager.registerDriver(new Driver());
+			register();
 		} catch (SQLException e) {
-			throw new SQLRuntimeException("Can't register driver");
+			throw new ExceptionInInitializerError(e);
 		}
-	}
-
-	public static class SQLRuntimeException extends RuntimeException {
-
-		private static final long serialVersionUID = -6960977193373569598L;
-
-		public SQLRuntimeException(String message) {
-			super(message);
-		}
-
-	}
-
-	public Driver() {
-		// Needed for Class.forName().newInstance()
 	}
 
 	public static Config config(Properties info) throws IOException {
@@ -234,9 +228,9 @@ public class Driver implements java.sql.Driver {
 		if (isRegistered()) {
 			throw new IllegalStateException("Driver is already registered. It can only be registered once.");
 		}
-		Driver registeredDriver = new Driver();
-		DriverManager.registerDriver(registeredDriver);
-		Driver.registeredDriver = registeredDriver;
+		Driver driver = new Driver();
+		DriverManager.registerDriver(driver);
+		registeredDriver = driver;
 	}
 
 	/**

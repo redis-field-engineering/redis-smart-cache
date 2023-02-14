@@ -232,6 +232,10 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 		private final RowSetFactory rowSetFactory = new CachedRowSetFactory();
 		private DataSize maxByteBufferCapacity = DEFAULT_BYTE_BUFFER_CAPACITY;
 
+		public Builder maxByteBufferCapacityMB(int sizeInMB) {
+			return maxByteBufferCapacity(DataSize.of(sizeInMB, Unit.MEGABYTE));
+		}
+
 		public Builder maxByteBufferCapacity(DataSize size) {
 			this.maxByteBufferCapacity = size;
 			return this;

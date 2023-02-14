@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 
 import org.awaitility.Awaitility;
 import org.junit.Assert;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
@@ -41,7 +40,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
 
 	private Driver driver;
-	private Duration testTimeout = Duration.ofSeconds(3600);
+	private Duration testTimeout = Duration.ofSeconds(3);
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
@@ -51,13 +50,6 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 	@BeforeAll
 	private void setupDriver() {
 		driver = new Driver();
-	}
-
-	@AfterAll
-	private void teardownDriver() throws SQLException {
-		if (driver != null) {
-			Driver.deregister();
-		}
 	}
 
 	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {

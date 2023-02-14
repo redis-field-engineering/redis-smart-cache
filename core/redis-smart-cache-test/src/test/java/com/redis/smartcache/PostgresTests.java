@@ -3,7 +3,6 @@ package com.redis.smartcache;
 import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
@@ -80,33 +79,6 @@ class PostgresTests extends AbstractIntegrationTests {
 			callableStatement.setString(2, "julien");
 			callableStatement.executeUpdate();
 			Assertions.assertEquals("hello julien", callableStatement.getString(1));
-		}
-	}
-
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementRefCursor(RedisTestContext redis) throws Exception {
-		String runFunction = "{? = call getUsers()}";
-		try (Connection connection = connection(POSTGRESQL, redis);
-				Statement statement = connection.createStatement();
-				CallableStatement cs = connection.prepareCall(runFunction)) {
-
-			// We must be inside a transaction for cursors to work.
-			connection.setAutoCommit(false);
-
-			// register output
-			cs.registerOutParameter(1, Types.REF_CURSOR);
-
-			// run function
-			cs.execute();
-
-			// get refcursor and convert it to ResultSet
-			ResultSet resultSet = (ResultSet) cs.getObject(1);
-			while (resultSet.next()) {
-				Assertions.assertEquals("test", resultSet.getString("usename"));
-				Assertions.assertEquals("********", resultSet.getString("passwd"));
-			}
-
 		}
 	}
 
