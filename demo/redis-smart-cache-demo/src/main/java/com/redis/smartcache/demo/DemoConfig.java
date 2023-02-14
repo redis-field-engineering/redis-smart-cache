@@ -3,20 +3,20 @@ package com.redis.smartcache.demo;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import com.redis.smartcache.BootstrapConfig;
+import com.redis.smartcache.core.Config;
 
 @Configuration
 @ConfigurationProperties(prefix = "")
 public class DemoConfig {
 
-	private BootstrapConfig smartcache = new BootstrapConfig();
+	private Config smartcache = new Config();
 	private DataConfig demo = new DataConfig();
 
-	public BootstrapConfig getSmartcache() {
+	public Config getSmartcache() {
 		return smartcache;
 	}
 
-	public void setSmartcache(BootstrapConfig config) {
+	public void setSmartcache(Config config) {
 		this.smartcache = config;
 	}
 

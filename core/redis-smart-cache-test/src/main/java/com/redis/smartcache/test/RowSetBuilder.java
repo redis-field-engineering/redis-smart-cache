@@ -15,7 +15,7 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
-import com.redis.smartcache.rowset.CachedRowSetFactory;
+import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 
 public class RowSetBuilder {
 

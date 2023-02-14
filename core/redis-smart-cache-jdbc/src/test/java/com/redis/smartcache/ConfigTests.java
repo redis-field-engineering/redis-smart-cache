@@ -11,40 +11,34 @@ import java.util.Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.redis.smartcache.BootstrapConfig;
-import com.redis.smartcache.SmartDriver;
-import com.redis.smartcache.PropsMapper;
-import com.redis.smartcache.RulesetConfig;
-import com.redis.smartcache.RulesetConfig.RuleConfig;
+import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.Config.RulesetConfig.RuleConfig;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 
 class ConfigTests {
 
-	private static final String PROPERTY_CODEC_BUFFER_SIZE = SmartDriver.PROPERTY_PREFIX_REDIS + ".codec-buffer-size";
-
 	@Test
 	void keyBuilder() {
-		BootstrapConfig config = new BootstrapConfig();
-		Assertions.assertEquals(
-				SmartDriver.PREFIX + SmartDriver.DEFAULT_KEY_SEPARATOR + SmartDriver.CACHE_KEY_PREFIX + SmartDriver.DEFAULT_KEY_SEPARATOR,
-				config.key(SmartDriver.CACHE_KEY_PREFIX, ""));
+		Config config = new Config();
+		Assertions.assertEquals(Config.DEFAULT_KEYSPACE + Config.DEFAULT_KEY_SEPARATOR + Driver.CACHE_KEY_PREFIX
+				+ Config.DEFAULT_KEY_SEPARATOR, config.key(Driver.CACHE_KEY_PREFIX, ""));
 	}
 
 	@Test
-	void bootstrapProperties() throws IOException {
-		BootstrapConfig config = new BootstrapConfig();
+	void configProperties() throws IOException {
+		String propertyName = Driver.PROPERTY_PREFIX + ".codec-buffer-size";
+		Config config = new Config();
 		DataSize bufferSize = DataSize.of(123, Unit.KILOBYTE);
-		config.getRedis().setCodecBufferSize(bufferSize);
-		PropsMapper mapper = new PropsMapper();
-		Properties properties = mapper.write(config);
-		Assertions.assertEquals(bufferSize, DataSize.valueOf(properties.getProperty(PROPERTY_CODEC_BUFFER_SIZE)));
-		BootstrapConfig actual = mapper.read(properties, BootstrapConfig.class);
+		config.setCodecBufferSize(bufferSize);
+		Properties properties = Driver.properties(config);
+		Assertions.assertEquals(bufferSize, DataSize.valueOf(properties.getProperty(propertyName)));
+		Config actual = Driver.config(properties);
 		Assertions.assertEquals(config, actual);
-		properties.setProperty(PROPERTY_CODEC_BUFFER_SIZE, "10MB");
-		Assertions.assertEquals(DataSize.of(10, Unit.MEGABYTE),
-				mapper.read(properties, BootstrapConfig.class).getRedis().getCodecBufferSize());
+		properties.setProperty(propertyName, "10MB");
+		Assertions.assertEquals(DataSize.of(10, Unit.MEGABYTE), Driver.config(properties).getCodecBufferSize());
 	}
 
 	@Test
@@ -55,7 +49,7 @@ class ConfigTests {
 		RuleConfig newRule = RuleConfig.tables("table1").build();
 		config.setRules(Arrays.asList(newRule));
 		Assertions.assertEquals(1, eventList.getEvents().size());
-		Assertions.assertEquals(RulesetConfig.PROPERTY_RULESET, eventList.getEvents().get(0).getPropertyName());
+		Assertions.assertEquals(RulesetConfig.PROPERTY_RULES, eventList.getEvents().get(0).getPropertyName());
 	}
 
 	class EventList implements PropertyChangeListener {

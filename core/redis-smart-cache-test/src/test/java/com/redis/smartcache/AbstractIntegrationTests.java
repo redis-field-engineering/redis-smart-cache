@@ -24,10 +24,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
-import com.redis.smartcache.BootstrapConfig;
-import com.redis.smartcache.SmartConnection;
-import com.redis.smartcache.SmartDriver;
-import com.redis.smartcache.PropsMapper;
+import com.redis.smartcache.core.Config;
+import com.redis.smartcache.jdbc.SmartConnection;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -41,10 +39,9 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 
 	private final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
-	private final PropsMapper propsMapper = new PropsMapper();
 
-	private SmartDriver driver;
-	private Duration testTimeout = Duration.ofHours(1);
+	private Driver driver;
+	private Duration testTimeout = Duration.ofSeconds(3600);
 
 	@Override
 	protected Collection<RedisServer> redisServers() {
@@ -53,13 +50,13 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 
 	@BeforeAll
 	private void setupDriver() {
-		driver = new SmartDriver();
+		driver = new Driver();
 	}
 
 	@AfterAll
-	private void teardownDriver() {
+	private void teardownDriver() throws SQLException {
 		if (driver != null) {
-			driver.clear();
+			Driver.deregister();
 		}
 	}
 
@@ -83,19 +80,19 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 
 	protected SmartConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
 			throws SQLException, IOException {
-		BootstrapConfig config = bootstrapConfig();
+		Config config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
 		config.setConfigStep(Duration.ofHours(1));
-		Properties info = propsMapper.write(config);
+		Properties info = Driver.properties(config);
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());
 		return driver.connect("jdbc:" + redis.getRedisURI(), info);
 	}
 
-	protected BootstrapConfig bootstrapConfig() {
-		BootstrapConfig config = new BootstrapConfig();
-		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
+	protected Config bootstrapConfig() {
+		Config config = new Config();
+		config.setCodecBufferSizeInBytes(BUFFER_SIZE);
 		config.setConfigStep(Duration.ofHours(1));
 		return config;
 	}
@@ -162,7 +159,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
-				String keyPattern = connection.getContext().getBootstrapConfig().key(SmartDriver.CACHE_KEY_PREFIX, "*");
+				String keyPattern = new Config().key(Driver.CACHE_KEY_PREFIX, "*");
 				return !redis.sync().keys(keyPattern).isEmpty();
 			});
 			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));

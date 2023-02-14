@@ -21,8 +21,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import com.redis.smartcache.SmartDriver;
-import com.redis.smartcache.PropsMapper;
+import com.redis.smartcache.Driver;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -41,7 +40,6 @@ public class QueryExecutor implements AutoCloseable {
 	private final DataSourceProperties dataSourceProperties;
 	private final DemoConfig config;
 	private final List<QueryTask> tasks = new ArrayList<>();
-	private final PropsMapper propsMapper = new PropsMapper();
 
 	private ProgressBar progressBar;
 
@@ -54,10 +52,10 @@ public class QueryExecutor implements AutoCloseable {
 	public void execute() throws InterruptedException, ExecutionException, IOException {
 		HikariConfig hikariConfig = new HikariConfig();
 		hikariConfig.setJdbcUrl("jdbc:" + redisURI.toString());
-		hikariConfig.setDriverClassName(SmartDriver.class.getName());
+		hikariConfig.setDriverClassName(Driver.class.getName());
 		config.getSmartcache().getDriver().setUrl(dataSourceProperties.determineUrl());
 		config.getSmartcache().getDriver().setClassName(dataSourceProperties.determineDriverClassName());
-		Properties props = propsMapper.write(config.getSmartcache());
+		Properties props = Driver.properties(config.getSmartcache());
 		for (String propertyName : props.stringPropertyNames()) {
 			hikariConfig.addDataSourceProperty(propertyName, props.getProperty(propertyName));
 		}

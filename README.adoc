@@ -133,7 +133,7 @@ The next step is to configure {product-name}, as described below.
 
 First, ensure that your application is using {product-name} as its JDBC driver:
 
-`com.redis.smartcache.SmartDriver`
+`com.redis.smartcache.Driver`
 
 Next, set your JDBC URI to the URI of your Redis instance prefixed by `jdbc:` for example:
 ----
@@ -365,44 +365,44 @@ Only the first rule with matching criteria will be considered, and its action ap
 
 ==== Examples
 
-===== `SELECT * FROM customer c, product p, order o` 
+===== `SELECT * FROM customers c, products p, orders o` 
 [cols="6a,^1",options="header"]
 |==========================
 |Criteria|Match
 |
 [source,json]
 ----
-{ "tables": ["order", "product"] }
+{ "tables": ["orders", "products"] }
 ----
 |image:cross.svg[Check,20]
 |
 [source,json]
 ----
-{ "tables": ["order", "product", "customer"] }
+{ "tables": ["orders", "products", "customers"] }
 ----
 |image:check.svg[Check,20]
 |
 [source,json]
 ----
-{ "tablesAny": ["transaction"] }
+{ "tablesAny": ["transactions"] }
 ----
 |image:cross.svg[Check,20]
 |
 [source,json]
 ----
-{ "tablesAny": ["transaction", "order"] }
+{ "tablesAny": ["transactions", "orders"] }
 ----
 |image:check.svg[Check,20]
 |
 [source,json]
 ----
-{ "tablesAll": ["transaction", "order", "product"] }
+{ "tablesAll": ["transactions", "orders", "products"] }
 ----
 |image:cross.svg[Check,20]
 |
 [source,json]
 ----
-{ "tablesAll": ["order", "product"] }
+{ "tablesAll": ["orders", "products"] }
 ----
 |image:check.svg[Check,20]
 |

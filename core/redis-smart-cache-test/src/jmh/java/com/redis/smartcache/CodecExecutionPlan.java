@@ -11,22 +11,25 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import com.redis.smartcache.codec.ResultSetCodec;
-import com.redis.smartcache.codec.SerializedResultSetCodec;
-import com.redis.smartcache.rowset.CachedRowSetFactory;
+import com.redis.smartcache.core.codec.RowSetCodec;
+import com.redis.smartcache.core.codec.SerializedResultSetCodec;
+import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
+
+import io.airlift.units.DataSize;
+import io.airlift.units.DataSize.Unit;
 
 @State(Scope.Benchmark)
 public class CodecExecutionPlan {
 
-	private static final int BYTE_BUFFER_CAPACITY = 100000000;
+	private static final DataSize BYTE_BUFFER_CAPACITY = DataSize.of(100, Unit.MEGABYTE);
 
 	@Param({ "10", "100" })
 	private int columns;
 	@Param({ "10", "100", "1000" })
 	private int rows;
 
-	private ResultSetCodec codec;
+	private RowSetCodec codec;
 	private SerializedResultSetCodec serializedCodec;
 	private ByteBuffer byteBuffer;
 	private ByteBuffer serializedByteBuffer;
@@ -34,8 +37,9 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = ResultSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
-		this.serializedCodec = new SerializedResultSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
+		this.codec = RowSetCodec.builder().maxByteBufferCapacity(BYTE_BUFFER_CAPACITY).build();
+		this.serializedCodec = new SerializedResultSetCodec(new CachedRowSetFactory(),
+				Math.toIntExact(BYTE_BUFFER_CAPACITY.toBytes()));
 	}
 
 	@Setup(Level.Invocation)
@@ -61,7 +65,7 @@ public class CodecExecutionPlan {
 		return rowSet;
 	}
 
-	public ResultSetCodec getCodec() {
+	public RowSetCodec getCodec() {
 		return codec;
 	}
 
