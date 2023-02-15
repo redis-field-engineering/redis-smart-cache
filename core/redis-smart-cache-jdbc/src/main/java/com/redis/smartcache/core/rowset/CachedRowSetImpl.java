@@ -77,8 +77,6 @@ import javax.sql.RowSet;
 import javax.sql.RowSetEvent;
 import javax.sql.RowSetInternal;
 import javax.sql.RowSetMetaData;
-import javax.sql.RowSetReader;
-import javax.sql.RowSetWriter;
 import javax.sql.rowset.BaseRowSet;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetMetaDataImpl;
@@ -91,7 +89,6 @@ import javax.sql.rowset.serial.SerialRef;
 import javax.sql.rowset.serial.SerialStruct;
 import javax.sql.rowset.spi.SyncProvider;
 import javax.sql.rowset.spi.SyncProviderException;
-import javax.sql.rowset.spi.TransactionalWriter;
 
 /**
  * The standard implementation of the <code>CachedRowSet</code> interface.
@@ -106,24 +103,6 @@ import javax.sql.rowset.spi.TransactionalWriter;
 
 public class CachedRowSetImpl extends BaseRowSet
 		implements RowSet, RowSetInternal, Serializable, Cloneable, CachedRowSet {
-
-	/**
-	 * The <code>RowSetReaderImpl</code> object that is the reader for this rowset.
-	 * The method <code>execute</code> uses this reader as part of its
-	 * implementation.
-	 * 
-	 * @serial
-	 */
-	private RowSetReader rowSetReader;
-
-	/**
-	 * The <code>RowSetWriterImpl</code> object that is the writer for this rowset.
-	 * The method <code>acceptChanges</code> uses this writer as part of its
-	 * implementation.
-	 * 
-	 * @serial
-	 */
-	private RowSetWriter rowSetWriter;
 
 	/**
 	 * The <code>Connection</code> object that connects with this
@@ -330,13 +309,6 @@ public class CachedRowSetImpl extends BaseRowSet
 	private boolean callWithCon;
 
 	/**
-	 * CachedRowSet reader object to read the data from the ResultSet when a
-	 * connection parameter is passed to populate the CachedRowSet object for
-	 * paging.
-	 */
-	private CachedRowSetReader crsReader;
-
-	/**
 	 * The Vector holding the Match Columns
 	 */
 	private Vector<Integer> iMatchColumns;
@@ -346,20 +318,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	private Vector<String> strMatchColumns;
 
-	/**
-	 * Trigger that indicates whether the active SyncProvider is exposes the
-	 * additional TransactionalWriter method
-	 */
-	private boolean tXWriter = false;
-
-	/**
-	 * The field object for a transactional RowSet writer
-	 */
-	private TransactionalWriter tWriter = null;
 
 	protected transient JdbcRowSetResourceBundle resBundle;
-
-	private boolean updateOnInsert;
 
 	/**
 	 * Constructs a new default <code>CachedRowSetImpl</code> object with the
@@ -401,9 +361,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		} catch (IOException ioe) {
 			throw new RuntimeException(ioe);
 		}
-
-		rowSetReader = (CachedRowSetReader) new CachedRowSetReader();
-		rowSetWriter = (CachedRowSetWriter) new CachedRowSetWriter();
 
 		// allocate the parameters collection
 		initParams();
@@ -500,11 +457,6 @@ public class CachedRowSetImpl extends BaseRowSet
 			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.nullhash").toString());
 		}
 
-		// set the Reader, this maybe overridden latter
-
-		rowSetReader = new CachedRowSetReader();
-		rowSetWriter = new CachedRowSetWriter();
-
 		initParams(); // allocate the parameters collection
 		initContainer();
 		initProperties(); // set up some default values
@@ -551,7 +503,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 		setEscapeProcessing(true);
 		// setTypeMap(null);
-		checkTransactionalWriter();
 
 		// Instantiating the vector for MatchColumns
 
@@ -564,32 +515,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		for (int j = 0; j < 10; j++) {
 			strMatchColumns.add(j, null);
 		}
-	}
-
-	/**
-	 * Determine whether the SyncProvider's writer implements the
-	 * <code>TransactionalWriter<code> interface
-	 */
-	private void checkTransactionalWriter() {
-		if (rowSetWriter != null) {
-			Class<?> c = rowSetWriter.getClass();
-			if (c != null) {
-				Class<?>[] theInterfaces = c.getInterfaces();
-				for (int i = 0; i < theInterfaces.length; i++) {
-					if ((theInterfaces[i].getName()).indexOf("TransactionalWriter") > 0) {
-						tXWriter = true;
-						establishTransactionalWriter();
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Sets an private field to all transaction bounddaries to be set
-	 */
-	private void establishTransactionalWriter() {
-		tWriter = (TransactionalWriter) new CachedRowSetWriter();
 	}
 
 	// -----------------------------------------------------------------------
@@ -754,8 +679,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		md.setColumnCount(numCols);
 		for (int col = 1; col <= numCols; col++) {
 			md.setAutoIncrement(col, rsmd.isAutoIncrement(col));
-			if (rsmd.isAutoIncrement(col))
-				updateOnInsert = true;
 			md.setCaseSensitive(col, rsmd.isCaseSensitive(col));
 			md.setCurrency(col, rsmd.isCurrency(col));
 			md.setNullable(col, rsmd.isNullable(col));
@@ -829,26 +752,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// store the connection so the reader can find it.
 		setConnection(conn);
 
-		if (getPageSize() != 0) {
-			crsReader = (CachedRowSetReader) new CachedRowSetReader();
-			crsReader.setStartPosition(1);
-			callWithCon = true;
-			crsReader.readData((RowSetInternal) this);
-		}
-
-		// Now call the current reader's readData method
-		else {
-			rowSetReader.readData((RowSetInternal) this);
-		}
-		RowSetMD = (RowSetMetaDataImpl) this.getMetaData();
-
-		if (conn != null) {
-			// JDBC 4.0 mandates as does the Java EE spec that all DataBaseMetaData methods
-			// must be implemented, therefore, the previous fix for 5055528 is being backed
-			// out
-			dbmslocatorsUpdateCopy = conn.getMetaData().locatorsUpdateCopy();
-		}
-
+			throw new UnsupportedOperationException("readData not supported");
 	}
 
 	/**
@@ -905,46 +809,12 @@ public class CachedRowSetImpl extends BaseRowSet
 			throw new SyncProviderException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
 		}
 
-		int saveCursorPos = cursorPos;
-		boolean success = false;
-		boolean conflict = false;
-
 		try {
-			if (rowSetWriter != null) {
-				saveCursorPos = cursorPos;
-				conflict = rowSetWriter.writeData((RowSetInternal) this);
-				cursorPos = saveCursorPos;
-			}
 
-			if (tXWriter) {
-				// do commit/rollback's here
-				if (!conflict) {
-					tWriter = (TransactionalWriter) rowSetWriter;
-					tWriter.rollback();
-					success = false;
-				} else {
-					tWriter = (TransactionalWriter) rowSetWriter;
-					if (tWriter instanceof CachedRowSetWriter) {
-						((CachedRowSetWriter) tWriter).commit(this, updateOnInsert);
-					} else {
-						tWriter.commit();
-					}
-
-					success = true;
-				}
-			}
-
-			if (success == true) {
-				setOriginal();
-			} else if (!(success)) {
-				throw new SyncProviderException(resBundle.handleGetObject("cachedrowsetimpl.accfailed").toString());
-			}
+			throw new SyncProviderException(resBundle.handleGetObject("cachedrowsetimpl.accfailed").toString());
 
 		} catch (SyncProviderException spe) {
 			throw spe;
-		} catch (SQLException e) {
-			e.printStackTrace();
-			throw new SyncProviderException(e.getMessage());
 		} catch (SecurityException e) {
 			throw new SyncProviderException(e.getMessage());
 		}
@@ -2407,7 +2277,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			return null;
 		}
 
-		unicodeStream =  new ByteArrayInputStream(value.toString().getBytes());
+		unicodeStream = new ByteArrayInputStream(value.toString().getBytes());
 
 		return unicodeStream;
 	}
@@ -7307,13 +7177,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		}
 		// Fix for 6554186
 		onFirstPage = false;
-		if (callWithCon) {
-			crsReader.setStartPosition(endPos);
-			crsReader.readData((RowSetInternal) this);
-			resultSet = null;
-		} else {
-			populate(resultSet, endPos);
-		}
+	    populate(resultSet, endPos);
 		return pagenotend;
 	}
 
@@ -7386,23 +7250,11 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		if (rem == 0) {
 			maxRowsreached -= (2 * pS);
-			if (callWithCon) {
-				crsReader.setStartPosition(startPrev);
-				crsReader.readData((RowSetInternal) this);
-				resultSet = null;
-			} else {
-				populate(resultSet, startPrev);
-			}
+			populate(resultSet, startPrev);
 			return true;
 		} else {
 			maxRowsreached -= (pS + rem);
-			if (callWithCon) {
-				crsReader.setStartPosition(startPrev);
-				crsReader.readData((RowSetInternal) this);
-				resultSet = null;
-			} else {
-				populate(resultSet, startPrev);
-			}
+			populate(resultSet, startPrev);
 			return true;
 		}
 	}
