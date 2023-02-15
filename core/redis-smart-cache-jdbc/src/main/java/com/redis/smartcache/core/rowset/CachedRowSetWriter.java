@@ -568,7 +568,6 @@ public class CachedRowSetWriter implements TransactionalWriter, Serializable {
                         // create new instance of the class
                         SQLData obj = null;
                         try {
-                            ReflectUtil.checkPackageAccess(c);
                             @SuppressWarnings("deprecation")
                             Object tmp = c.newInstance();
                             obj = (SQLData)tmp;
