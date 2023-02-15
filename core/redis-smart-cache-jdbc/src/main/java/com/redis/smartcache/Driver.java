@@ -181,7 +181,7 @@ public class Driver implements java.sql.Driver {
 		try {
 			driver = (java.sql.Driver) Class.forName(className).getConstructor().newInstance();
 		} catch (Exception e) {
-			throw new SQLException("Could not load driver class '" + className + "'", e);
+			throw new SQLException("Could not load backend driver class '" + className + "'", e);
 		}
 		drivers.put(className, driver);
 		return driver;

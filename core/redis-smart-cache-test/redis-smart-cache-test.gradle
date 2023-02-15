@@ -1,48 +1,7 @@
-dependencies {
-    implementation project(':redis-smart-cache-jdbc')
-    testImplementation 'commons-codec:commons-codec'
-    testImplementation 'org.slf4j:slf4j-simple'
-    testImplementation 'org.postgresql:postgresql'
-    testImplementation 'com.oracle.database.jdbc:ojdbc8'
-    testImplementation 'com.mysql:mysql-connector-j'
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
-    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
-    testImplementation 'com.zaxxer:HikariCP'
-    testImplementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
-    testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
-    testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version
-    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
-    testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
-    testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
-    testImplementation group: 'org.testcontainers', name: 'mssqlserver', version: testcontainersVersion
-    testImplementation group: 'org.testcontainers', name: 'db2', version: testcontainersVersion
-    testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
-    testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
-}
-
 bootJar {
     enabled = false
 }
 
 jar {
-    enabled = true
     archiveClassifier = ''
 }
-
-jmh {
-    fork = 1
-    iterations = 1
-    timeUnit = 'ms'
-    warmup = '1s'
-    warmupForks = 0
-    warmupIterations = 0
-}
-
-jmhJar {
-    exclude('org/slf4j/impl/**')
-}
-
-tasks.bootJar.dependsOn ':redis-smart-cache-jdbc:shadowJar'
-tasks.bootJarMainClassName.dependsOn ':redis-smart-cache-jdbc:shadowJar'
-tasks.test.dependsOn ':redis-smart-cache-jdbc:shadowJar'
-tasks.jmhRunBytecodeGenerator.dependsOn ':redis-smart-cache-jdbc:shadowJar'

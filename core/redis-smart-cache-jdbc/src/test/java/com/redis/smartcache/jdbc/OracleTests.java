@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.jdbc;
 
 import java.io.IOException;
 import java.math.BigDecimal;

@@ -35,8 +35,6 @@ projects {
         }
         path(':redis-smart-cache-jdbc') {
             id 'com.github.johnrengelman.shadow'
-        }
-        path(':redis-smart-cache-test') {
             id 'me.champeau.jmh'
         }
     }

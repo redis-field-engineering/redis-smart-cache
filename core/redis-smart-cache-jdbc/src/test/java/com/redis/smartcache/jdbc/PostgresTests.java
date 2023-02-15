@@ -1,13 +1,15 @@
-package com.redis.smartcache;
+package com.redis.smartcache.jdbc;
 
 import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
+import java.util.Properties;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,6 +18,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
+import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
 import com.redis.testcontainers.junit.RedisTestContext;
 import com.redis.testcontainers.junit.RedisTestContextsSource;
@@ -116,6 +119,20 @@ class PostgresTests extends AbstractIntegrationTests {
 	@RedisTestContextsSource
 	void testResultSetMetadata(RedisTestContext redis) throws Exception {
 		testResultSetMetaData(POSTGRESQL, redis, "SELECT * FROM orders");
+	}
+
+	@ParameterizedTest
+	@RedisTestContextsSource
+	void testConnect(RedisTestContext redis) throws SQLException, IOException {
+		Config config = new Config();
+		config.getDriver().setClassName(POSTGRESQL.getDriverClassName());
+		config.getDriver().setUrl(POSTGRESQL.getJdbcUrl());
+		Properties info = Driver.properties(config);
+		info.setProperty("user", POSTGRESQL.getUsername());
+		info.setProperty("password", POSTGRESQL.getPassword());
+		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());
+		Connection connection = driver.connect("jdbc:" + redis.getRedisURI(), info);
+		Assertions.assertInstanceOf(SmartConnection.class, connection);
 	}
 
 }

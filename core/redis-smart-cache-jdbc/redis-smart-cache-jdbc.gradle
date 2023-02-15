@@ -1,4 +1,4 @@
-	dependencies {
+dependencies {
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
     implementation 'org.apache.commons:commons-pool2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
@@ -7,8 +7,20 @@
     implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRtsVersion
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
+    testImplementation project(':redis-smart-cache-test')
     testImplementation 'org.slf4j:slf4j-simple'
+    testImplementation 'org.postgresql:postgresql'
+    testImplementation 'com.oracle.database.jdbc:ojdbc8'
+    testImplementation 'com.mysql:mysql-connector-j'
+    testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
+    testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version    
     testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
+    testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'mssqlserver', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'db2', version: testcontainersVersion
+    testImplementation group: 'org.testcontainers', name: 'mysql', version: testcontainersVersion
+    testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
 }
 
 bootJar {
@@ -33,3 +45,16 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 }
 
 tasks.shadowJar.dependsOn tasks.relocateShadowJar
+
+jmh {
+    fork = 1
+    iterations = 1
+    timeUnit = 'ms'
+    warmup = '1s'
+    warmupForks = 0
+    warmupIterations = 0
+}
+
+jmhJar {
+    exclude('org/slf4j/impl/**')
+}

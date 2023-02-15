@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.jdbc;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,12 +19,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.awaitility.Awaitility;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
+import com.redis.smartcache.Driver;
+import com.redis.smartcache.TestUtils;
 import com.redis.smartcache.core.Config;
-import com.redis.smartcache.jdbc.SmartConnection;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
 import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
@@ -164,20 +165,20 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 			Statement statement = connection.createStatement();
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();
-			Assert.assertNotNull(resultSet);
+			Assertions.assertNotNull(resultSet);
 			final ResultSetMetaData metaData = resultSet.getMetaData();
-			Assert.assertNotNull(metaData);
+			Assertions.assertNotNull(metaData);
 			int colCount = metaData.getColumnCount();
-			Assert.assertTrue(colCount > 0);
+			Assertions.assertTrue(colCount > 0);
 			for (int i = 1; i <= colCount; i++) {
-				Assert.assertNotNull(metaData.getColumnName(i));
-				Assert.assertNotNull(metaData.getColumnLabel(i));
-				Assert.assertNotNull(metaData.getColumnTypeName(i));
-				Assert.assertNotNull(metaData.getCatalogName(i));
-				Assert.assertNotNull(metaData.getColumnClassName(i));
-				Assert.assertTrue(metaData.getColumnDisplaySize(i) > 0);
-				Assert.assertNotNull(metaData.getSchemaName(i));
-				Assert.assertNotNull(metaData.getTableName(i));
+				Assertions.assertNotNull(metaData.getColumnName(i));
+				Assertions.assertNotNull(metaData.getColumnLabel(i));
+				Assertions.assertNotNull(metaData.getColumnTypeName(i));
+				Assertions.assertNotNull(metaData.getCatalogName(i));
+				Assertions.assertNotNull(metaData.getColumnClassName(i));
+				Assertions.assertTrue(metaData.getColumnDisplaySize(i) > 0);
+				Assertions.assertNotNull(metaData.getSchemaName(i));
+				Assertions.assertNotNull(metaData.getTableName(i));
 			}
 		}
 	}
