@@ -390,12 +390,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 100
               }
             ]
           },
@@ -456,12 +452,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 100
               }
             ]
           },
@@ -644,12 +636,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 10
               }
             ]
           },
@@ -710,12 +698,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 100
               }
             ]
           },
@@ -779,12 +763,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 100
               }
             ]
           },
@@ -1640,6 +1620,6 @@
   "timezone": "",
   "title": "Redis Smart Cache",
   "uid": "7B6csWTVk",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
