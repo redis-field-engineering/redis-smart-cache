@@ -13,8 +13,6 @@ services:
       - MYSQL_USER=smartcache
       - MYSQL_PASSWORD=smartcache
       - MYSQL_DATABASE=smartcache
-    volumes:
-      - "./conf.d:/etc/mysql/conf.d:ro"
 
   grafana:
     image: grafana/grafana
@@ -35,7 +33,7 @@ services:
   demo:
     image: fieldengineering/demo-redis-smart-cache:early-access
     hostname: smartcache
-    container_name: redis-smart-cache-demo
+    container_name: smartcache
     restart: on-failure
     depends_on:
       - mysql
