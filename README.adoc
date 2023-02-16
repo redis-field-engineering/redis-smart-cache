@@ -101,7 +101,7 @@ image:grafana-import-dashboard-datasource.png[Import Dashboard Data Source,width
 
 You should see the following dashboard:
 
-image:grafana-dashboard.png[Dashboard,width=800]
+image:grafana-dashboard.png[Dashboard,width=1486]
 
 After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
 
