@@ -23,6 +23,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
+import me.tongfei.progressbar.ProgressBarStyle;
 
 @Component
 public class DataLoader {
@@ -79,6 +80,7 @@ public class DataLoader {
 		}
 		connection.setAutoCommit(false);
 		ProgressBarBuilder progressBarBuilder = new ProgressBarBuilder();
+		progressBarBuilder.setStyle(ProgressBarStyle.COLORFUL_UNICODE_BAR);
 		progressBarBuilder.setInitialMax(end);
 		progressBarBuilder.setTaskName(String.format("Populating %s", table));
 		progressBarBuilder.showSpeed();
@@ -95,7 +97,7 @@ public class DataLoader {
 				preparedStatement.executeBatch();
 				connection.commit();
 				preparedStatement.close();
-				preparedStatement = preparedStatement.getConnection().prepareStatement(insertSQL);
+				preparedStatement = connection.prepareStatement(insertSQL);
 				progressBar.stepBy(config.getDemo().getBatch());
 			}
 		}

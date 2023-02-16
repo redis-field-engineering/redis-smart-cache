@@ -15,11 +15,13 @@ import io.micrometer.core.instrument.Timer;
 
 public class SmartStatement implements Statement {
 
-	private static final String QUERY_TIMER_ID = "queries";
+	private static final String METER_QUERY = "query";
+	private static final String METER_DB = "db";
 
 	private final SmartConnection connection;
 	protected final Statement statement;
 	private final Timer queryTimer;
+	private final Timer dbTimer;
 	private long executeDuration = 0;
 	private Query query;
 	private RowSet rowSet;
@@ -27,7 +29,9 @@ public class SmartStatement implements Statement {
 	public SmartStatement(SmartConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
-		this.queryTimer = connection.getMeterRegistry().timer(QUERY_TIMER_ID);
+		this.queryTimer = Timer.builder(METER_QUERY).publishPercentiles(0.9, 0.99)
+				.register(connection.getMeterRegistry());
+		this.dbTimer = Timer.builder(METER_DB).publishPercentiles(0.9, 0.99).register(connection.getMeterRegistry());
 	}
 
 	@Override
@@ -47,27 +51,27 @@ public class SmartStatement implements Statement {
 
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
-		return executeQuery(sql, () -> statement.executeQuery(sql));
+		return executeQuery(sql, statement::executeQuery);
 	}
 
 	protected String key(Query query) {
 		return query.getKey();
 	}
 
-	protected ResultSet executeQuery(String sql, ResultSetProvider execution) throws SQLException {
+	protected ResultSet executeQuery(String sql, QueryExecutable executeQuery) throws SQLException {
 		try {
 			return queryTimer.recordCallable(() -> {
-				Query query = connection.getQuery(sql);
-				connection.getRuleSession().fire(query);
-				String key = key(query);
-				if (query.isCaching()) {
+				Query sqlQuery = connection.getQuery(sql);
+				connection.getRuleSession().fire(sqlQuery);
+				String key = key(sqlQuery);
+				if (sqlQuery.isCaching()) {
 					RowSet cachedRowSet = connection.getRowSetCache().get(key);
 					if (cachedRowSet != null) {
 						return cachedRowSet;
 					}
 				}
-				ResultSet resultSet = execution.get();
-				return cacheResultSet(key, query, resultSet);
+				ResultSet resultSet = dbTimer.recordCallable(() -> executeQuery.executeQuery(sql));
+				return cacheResultSet(key, sqlQuery, resultSet);
 			});
 		} catch (SQLException e) {
 			throw e;
@@ -95,9 +99,9 @@ public class SmartStatement implements Statement {
 		return resultSet;
 	}
 
-	protected interface ResultSetProvider {
+	protected interface QueryExecutable {
 
-		ResultSet get() throws SQLException;
+		ResultSet executeQuery(String sql) throws SQLException;
 
 	}
 
@@ -106,12 +110,12 @@ public class SmartStatement implements Statement {
 		boolean execute() throws SQLException;
 	}
 
-	protected boolean execute(String sql, Executable execution) throws SQLException {
+	protected boolean execute(String sql, Executable executable) throws SQLException {
 		long startTime = System.nanoTime();
 		try {
 			query = connection.getQuery(sql);
 			connection.getRuleSession().fire(query);
-			return execute(query.getKey(), query, execution::execute);
+			return execute(query.getKey(), query, executable::execute);
 		} finally {
 			executeDuration += System.nanoTime() - startTime;
 		}
@@ -124,8 +128,14 @@ public class SmartStatement implements Statement {
 				return true;
 			}
 		}
-		return executable.execute();
-
+		try {
+			return dbTimer.recordCallable(executable::execute);
+		} catch (SQLException e) {
+			throw e;
+		} catch (Exception e) {
+			// Should not happen but rethrow anyway
+			throw new SQLException(e);
+		}
 	}
 
 	@Override

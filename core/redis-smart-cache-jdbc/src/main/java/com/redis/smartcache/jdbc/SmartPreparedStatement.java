@@ -49,7 +49,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
+		return executeQuery(sql, s -> ((PreparedStatement) statement).executeQuery());
 	}
 
 	@Override

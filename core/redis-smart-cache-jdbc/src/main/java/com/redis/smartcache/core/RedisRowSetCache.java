@@ -13,11 +13,11 @@ import io.micrometer.core.instrument.Timer;
 public class RedisRowSetCache implements RowSetCache {
 
 	private static final String METER_PREFIX = "cache.";
-	private static final String METER_GETS = METER_PREFIX + "gets";
-	private static final String METER_PUTS = METER_PREFIX + "puts";
-	private static final String METER_RESULT_TAG = "result";
-	private static final String METER_MISS_TAG = "miss";
-	private static final String METER_HIT_TAG = "hit";
+	private static final String METER_GET = METER_PREFIX + "get";
+	private static final String METER_PUT = METER_PREFIX + "put";
+	private static final String TAG_RESULT = "result";
+	private static final String TAG_MISS = "miss";
+	private static final String TAG_HIT = "hit";
 
 	private final StatefulRedisConnection<String, RowSet> connection;
 	private final String prefix;
@@ -32,10 +32,10 @@ public class RedisRowSetCache implements RowSetCache {
 		LettuceAssert.notNull(meterRegistry, "Meter registry must not be null");
 		this.connection = connection;
 		this.prefix = prefix;
-		this.getTimer = meterRegistry.timer(METER_GETS);
-		this.putTimer = meterRegistry.timer(METER_PUTS);
-		this.missCounter = meterRegistry.counter(METER_GETS, METER_RESULT_TAG, METER_MISS_TAG);
-		this.hitCounter = meterRegistry.counter(METER_GETS, METER_RESULT_TAG, METER_HIT_TAG);
+		this.getTimer = Timer.builder(METER_GET).publishPercentiles(0.9, 0.99).register(meterRegistry);
+		this.putTimer = Timer.builder(METER_PUT).publishPercentiles(0.9, 0.99).register(meterRegistry);
+		this.missCounter = Counter.builder(METER_GET).tag(TAG_RESULT, TAG_MISS).register(meterRegistry);
+		this.hitCounter = Counter.builder(METER_GET).tag(TAG_RESULT, TAG_HIT).register(meterRegistry);
 	}
 
 	private String key(String id) {
