@@ -12,8 +12,6 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
-import com.redis.smartcache.core.rowset.CachedRowSetFactory;
-
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.lettuce.core.codec.RedisCodec;
@@ -30,9 +28,9 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	private RowSetCodec(Builder builder) {
-		this.rowSetFactory = builder.rowSetFactory;
-		this.maxByteBufferCapacity = Math.toIntExact(builder.maxByteBufferCapacity.toBytes());
+	public RowSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
+		this.rowSetFactory = rowSetFactory;
+		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
 	@Override
@@ -221,30 +219,6 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 			byteBuf.writeInt(length);
 			ByteBufUtil.reserveAndWriteUtf8(byteBuf, string, length);
 		}
-	}
-
-	public static Builder builder() {
-		return new Builder();
-	}
-
-	public static class Builder {
-
-		private final RowSetFactory rowSetFactory = new CachedRowSetFactory();
-		private DataSize maxByteBufferCapacity = DEFAULT_BYTE_BUFFER_CAPACITY;
-
-		public Builder maxByteBufferCapacityMB(int sizeInMB) {
-			return maxByteBufferCapacity(DataSize.of(sizeInMB, Unit.MEGABYTE));
-		}
-
-		public Builder maxByteBufferCapacity(DataSize size) {
-			this.maxByteBufferCapacity = size;
-			return this;
-		}
-
-		public RowSetCodec build() {
-			return new RowSetCodec(this);
-		}
-
 	}
 
 }

@@ -19,7 +19,7 @@ import com.redis.smartcache.test.RowSetBuilder;
 @State(Scope.Benchmark)
 public class CodecExecutionPlan {
 
-	private static final int BYTE_BUFFER_CAPACITY = 100;
+	private static final int BYTE_BUFFER_CAPACITY = 100 * 1024 * 1024;
 
 	@Param({ "10", "100" })
 	private int columns;
@@ -34,15 +34,14 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = RowSetCodec.builder().maxByteBufferCapacityMB(BYTE_BUFFER_CAPACITY).build();
-		this.serializedCodec = new SerializedResultSetCodec(new CachedRowSetFactory(),
-				BYTE_BUFFER_CAPACITY * 1024 * 1024);
+		this.codec = new RowSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
+		this.serializedCodec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)
 	public void setUpInvocation() throws SQLException {
-		RowSetBuilder rowSetBuilder = new RowSetBuilder();
-		this.rowSet = rowSetBuilder.build(rowSetBuilder.metaData(columns, RowSetBuilder.SUPPORTED_TYPES), rows);
+		RowSetBuilder rowSetBuilder = RowSetBuilder.of(new CachedRowSetFactory()).rowCount(rows).columnCount(columns);
+		this.rowSet = rowSetBuilder.build();
 		rowSet.beforeFirst();
 		this.byteBuffer = codec.encodeValue(rowSet);
 		rowSet.beforeFirst();

@@ -3,7 +3,6 @@ package com.redis.smartcache;
 import java.sql.SQLException;
 
 import javax.sql.RowSet;
-import javax.sql.RowSetMetaData;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import com.redis.smartcache.core.codec.RowSetCodec;
 import com.redis.smartcache.core.codec.SerializedResultSetCodec;
+import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -23,14 +23,13 @@ class CodecTests {
 
 	@BeforeAll
 	public void setup() throws SQLException {
-		rowSetBuilder = new RowSetBuilder();
+		rowSetBuilder = new RowSetBuilder(new CachedRowSetFactory());
 	}
 
 	@Test
 	void resultSetCodec() throws SQLException {
-		RowSetMetaData metaData = rowSetBuilder.metaData(RowSetBuilder.SUPPORTED_TYPES);
-		RowSet rowSet = rowSetBuilder.build(metaData, 1000);
-		RowSetCodec codec = RowSetCodec.builder().maxByteBufferCapacityMB(BYTE_BUFFER_CAPACITY).build();
+		RowSet rowSet = rowSetBuilder.build();
+		RowSetCodec codec = new RowSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
 		TestUtils.assertEquals(rowSet, actual);
@@ -38,9 +37,8 @@ class CodecTests {
 
 	@Test
 	void serializedResultSetCodec() throws SQLException {
-		RowSet rowSet = rowSetBuilder.build(rowSetBuilder.metaData(RowSetBuilder.SUPPORTED_TYPES), 100);
-		SerializedResultSetCodec codec = new SerializedResultSetCodec(rowSetBuilder.getRowSetFactory(),
-				BYTE_BUFFER_CAPACITY * 1024 * 1024);
+		RowSet rowSet = rowSetBuilder.build();
+		SerializedResultSetCodec codec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
 		TestUtils.assertEquals(rowSet, actual);

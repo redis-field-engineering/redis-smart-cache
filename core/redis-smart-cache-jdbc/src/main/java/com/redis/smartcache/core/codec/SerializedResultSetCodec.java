@@ -7,28 +7,23 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
 import javax.sql.RowSet;
 import javax.sql.rowset.CachedRowSet;
-import javax.sql.rowset.RowSetFactory;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
-public class SerializedResultSetCodec implements RedisCodec<String, ResultSet> {
+public class SerializedResultSetCodec implements RedisCodec<String, RowSet> {
 
 	private static final byte[] EMPTY = new byte[0];
 	private static final StringCodec STRING_CODEC = StringCodec.UTF8;
 
-	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public SerializedResultSetCodec(RowSetFactory rowSetFactory, int maxBufferCapacity) {
-		this.rowSetFactory = rowSetFactory;
+	public SerializedResultSetCodec(int maxBufferCapacity) {
 		this.maxByteBufferCapacity = maxBufferCapacity;
 	}
 
@@ -51,20 +46,18 @@ public class SerializedResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	private RowSet decode(ByteBuf byteBuf) throws SQLException, IOException, ClassNotFoundException {
+	private RowSet decode(ByteBuf byteBuf) throws IOException, ClassNotFoundException {
 		return decode(byteBuf.array());
 	}
 
-	public RowSet decode(byte[] bytes) throws SQLException, IOException, ClassNotFoundException {
-		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+	public RowSet decode(byte[] bytes) throws IOException, ClassNotFoundException {
 		ByteArrayInputStream in = new ByteArrayInputStream(bytes);
 		ObjectInputStream is = new ObjectInputStream(in);
-		rowSet.populate((CachedRowSet) is.readObject());
-		return rowSet;
+		return (CachedRowSet) is.readObject();
 	}
 
 	@Override
-	public ByteBuffer encodeValue(ResultSet resultSet) {
+	public ByteBuffer encodeValue(RowSet resultSet) {
 		if (resultSet == null) {
 			return ByteBuffer.wrap(EMPTY);
 		}
@@ -82,14 +75,11 @@ public class SerializedResultSetCodec implements RedisCodec<String, ResultSet> {
 		return buffer;
 	}
 
-	public byte[] encode(ResultSet resultSet) throws SQLException, IOException {
-		try (CachedRowSet cachedRowSet = rowSetFactory.createCachedRowSet()) {
-			cachedRowSet.populate(resultSet, 1);
-			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			ObjectOutput out = new ObjectOutputStream(bos);
-			out.writeObject(cachedRowSet);
-			return bos.toByteArray();
-		}
+	public byte[] encode(RowSet rowSet) throws IOException {
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		ObjectOutput out = new ObjectOutputStream(bos);
+		out.writeObject(rowSet);
+		return bos.toByteArray();
 	}
 
 }

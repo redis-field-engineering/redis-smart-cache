@@ -157,7 +157,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private static RedisCodec<String, RowSet> rowSetCodec(Config config) {
-		return RowSetCodec.builder().maxByteBufferCapacity(config.getCodecBufferSize()).build();
+		return new RowSetCodec(ROW_SET_FACTORY, Math.toIntExact(config.getCodecBufferSize().toBytes()));
 	}
 
 	private static Connection backendConnection(DriverConfig config, Properties info) throws SQLException {

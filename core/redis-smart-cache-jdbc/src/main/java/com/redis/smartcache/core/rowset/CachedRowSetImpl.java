@@ -34,10 +34,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OptionalDataException;
 import java.io.Reader;
 import java.io.Serializable;
-import java.io.StreamCorruptedException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.sql.Array;
@@ -64,14 +62,14 @@ import java.sql.Types;
 import java.text.DateFormat;
 import java.text.MessageFormat;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.Vector;
 
 import javax.sql.RowSet;
 import javax.sql.RowSetEvent;
@@ -101,8 +99,17 @@ import javax.sql.rowset.spi.SyncProviderException;
  * @author Jonathan Bruce, Amit Handa
  */
 
-public class CachedRowSetImpl extends BaseRowSet
-		implements RowSet, RowSetInternal, Serializable, Cloneable, CachedRowSet {
+public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetInternal, Serializable, CachedRowSet {
+
+	private static final String MESSAGE_CLONE_FAIL = "Clone failed: {0}";
+	private static final String MESSAGE_DATA_TYPE_MISMATCH = "Data Type Mismatch";
+	private static final String MESSAGE_INVALID_CURSOR_POSITION = "Invalid cursor position";
+	private static final String MESSAGE_INVALID_OPERATION = "Invalid operation while on insert row";
+	private static final String MESSAGE_OPERATION_NOT_YET_SUPPORTED = "Operation not yet supported";
+	private static final String MESSAGE_OPERATION_NOT_SUPPORTED = "Operation not supported by Database";
+	private static final String MESSAGE_MATCH_COLUMNS = "Match columns are not the same as those set";
+	private static final String MESSAGE_FEATURE_NOT_SUPPORTED = "Feature not supported";
+	private static final String MESSAGE_MAX_ROWS_EXCEEDED = "Populating rows setting has exceeded max row setting";
 
 	/**
 	 * The <code>Connection</code> object that connects with this
@@ -115,7 +122,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * columns in the <code>ResultSet</code> object that is the current source of
 	 * data for this <code>CachedRowSetImpl</code> object.
 	 */
-	private transient ResultSetMetaData RSMD;
+	private transient ResultSetMetaData resultSetMetaData;
 
 	/**
 	 * The <code>RowSetMetaData</code> object that contains information about the
@@ -123,7 +130,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * 
 	 * @serial
 	 */
-	private RowSetMetaDataImpl RowSetMD;
+	private RowSetMetaDataImpl rowSetMetaData;
 
 	// Properties of this RowSet
 
@@ -133,7 +140,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * 
 	 * @serial
 	 */
-	private int keyCols[];
+	private int[] keyCols;
 
 	/**
 	 * The name of the table in the underlying database to which updates should be
@@ -150,7 +157,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * 
 	 * @serial
 	 */
-	private Vector<Object> rvh;
+	private List<Object> rvh;
 
 	/**
 	 * The current position of the cursor in this <code>CachedRowSetImpl</code>
@@ -311,15 +318,12 @@ public class CachedRowSetImpl extends BaseRowSet
 	/**
 	 * The Vector holding the Match Columns
 	 */
-	private Vector<Integer> iMatchColumns;
+	private List<Integer> iMatchColumns;
 
 	/**
 	 * The Vector that will hold the Match Column names.
 	 */
-	private Vector<String> strMatchColumns;
-
-
-	protected transient JdbcRowSetResourceBundle resBundle;
+	private List<String> strMatchColumns;
 
 	/**
 	 * Constructs a new default <code>CachedRowSetImpl</code> object with the
@@ -356,12 +360,6 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public CachedRowSetImpl() throws SQLException {
 
-		try {
-			resBundle = JdbcRowSetResourceBundle.getJdbcRowSetResourceBundle();
-		} catch (IOException ioe) {
-			throw new RuntimeException(ioe);
-		}
-
 		// allocate the parameters collection
 		initParams();
 
@@ -381,95 +379,13 @@ public class CachedRowSetImpl extends BaseRowSet
 	}
 
 	/**
-	 * Provides a <code>CachedRowSetImpl</code> instance with the same default
-	 * properties as as the zero parameter constructor.
-	 * 
-	 * <pre>
-	 *     onInsertRow = false
-	 *     insertRow = null
-	 *     cursorPos = 0
-	 *     numRows = 0
-	 *     showDeleted = false
-	 *     queryTimeout = 0
-	 *     maxRows = 0
-	 *     maxFieldSize = 0
-	 *     rowSetType = ResultSet.TYPE_SCROLL_INSENSITIVE
-	 *     concurrency = ResultSet.CONCUR_UPDATABLE
-	 *     readOnly = false
-	 *     isolation = Connection.TRANSACTION_READ_COMMITTED
-	 *     escapeProcessing = true
-	 *     onInsertRow = false
-	 *     insertRow = null
-	 *     cursorPos = 0
-	 *     absolutePos = 0
-	 *     numRows = 0
-	 * </pre>
-	 *
-	 * However, applications will have the means to specify at runtime the desired
-	 * <code>SyncProvider</code> object.
-	 * <p>
-	 * For example, creating a <code>CachedRowSetImpl</code> object as follows
-	 * ensures that a it is established with the <code>com.foo.provider.Impl</code>
-	 * synchronization implementation providing the synchronization mechanism for
-	 * this disconnected <code>RowSet</code> object.
-	 * 
-	 * <pre>
-	 * Hashtable env = new Hashtable();
-	 * env.put(javax.sql.rowset.spi.SyncFactory.ROWSET_PROVIDER_NAME, "com.foo.provider.Impl");
-	 * CachedRowSetImpl crs = new CachedRowSet(env);
-	 * </pre>
-	 * <p>
-	 * Calling this constructor with a <code>null</code> parameter will cause the
-	 * <code>SyncFactory</code> to provide the reference optimistic provider
-	 * <code>com.sun.rowset.providers.RIOptimisticProvider</code>.
-	 * <p>
-	 * In addition, the following properties can be associated with the provider to
-	 * assist in determining the choice of the synchronizaton provider such as:
-	 * <ul>
-	 * <li><code>ROWSET_SYNC_PROVIDER</code> - the property specifying the
-	 * <code>SyncProvider</code> class name to be instantiated by the
-	 * <code>SyncFacttory</code>
-	 * <li><code>ROWSET_SYNC_VENDOR</code> - the property specifying the software
-	 * vendor associated with a <code>SyncProvider</code> implementation.
-	 * <li><code>ROWSET_SYNC_PROVIDER_VER</code> - the property specifying the
-	 * version of the <code>SyncProvider</code> implementation provided by the
-	 * software vendor.
-	 * </ul>
-	 * More specific detailes are available in the <code>SyncFactory</code> and
-	 * <code>SyncProvider</code> specificiations later in this document.
-	 * <p>
-	 * 
-	 * @param env a <code>Hashtable</code> object with a list of desired
-	 *            synchronization providers
-	 * @throws SQLException if the requested provider cannot be found by the
-	 *                      synchronization factory
-	 * @see SyncProvider
-	 */
-	public CachedRowSetImpl(@SuppressWarnings("rawtypes") Hashtable env) throws SQLException {
-
-		try {
-			resBundle = JdbcRowSetResourceBundle.getJdbcRowSetResourceBundle();
-		} catch (IOException ioe) {
-			throw new RuntimeException(ioe);
-		}
-
-		if (env == null) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.nullhash").toString());
-		}
-
-		initParams(); // allocate the parameters collection
-		initContainer();
-		initProperties(); // set up some default values
-	}
-
-	/**
 	 * Sets the <code>rvh</code> field to a new <code>Vector</code> object with a
 	 * capacity of 100 and sets the <code>cursorPos</code> and <code>numRows</code>
 	 * fields to zero.
 	 */
 	private void initContainer() {
 
-		rvh = new Vector<Object>(100);
+		rvh = new ArrayList<>(100);
 		cursorPos = 0;
 		absolutePos = 0;
 		numRows = 0;
@@ -483,35 +399,24 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	private void initProperties() throws SQLException {
 
-		if (resBundle == null) {
-			try {
-				resBundle = JdbcRowSetResourceBundle.getJdbcRowSetResourceBundle();
-			} catch (IOException ioe) {
-				throw new RuntimeException(ioe);
-			}
-		}
 		setShowDeleted(false);
 		setQueryTimeout(0);
 		setMaxRows(0);
 		setMaxFieldSize(0);
 		setType(ResultSet.TYPE_SCROLL_INSENSITIVE);
 		setConcurrency(ResultSet.CONCUR_UPDATABLE);
-		if ((rvh.size() > 0) && (isReadOnly() == false))
-			setReadOnly(false);
-		else
-			setReadOnly(true);
+		setReadOnly(rvh.isEmpty() || isReadOnly());
 		setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 		setEscapeProcessing(true);
-		// setTypeMap(null);
 
 		// Instantiating the vector for MatchColumns
 
-		iMatchColumns = new Vector<Integer>(10);
+		iMatchColumns = new ArrayList<>(10);
 		for (int i = 0; i < 10; i++) {
 			iMatchColumns.add(i, -1);
 		}
 
-		strMatchColumns = new Vector<String>(10);
+		strMatchColumns = new ArrayList<>(10);
 		for (int j = 0; j < 10; j++) {
 			strMatchColumns.add(j, null);
 		}
@@ -534,10 +439,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *            set as the command; may be <code>null</code>
 	 * @throws SQLException if an error occurs
 	 */
+	@Override
 	public void setCommand(String cmd) throws SQLException {
-
 		super.setCommand(cmd);
-
 		if (!buildTableName(cmd).isEmpty()) {
 			this.setTableName(buildTableName(cmd));
 		}
@@ -568,10 +472,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      while populating the RowSet
 	 * @see #execute
 	 */
-
+	@Override
 	public void populate(ResultSet data) throws SQLException {
 		int rowsFetched;
-		Row currentRow;
+		Row row;
 		int numCols;
 		int i;
 		Map<String, Class<?>> map = getTypeMap();
@@ -579,34 +483,32 @@ public class CachedRowSetImpl extends BaseRowSet
 		int mRows;
 
 		if (data == null) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.populate").toString());
+			throw new SQLException("Invalid ResultSet object supplied to populate method");
 		}
 		this.resultSet = data;
 
 		// get the meta data for this ResultSet
-		RSMD = data.getMetaData();
+		resultSetMetaData = data.getMetaData();
 
 		// set up the metadata
-		RowSetMD = new RowSetMetaDataImpl();
-		initMetaData(RowSetMD, RSMD);
+		rowSetMetaData = new RowSetMetaDataImpl();
+		initMetaData(rowSetMetaData, resultSetMetaData);
 
 		// release the meta-data so that aren't tempted to use it.
-		RSMD = null;
-		numCols = RowSetMD.getColumnCount();
+		resultSetMetaData = null;
+		numCols = rowSetMetaData.getColumnCount();
 		mRows = this.getMaxRows();
 		rowsFetched = 0;
-		currentRow = null;
 
 		while (data.next()) {
 
-			currentRow = new Row(numCols);
+			row = new Row(numCols);
 
 			if (rowsFetched > mRows && mRows > 0) {
-				rowsetWarning
-						.setNextWarning(new RowSetWarning("Populating rows " + "setting has exceeded max row setting"));
+				rowsetWarning.setNextWarning(new RowSetWarning(MESSAGE_MAX_ROWS_EXCEEDED));
 			}
 			for (i = 1; i <= numCols; i++) {
-				obj = getValue(RowSetMD, i, data, map);
+				obj = getValue(rowSetMetaData, i, data, map);
 				/*
 				 * the following block checks for the various types that we have to serialize in
 				 * order to store - right now only structs have been tested
@@ -626,10 +528,10 @@ public class CachedRowSetImpl extends BaseRowSet
 						obj = new SerialArray((java.sql.Array) obj);
 				}
 
-				currentRow.initColumnObject(i, obj);
+				row.initColumnObject(i, obj);
 			}
 			rowsFetched++;
-			rvh.add(currentRow);
+			rvh.add(row);
 		}
 
 		numRows = rowsFetched;
@@ -752,7 +654,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// store the connection so the reader can find it.
 		setConnection(conn);
 
-			throw new UnsupportedOperationException("readData not supported");
+		throw new UnsupportedOperationException("readData not supported");
 	}
 
 	/**
@@ -805,13 +707,13 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see javax.sql.rowset.spi.SyncProvider
 	 */
 	public void acceptChanges() throws SyncProviderException {
-		if (onInsertRow == true) {
-			throw new SyncProviderException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow) {
+			throw new SyncProviderException(MESSAGE_INVALID_OPERATION);
 		}
 
 		try {
 
-			throw new SyncProviderException(resBundle.handleGetObject("cachedrowsetimpl.accfailed").toString());
+			throw new SyncProviderException("acceptChanges Failed");
 
 		} catch (SyncProviderException spe) {
 			throw spe;
@@ -857,18 +759,18 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see javax.sql.RowSetListener#rowSetChanged
 	 */
 	public void restoreOriginal() throws SQLException {
-		Row currentRow;
+		Row row;
 		for (Iterator<?> i = rvh.iterator(); i.hasNext();) {
-			currentRow = (Row) i.next();
-			if (currentRow.getInserted() == true) {
+			row = (Row) i.next();
+			if (row.getInserted()) {
 				i.remove();
 				--numRows;
 			} else {
-				if (currentRow.getDeleted() == true) {
-					currentRow.clearDeleted();
+				if (row.getDeleted()) {
+					row.clearDeleted();
 				}
-				if (currentRow.getUpdated() == true) {
-					currentRow.clearUpdated();
+				if (row.getUpdated()) {
+					row.clearUpdated();
 				}
 			}
 		}
@@ -902,20 +804,20 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if the cursor is not on a valid row
 	 */
 	public void undoDelete() throws SQLException {
-		if (getShowDeleted() == false) {
+		if (!getShowDeleted()) {
 			return;
 		}
 		// make sure we are on a row
 		checkCursor();
 
 		// don't want this to happen...
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
-		Row currentRow = (Row) getCurrentRow();
-		if (currentRow.getDeleted() == true) {
-			currentRow.clearDeleted();
+		Row row = (Row) getCurrentRow();
+		if (row.getDeleted()) {
+			row.clearDeleted();
 			--numDeleted;
 			notifyRowChanged();
 		}
@@ -938,17 +840,17 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkCursor();
 
 		// don't want this to happen...
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
-		Row currentRow = (Row) getCurrentRow();
-		if (currentRow.getInserted() == true) {
+		Row row = (Row) getCurrentRow();
+		if (row.getInserted()) {
 			rvh.remove(cursorPos - 1);
 			--numRows;
 			notifyRowChanged();
 		} else {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.illegalop").toString());
+			throw new SQLException("Illegal operation on non-inserted row");
 		}
 	}
 
@@ -1011,27 +913,6 @@ public class CachedRowSetImpl extends BaseRowSet
 	}
 
 	/**
-	 * Returns a new <code>RowSet</code> object containing by the same data as this
-	 * <code>CachedRowSetImpl</code> object. This method differs from the method
-	 * <code>createCopy</code> in that it throws a
-	 * <code>CloneNotSupportedException</code> object instead of an
-	 * <code>SQLException</code> object, as the method <code>createShared</code>
-	 * does. This <code>clone</code> method is called internally by the method
-	 * <code>createShared</code>, which catches the
-	 * <code>CloneNotSupportedException</code> object and in turn throws a new
-	 * <code>SQLException</code> object.
-	 *
-	 * @return a copy of this <code>CachedRowSetImpl</code> object
-	 * @throws CloneNotSupportedException if an error occurs when attempting to
-	 *                                    clone this <code>CachedRowSetImpl</code>
-	 *                                    object
-	 * @see #createShared
-	 */
-	protected Object clone() throws CloneNotSupportedException {
-		return (super.clone());
-	}
-
-	/**
 	 * Creates a <code>RowSet</code> object that is a deep copy of this
 	 * <code>CachedRowSetImpl</code> object's data, including constraints. Updates
 	 * made on a copy are not visible to the original rowset; a copy of a rowset is
@@ -1057,8 +938,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			out = new ObjectOutputStream(bOut);
 			out.writeObject(this);
 		} catch (IOException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
+			throw new SQLException(cloneFailMessage(ex));
 		}
 
 		ObjectInputStream in;
@@ -1066,30 +946,20 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			ByteArrayInputStream bIn = new ByteArrayInputStream(bOut.toByteArray());
 			in = new ObjectInputStream(bIn);
-		} catch (StreamCorruptedException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
 		} catch (IOException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
+			throw new SQLException(cloneFailMessage(ex));
 		}
 
 		try {
-			// return ((CachedRowSet)(in.readObject()));
-			CachedRowSetImpl crsTemp = (CachedRowSetImpl) in.readObject();
-			crsTemp.resBundle = this.resBundle;
-			return ((CachedRowSet) crsTemp);
+			return (CachedRowSet) in.readObject();
 
-		} catch (ClassNotFoundException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
-		} catch (OptionalDataException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
-		} catch (IOException ex) {
-			throw new SQLException(MessageFormat
-					.format(resBundle.handleGetObject("cachedrowsetimpl.clonefail").toString(), ex.getMessage()));
+		} catch (Exception ex) {
+			throw new SQLException(cloneFailMessage(ex));
 		}
+	}
+
+	private String cloneFailMessage(Exception ex) {
+		return MessageFormat.format(MESSAGE_CLONE_FAIL, ex.getMessage());
 	}
 
 	/**
@@ -1210,7 +1080,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	public Collection<?> toCollection(int column) throws SQLException {
 
 		int nRows = numRows;
-		Vector<Object> vec = new Vector<>(nRows);
+		List<Object> vec = new ArrayList<>(nRows);
 
 		// create a copy
 		CachedRowSetImpl crsTemp;
@@ -1335,7 +1205,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		 * before first (0) or after last (numRows + 1)
 		 */
 		if (cursorPos < 0 || cursorPos >= numRows + 1) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 		// now move and notify
 		boolean ret = this.internalNext();
@@ -1379,13 +1249,13 @@ public class CachedRowSetImpl extends BaseRowSet
 				ret = false;
 				break;
 			}
-		} while ((getShowDeleted() == false) && (rowDeleted() == true));
+		} while (!getShowDeleted() && rowDeleted());
 
 		/*
 		 * each call to internalNext may increment cursorPos multiple times however, the
 		 * absolutePos only increments once per call.
 		 */
-		if (ret == true)
+		if (ret)
 			absolutePos++;
 		else
 			absolutePos = 0;
@@ -1417,8 +1287,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		// clear the vector of it's present contents
 		rvh.clear();
 
-		// this will make it eligible for gc
-		// rvh = null;
 	}
 
 	/**
@@ -1464,8 +1332,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if the given index is out of bounds
 	 */
 	private void checkIndex(int idx) throws SQLException {
-		if (idx < 1 || RowSetMD == null || idx > RowSetMD.getColumnCount()) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcol").toString());
+		if (idx < 1 || rowSetMetaData == null || idx > rowSetMetaData.getColumnCount()) {
+			throw new SQLException("Invalid column index");
 		}
 	}
 
@@ -1482,8 +1350,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      object is not on a valid row
 	 */
 	private void checkCursor() throws SQLException {
-		if (isAfterLast() == true || isBeforeFirst() == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+		if (isAfterLast() || isBeforeFirst()) {
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 	}
 
@@ -1499,19 +1367,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      columns in this rowset
 	 */
 	private int getColIdxByName(String name) throws SQLException {
-		RowSetMD = (RowSetMetaDataImpl) this.getMetaData();
-		int cols = RowSetMD.getColumnCount();
-		if (RowSetMD != null) {
+		rowSetMetaData = (RowSetMetaDataImpl) this.getMetaData();
+		int cols = rowSetMetaData.getColumnCount();
+		if (rowSetMetaData != null) {
 			for (int i = 1; i <= cols; ++i) {
-				String colName = RowSetMD.getColumnName(i);
-				if (colName != null)
-					if (name.equalsIgnoreCase(colName))
-						return (i);
-					else
-						continue;
+				String colName = rowSetMetaData.getColumnName(i);
+				if (colName != null && name.equalsIgnoreCase(colName)) {
+					return (i);
+				}
 			}
 		}
-		throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalcolnm").toString());
+		throw new SQLException("Invalid column name");
 
 	}
 
@@ -1523,11 +1389,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *         <code>CachedRowSetImpl</code> objects's cursor is positioned
 	 */
 	protected BaseRow getCurrentRow() {
-		if (onInsertRow == true) {
-			return (BaseRow) insertRow;
-		} else {
-			return (BaseRow) (rvh.get(cursorPos - 1));
+		if (onInsertRow) {
+			return insertRow;
 		}
+		return (BaseRow) (rvh.get(cursorPos - 1));
 	}
 
 	/**
@@ -1625,10 +1490,13 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			return Double.compare(Double.parseDouble(value.toString()), 0) != 0;
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.boolfail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getBoolean", value, columnIndex));
 		}
+	}
+
+	private String failMessage(String methodName, Object value, int columnIndex) {
+		return MessageFormat.format("{0} failed on value ( {1} ) in column {2}", methodName, value.toString().trim(),
+				columnIndex);
 	}
 
 	/**
@@ -1670,9 +1538,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			return ((Byte.valueOf(value.toString())).byteValue());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.bytefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getByte", value, columnIndex));
 		}
 	}
 
@@ -1715,9 +1581,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			return ((Short.valueOf(value.toString().trim())).shortValue());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.shortfail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getShort", value, columnIndex));
 		}
 	}
 
@@ -1759,9 +1623,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			return ((Integer.valueOf(value.toString().trim())).intValue());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.intfail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getInt", value, columnIndex));
 		}
 	}
 
@@ -1798,14 +1660,12 @@ public class CachedRowSetImpl extends BaseRowSet
 		// check for SQL NULL
 		if (value == null) {
 			setLastValueNull(true);
-			return (long) 0;
+			return 0;
 		}
 		try {
 			return ((Long.valueOf(value.toString().trim())).longValue());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.longfail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getLong", value, columnIndex));
 		}
 	}
 
@@ -1842,14 +1702,12 @@ public class CachedRowSetImpl extends BaseRowSet
 		// check for SQL NULL
 		if (value == null) {
 			setLastValueNull(true);
-			return (float) 0;
+			return 0;
 		}
 		try {
 			return Float.parseFloat(value.toString());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.floatfail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getFloat", value, columnIndex));
 		}
 	}
 
@@ -1887,14 +1745,12 @@ public class CachedRowSetImpl extends BaseRowSet
 		// check for SQL NULL
 		if (value == null) {
 			setLastValueNull(true);
-			return (double) 0;
+			return 0;
 		}
 		try {
 			return Double.parseDouble(value.toString().trim());
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.doublefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getDouble", value, columnIndex));
 		}
 	}
 
@@ -1919,10 +1775,11 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      is not on a valid row, or this method fails
 	 * @deprecated
 	 */
-	@Deprecated
+	@Override
 	public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
 		Object value;
-		BigDecimal bDecimal, retVal;
+		BigDecimal bDecimal;
+		BigDecimal retVal;
 
 		// sanity check.
 		checkIndex(columnIndex);
@@ -1971,8 +1828,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		return (byte[]) (getCurrentRow().getColumnObject(columnIndex));
@@ -2013,7 +1870,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		 * field variety. If it's a date type return it, a timestamp we turn into a long
 		 * and then into a date, char strings we try to parse. Yuck.
 		 */
-		switch (RowSetMD.getColumnType(columnIndex)) {
+		switch (rowSetMetaData.getColumnType(columnIndex)) {
 		case java.sql.Types.DATE: {
 			long sec = ((java.sql.Date) value).getTime();
 			return new java.sql.Date(sec);
@@ -2024,22 +1881,21 @@ public class CachedRowSetImpl extends BaseRowSet
 		}
 		case java.sql.Types.CHAR:
 		case java.sql.Types.VARCHAR:
-		case java.sql.Types.LONGVARCHAR: {
+		case java.sql.Types.LONGVARCHAR:
 			try {
 				DateFormat df = DateFormat.getDateInstance();
 				return ((java.sql.Date) (df.parse(value.toString())));
 			} catch (ParseException ex) {
-				throw new SQLException(
-						MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.datefail").toString(),
-								new Object[] { value.toString().trim(), columnIndex }));
+				throw new SQLException(getDateFailed(value, columnIndex));
 			}
-		}
 		default: {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.datefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(getDateFailed(value, columnIndex));
 		}
 		}
+	}
+
+	private String getDateFailed(Object value, int columnIndex) {
+		return failMessage("getDate", value, columnIndex);
 	}
 
 	/**
@@ -2077,7 +1933,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		 * field variety. If it's a date type return it, a timestamp we turn into a long
 		 * and then into a date, char strings we try to parse. Yuck.
 		 */
-		switch (RowSetMD.getColumnType(columnIndex)) {
+		switch (rowSetMetaData.getColumnType(columnIndex)) {
 		case java.sql.Types.TIME: {
 			return (java.sql.Time) value;
 		}
@@ -2092,15 +1948,11 @@ public class CachedRowSetImpl extends BaseRowSet
 				DateFormat tf = DateFormat.getTimeInstance();
 				return ((java.sql.Time) (tf.parse(value.toString())));
 			} catch (ParseException ex) {
-				throw new SQLException(
-						MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.timefail").toString(),
-								new Object[] { value.toString().trim(), columnIndex }));
+				throw new SQLException(failMessage("getTime", value, columnIndex));
 			}
 		}
 		default: {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.timefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getTime", value, columnIndex));
 		}
 		}
 	}
@@ -2141,7 +1993,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		 * field variety. If it's a date type return it; a timestamp we turn into a long
 		 * and then into a date; char strings we try to parse. Yuck.
 		 */
-		switch (RowSetMD.getColumnType(columnIndex)) {
+		switch (rowSetMetaData.getColumnType(columnIndex)) {
 		case java.sql.Types.TIMESTAMP: {
 			return (java.sql.Timestamp) value;
 		}
@@ -2160,23 +2012,18 @@ public class CachedRowSetImpl extends BaseRowSet
 				DateFormat tf = DateFormat.getTimeInstance();
 				return ((java.sql.Timestamp) (tf.parse(value.toString())));
 			} catch (ParseException ex) {
-				throw new SQLException(
-						MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.timefail").toString(),
-								new Object[] { value.toString().trim(), columnIndex }));
+				throw new SQLException(failMessage("getTimestamp", value, columnIndex));
 			}
 		}
 		default: {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.timefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getTimestamp", value, columnIndex));
 		}
 		}
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.io.InputStream</code>
-	 * object.
+	 * <code>CachedRowSetImpl</code> object as a <code>InputStream</code> object.
 	 *
 	 * A column value can be retrieved as a stream of ASCII characters and then read
 	 * in chunks from the stream. This method is particularly suitable for
@@ -2208,7 +2055,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      is used to retrieve.
 	 * @see #getAsciiStream(String)
 	 */
-	public java.io.InputStream getAsciiStream(int columnIndex) throws SQLException {
+	public InputStream getAsciiStream(int columnIndex) throws SQLException {
 		Object value;
 
 		// always free an old stream
@@ -2225,10 +2072,10 @@ public class CachedRowSetImpl extends BaseRowSet
 			return null;
 		}
 
-		if (isString(RowSetMD.getColumnType(columnIndex))) {
+		if (isString(rowSetMetaData.getColumnType(columnIndex))) {
 			asciiStream = new ByteArrayInputStream(((String) value).getBytes(US_ASCII));
 		} else {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		return asciiStream;
@@ -2256,8 +2103,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs
 	 * @deprecated
 	 */
-	@Deprecated
-	public java.io.InputStream getUnicodeStream(int columnIndex) throws SQLException {
+	@Override
+	public InputStream getUnicodeStream(int columnIndex) throws SQLException {
 		// always free an old stream
 		unicodeStream = null;
 
@@ -2266,9 +2113,9 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex)) == false
-				&& isString(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isBinary(rowSetMetaData.getColumnType(columnIndex))
+				&& !isString(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		Object value = getCurrentRow().getColumnObject(columnIndex);
@@ -2284,8 +2131,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.io.InputStream</code>
-	 * object.
+	 * <code>CachedRowSetImpl</code> object as a <code>InputStream</code> object.
 	 * <P>
 	 * A column value can be retrieved as a stream of uninterpreted bytes and then
 	 * read in chunks from the stream. This method is particularly suitable for
@@ -2314,7 +2160,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      retrieve.
 	 * @see #getBinaryStream(String)
 	 */
-	public java.io.InputStream getBinaryStream(int columnIndex) throws SQLException {
+	public InputStream getBinaryStream(int columnIndex) throws SQLException {
 
 		// always free an old stream
 		binaryStream = null;
@@ -2324,8 +2170,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		Object value = getCurrentRow().getColumnObject(columnIndex);
@@ -2535,7 +2381,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @deprecated Use the <code>getBigDecimal(String columnName)</code> method
 	 *             instead
 	 */
-	@Deprecated
+	@Override
 	public BigDecimal getBigDecimal(String columnName, int scale) throws SQLException {
 		return getBigDecimal(getColIdxByName(columnName), scale);
 	}
@@ -2615,8 +2461,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.io.InputStream</code>
-	 * object.
+	 * <code>CachedRowSetImpl</code> object as a <code>InputStream</code> object.
 	 *
 	 * A column value can be retrieved as a stream of ASCII characters and then read
 	 * in chunks from the stream. This method is particularly suitable for
@@ -2645,7 +2490,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      is used to retrieve.
 	 * @see #getAsciiStream(int)
 	 */
-	public java.io.InputStream getAsciiStream(String columnName) throws SQLException {
+	public InputStream getAsciiStream(String columnName) throws SQLException {
 		return getAsciiStream(getColIdxByName(columnName));
 
 	}
@@ -2671,15 +2516,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      this rowset's rows or its insert row
 	 * @deprecated use the method <code>getCharacterStream</code> instead
 	 */
-	@Deprecated
-	public java.io.InputStream getUnicodeStream(String columnName) throws SQLException {
+	@Override
+	public InputStream getUnicodeStream(String columnName) throws SQLException {
 		return getUnicodeStream(getColIdxByName(columnName));
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.io.InputStream</code>
-	 * object.
+	 * <code>CachedRowSetImpl</code> object as a <code>InputStream</code> object.
 	 * <P>
 	 * A column value can be retrieved as a stream of uninterpreted bytes and then
 	 * read in chunks from the stream. This method is particularly suitable for
@@ -2707,7 +2551,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getBinaryStream(int)
 	 *
 	 */
-	public java.io.InputStream getBinaryStream(String columnName) throws SQLException {
+	public InputStream getBinaryStream(String columnName) throws SQLException {
 		return getBinaryStream(getColIdxByName(columnName));
 	}
 
@@ -2770,7 +2614,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs
 	 */
 	public String getCursorName() throws SQLException {
-		throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.posupdate").toString());
+		throw new SQLException("Positioned updates not supported");
 	}
 
 	/**
@@ -2799,7 +2643,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see javax.sql.RowSetMetaData
 	 */
 	public ResultSetMetaData getMetaData() throws SQLException {
-		return (ResultSetMetaData) RowSetMD;
+		return rowSetMetaData;
 	}
 
 	/**
@@ -2864,12 +2708,12 @@ public class CachedRowSetImpl extends BaseRowSet
 					throw new SQLException("Unable to Instantiate: ", ex);
 				}
 				// get the attributes from the struct
-				Object attribs[] = s.getAttributes(map);
+				Object[] attribs = s.getAttributes(map);
 				// create the SQLInput "stream"
 				SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
 				// read the values...
 				obj.readSQL(sqlInput, s.getSQLTypeName());
-				return (Object) obj;
+				return obj;
 			}
 		}
 		return value;
@@ -2931,7 +2775,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	/**
 	 * Retrieves the value stored in the designated column of the current row as a
-	 * <code>java.io.Reader</code> object.
+	 * <code>Reader</code> object.
 	 *
 	 * <P>
 	 * <B>Note:</B> All the data in the returned stream must be read prior to
@@ -2943,9 +2787,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                    larger and equal to or less than the number of columns in
 	 *                    the rowset
 	 * @return a Java character stream that delivers the database column value as a
-	 *         stream of two-byte unicode characters in a
-	 *         <code>java.io.Reader</code> object. If the value is SQL
-	 *         <code>NULL</code>, the result is <code>null</code>.
+	 *         stream of two-byte unicode characters in a <code>Reader</code>
+	 *         object. If the value is SQL <code>NULL</code>, the result is
+	 *         <code>null</code>.
 	 * @throws SQLException if (1) the given column index is out of bounds, (2) the
 	 *                      cursor is not on one of this rowset's rows or its insert
 	 *                      row, or (3) the designated column does not store an SQL
@@ -2954,21 +2798,21 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      designates the recommended return type.
 	 * @see #getCharacterStream(String)
 	 */
-	public java.io.Reader getCharacterStream(int columnIndex) throws SQLException {
+	public Reader getCharacterStream(int columnIndex) throws SQLException {
 
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex))) {
+		if (isBinary(rowSetMetaData.getColumnType(columnIndex))) {
 			Object value = getCurrentRow().getColumnObject(columnIndex);
 			if (value == null) {
 				lastValueNull = true;
 				return null;
 			}
 			charStream = new InputStreamReader(new ByteArrayInputStream((byte[]) value));
-		} else if (isString(RowSetMD.getColumnType(columnIndex))) {
+		} else if (isString(rowSetMetaData.getColumnType(columnIndex))) {
 			Object value = getCurrentRow().getColumnObject(columnIndex);
 			if (value == null) {
 				lastValueNull = true;
@@ -2976,7 +2820,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			}
 			charStream = new StringReader(value.toString());
 		} else {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		return charStream;
@@ -2984,7 +2828,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	/**
 	 * Retrieves the value stored in the designated column of the current row as a
-	 * <code>java.io.Reader</code> object.
+	 * <code>Reader</code> object.
 	 *
 	 * <P>
 	 * <B>Note:</B> All the data in the returned stream must be read prior to
@@ -3004,7 +2848,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * BINARY, VARYBINARY</code> or <code>LONGVARBINARY</code> value. The bold SQL
 	 *                      type designates the recommended return type.
 	 */
-	public java.io.Reader getCharacterStream(String columnName) throws SQLException {
+	public Reader getCharacterStream(String columnName) throws SQLException {
 		return getCharacterStream(getColIdxByName(columnName));
 	}
 
@@ -3048,9 +2892,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			return (new BigDecimal(value.toString().trim()));
 		} catch (NumberFormatException ex) {
-			throw new SQLException(
-					MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.doublefail").toString(),
-							new Object[] { value.toString().trim(), columnIndex }));
+			throw new SQLException(failMessage("getBigDecimal", value, columnIndex));
 		}
 	}
 
@@ -3100,11 +2942,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs
 	 */
 	public boolean isBeforeFirst() throws SQLException {
-		if (cursorPos == 0 && numRows > 0) {
-			return true;
-		} else {
-			return false;
-		}
+		return cursorPos == 0 && numRows > 0;
 	}
 
 	/**
@@ -3116,11 +2954,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs
 	 */
 	public boolean isAfterLast() throws SQLException {
-		if (cursorPos == numRows + 1 && numRows > 0) {
-			return true;
-		} else {
-			return false;
-		}
+		return cursorPos == numRows + 1 && numRows > 0;
 	}
 
 	/**
@@ -3184,7 +3018,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void beforeFirst() throws SQLException {
 		if (getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.beforefirst").toString());
+			throw new SQLException("beforeFirst: Invalid cursor operation");
 		}
 		cursorPos = 0;
 		absolutePos = 0;
@@ -3219,7 +3053,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public boolean first() throws SQLException {
 		if (getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.first").toString());
+			throw new SQLException("First: Invalid cursor operation");
 		}
 
 		// move and notify
@@ -3250,14 +3084,14 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		if (numRows > 0) {
 			cursorPos = 1;
-			if ((getShowDeleted() == false) && (rowDeleted() == true)) {
+			if (!getShowDeleted() && rowDeleted()) {
 				ret = internalNext();
 			} else {
 				ret = true;
 			}
 		}
 
-		if (ret == true)
+		if (ret)
 			absolutePos = 1;
 		else
 			absolutePos = 0;
@@ -3278,7 +3112,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public boolean last() throws SQLException {
 		if (getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.last").toString());
+			throw new SQLException("last: TYPE_FORWARD_ONLY");
 		}
 
 		// move and notify
@@ -3310,13 +3144,13 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		if (numRows > 0) {
 			cursorPos = numRows;
-			if ((getShowDeleted() == false) && (rowDeleted() == true)) {
+			if (!getShowDeleted() && rowDeleted()) {
 				ret = internalPrevious();
 			} else {
 				ret = true;
 			}
 		}
-		if (ret == true)
+		if (ret)
 			absolutePos = numRows - numDeleted;
 		else
 			absolutePos = 0;
@@ -3334,10 +3168,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public int getRow() throws SQLException {
 		// are we on a valid row? Valid rows are between first and last
-		if (numRows > 0 && cursorPos > 0 && cursorPos < (numRows + 1)
-				&& (getShowDeleted() == false && rowDeleted() == false)) {
+		if (numRows > 0 && cursorPos > 0 && cursorPos < (numRows + 1) && (!getShowDeleted() && !rowDeleted())) {
 			return absolutePos;
-		} else if (getShowDeleted() == true) {
+		} else if (getShowDeleted()) {
 			return cursorPos;
 		} else {
 			return 0;
@@ -3401,7 +3234,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public boolean absolute(int row) throws SQLException {
 		if (row == 0 || getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.absolute").toString());
+			throw new SQLException("absolute: " + MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
 		if (row > 0) { // we are moving foward
@@ -3437,11 +3270,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		notifyCursorMoved();
 
-		if (isAfterLast() || isBeforeFirst()) {
-			return false;
-		} else {
-			return true;
-		}
+		return !isAfterLast() && !isBeforeFirst();
 	}
 
 	/**
@@ -3503,7 +3332,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public boolean relative(int rows) throws SQLException {
 		if (numRows == 0 || isBeforeFirst() || isAfterLast() || getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.relative").toString());
+			throw new SQLException("relative: " + MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
 		if (rows == 0) {
@@ -3532,12 +3361,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			}
 		}
 		notifyCursorMoved();
-
-		if (isAfterLast() || isBeforeFirst()) {
-			return false;
-		} else {
-			return true;
-		}
+		return !isAfterLast() && !isBeforeFirst();
 	}
 
 	/**
@@ -3587,14 +3411,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public boolean previous() throws SQLException {
 		if (getType() == ResultSet.TYPE_FORWARD_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.last").toString());
+			throw new SQLException("last: TYPE_FORWARD_ONLY");
 		}
 		/*
 		 * make sure things look sane. The cursor must be positioned in the rowset or
 		 * before first (0) or after last (numRows + 1)
 		 */
 		if (cursorPos < 0 || cursorPos > numRows + 1) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 		// move and notify
 		boolean ret = this.internalPrevious();
@@ -3632,13 +3456,13 @@ public class CachedRowSetImpl extends BaseRowSet
 				ret = false;
 				break;
 			}
-		} while ((getShowDeleted() == false) && (rowDeleted() == true));
+		} while (!getShowDeleted() && rowDeleted());
 
 		/*
 		 * Each call to internalPrevious may move the cursor over multiple rows, the
 		 * absolute position moves one row
 		 */
-		if (ret == true)
+		if (ret)
 			--absolutePos;
 		else
 			absolutePos = 0;
@@ -3666,8 +3490,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	public boolean rowUpdated() throws SQLException {
 		// make sure the cursor is on a valid row
 		checkCursor();
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_OPERATION);
 		}
 		return (((Row) getCurrentRow()).getUpdated());
 	}
@@ -3688,8 +3512,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	public boolean columnUpdated(int idx) throws SQLException {
 		// make sure the cursor is on a valid row
 		checkCursor();
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_OPERATION);
 		}
 		return (((Row) getCurrentRow()).getColUpdated(idx - 1));
 	}
@@ -3726,8 +3550,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	public boolean rowInserted() throws SQLException {
 		// make sure the cursor is on a valid row
 		checkCursor();
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_OPERATION);
 		}
 		return (((Row) getCurrentRow()).getInserted());
 	}
@@ -3747,9 +3571,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	public boolean rowDeleted() throws SQLException {
 		// make sure the cursor is on a valid row
 
-		if (isAfterLast() == true || isBeforeFirst() == true || onInsertRow == true) {
+		if (isAfterLast() || isBeforeFirst() || onInsertRow) {
 
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 		return (((Row) getCurrentRow()).getDeleted());
 	}
@@ -3891,8 +3715,8 @@ public class CachedRowSetImpl extends BaseRowSet
 			return srcObj;
 		}
 
-		if (isNumeric(trgType) == false && isString(trgType) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString() + trgType);
+		if (!isNumeric(trgType) && !isString(trgType)) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + ": " + trgType);
 		}
 
 		try {
@@ -3921,10 +3745,10 @@ public class CachedRowSetImpl extends BaseRowSet
 			case java.sql.Types.LONGVARCHAR:
 				return srcObj.toString();
 			default:
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString() + trgType);
+				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + ": " + trgType);
 			}
 		} catch (NumberFormatException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString() + trgType);
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + ": " + trgType);
 		}
 	}
 
@@ -3987,8 +3811,8 @@ public class CachedRowSetImpl extends BaseRowSet
 			return srcObj;
 		}
 
-		if (isNumeric(trgType) == true || (isString(trgType) == false && isTemporal(trgType) == false)) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (isNumeric(trgType) || (!isString(trgType) && !isTemporal(trgType))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		try {
@@ -3997,7 +3821,7 @@ public class CachedRowSetImpl extends BaseRowSet
 				if (srcType == java.sql.Types.TIMESTAMP) {
 					return new java.sql.Date(((java.sql.Timestamp) srcObj).getTime());
 				} else {
-					throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+					throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 				}
 			case java.sql.Types.TIMESTAMP:
 				if (srcType == java.sql.Types.TIME) {
@@ -4009,17 +3833,17 @@ public class CachedRowSetImpl extends BaseRowSet
 				if (srcType == java.sql.Types.TIMESTAMP) {
 					return new Time(((java.sql.Timestamp) srcObj).getTime());
 				} else {
-					throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+					throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 				}
 			case java.sql.Types.CHAR:
 			case java.sql.Types.VARCHAR:
 			case java.sql.Types.LONGVARCHAR:
 				return srcObj.toString();
 			default:
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 			}
 		} catch (NumberFormatException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 	}
@@ -4051,8 +3875,8 @@ public class CachedRowSetImpl extends BaseRowSet
 			return srcObj;
 		}
 
-		if (isNumeric(trgType) == true || (isString(trgType) == false && isBoolean(trgType) == false)) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (isNumeric(trgType) || (!isString(trgType) && !isBoolean(trgType))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		try {
@@ -4063,10 +3887,10 @@ public class CachedRowSetImpl extends BaseRowSet
 			case java.sql.Types.BOOLEAN:
 				return Boolean.valueOf(srcObj.toString().trim());
 			default:
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString() + trgType);
+				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + trgType);
 			}
 		} catch (NumberFormatException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString() + trgType);
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + trgType);
 		}
 	}
 
@@ -4134,7 +3958,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertBoolean(Boolean.valueOf(x), java.sql.Types.BIT, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertBoolean(Boolean.valueOf(x), java.sql.Types.BIT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4168,7 +3992,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Byte.valueOf(x), java.sql.Types.TINYINT, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(Byte.valueOf(x), java.sql.Types.TINYINT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4202,7 +4026,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Short.valueOf(x), java.sql.Types.SMALLINT, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(Short.valueOf(x), java.sql.Types.SMALLINT,
+				rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4235,7 +4060,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertNumeric(x, java.sql.Types.INTEGER, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(x, java.sql.Types.INTEGER, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4269,7 +4094,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Long.valueOf(x), java.sql.Types.BIGINT, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(Long.valueOf(x), java.sql.Types.BIGINT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 
@@ -4304,7 +4129,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Float.valueOf(x), java.sql.Types.REAL, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(Float.valueOf(x), java.sql.Types.REAL, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4337,7 +4162,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertNumeric(Double.valueOf(x), java.sql.Types.DOUBLE, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(Double.valueOf(x), java.sql.Types.DOUBLE,
+				rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4371,7 +4197,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(x, java.sql.Types.NUMERIC, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertNumeric(x, java.sql.Types.NUMERIC, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4434,14 +4260,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      row, or (3) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateBytes(int columnIndex, byte x[]) throws SQLException {
+	public void updateBytes(int columnIndex, byte[] x) throws SQLException {
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		getCurrentRow().setColumnObject(columnIndex, x);
@@ -4477,7 +4303,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.DATE, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, java.sql.Types.DATE, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4512,7 +4338,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.TIME, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, java.sql.Types.TIME, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4548,7 +4374,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.TIMESTAMP, RowSetMD.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, java.sql.Types.TIMESTAMP, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4573,26 +4399,26 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param length      the number of one-byte ASCII characters in the stream
 	 * @throws SQLException if this method is invoked
 	 */
-	public void updateAsciiStream(int columnIndex, java.io.InputStream x, int length) throws SQLException {
+	public void updateAsciiStream(int columnIndex, InputStream x, int length) throws SQLException {
 		// sanity Check
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isString(RowSetMD.getColumnType(columnIndex)) == false
-				&& isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isString(rowSetMetaData.getColumnType(columnIndex))
+				&& !isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
-		byte buf[] = new byte[length];
+		byte[] buf = new byte[length];
 		try {
 			int charsRead = 0;
 			do {
 				charsRead += x.read(buf, charsRead, length - charsRead);
 			} while (charsRead != length);
 			// Changed the condition check to check for length instead of -1
-		} catch (java.io.IOException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.asciistream").toString());
+		} catch (IOException ex) {
+			throw new SQLException("read failed for ascii stream");
 		}
 		String str = new String(buf);
 
@@ -4603,7 +4429,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	/**
 	 * Sets the designated column in either the current row or the insert row of
 	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.io.InputStream</code> object.
+	 * <code>InputStream</code> object.
 	 * <P>
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -4617,9 +4443,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
 	 *                    larger and equal to or less than the number of columns in
 	 *                    this rowset
-	 * @param x           the new column value; must be a
-	 *                    <code>java.io.InputStream</code> containing
-	 *                    <code>BINARY</code>, <code>VARBINARY</code>, or
+	 * @param x           the new column value; must be a <code>InputStream</code>
+	 *                    containing <code>BINARY</code>, <code>VARBINARY</code>, or
 	 *                    <code>LONGVARBINARY</code> data
 	 * @param length      the length of the stream in bytes
 	 * @throws SQLException if (1) the given column index is out of bounds, (2) the
@@ -4627,24 +4452,24 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      row, (3) the data in the stream is not binary, or (4)
 	 *                      this rowset is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateBinaryStream(int columnIndex, java.io.InputStream x, int length) throws SQLException {
+	public void updateBinaryStream(int columnIndex, InputStream x, int length) throws SQLException {
 		// sanity Check
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
-		byte buf[] = new byte[length];
+		byte[] buf = new byte[length];
 		try {
 			int bytesRead = 0;
 			do {
 				bytesRead += x.read(buf, bytesRead, length - bytesRead);
 			} while (bytesRead != -1);
-		} catch (java.io.IOException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.binstream").toString());
+		} catch (IOException ex) {
+			throw new SQLException("read failed for binary stream");
 		}
 
 		getCurrentRow().setColumnObject(columnIndex, buf);
@@ -4652,8 +4477,8 @@ public class CachedRowSetImpl extends BaseRowSet
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.io.Reader</code> object.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Reader</code>
+	 * object.
 	 * <P>
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -4667,9 +4492,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
 	 *                    larger and equal to or less than the number of columns in
 	 *                    this rowset
-	 * @param x           the new column value; must be a
-	 *                    <code>java.io.Reader</code> containing
-	 *                    <code>BINARY</code>, <code>VARBINARY</code>,
+	 * @param x           the new column value; must be a <code>Reader</code>
+	 *                    containing <code>BINARY</code>, <code>VARBINARY</code>,
 	 *                    <code>LONGVARBINARY</code>, <code>CHAR</code>,
 	 *                    <code>VARCHAR</code>, or <code>LONGVARCHAR</code> data
 	 * @param length      the length of the stream in characters
@@ -4679,26 +4503,26 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      character type, or (4) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateCharacterStream(int columnIndex, java.io.Reader x, int length) throws SQLException {
+	public void updateCharacterStream(int columnIndex, Reader x, int length) throws SQLException {
 		// sanity Check
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (isString(RowSetMD.getColumnType(columnIndex)) == false
-				&& isBinary(RowSetMD.getColumnType(columnIndex)) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (!isString(rowSetMetaData.getColumnType(columnIndex))
+				&& !isBinary(rowSetMetaData.getColumnType(columnIndex))) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
-		char buf[] = new char[length];
+		char[] buf = new char[length];
 		try {
 			int charsRead = 0;
 			do {
 				charsRead += x.read(buf, charsRead, length - charsRead);
 			} while (charsRead != length);
 			// Changed the condition checking to check for length instead of -1
-		} catch (java.io.IOException ex) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.binstream").toString());
+		} catch (IOException ex) {
+			throw new SQLException("read failed for binary stream");
 		}
 		String str = new String(buf);
 
@@ -4740,7 +4564,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		int type = RowSetMD.getColumnType(columnIndex);
+		int type = rowSetMetaData.getColumnType(columnIndex);
 		if (type == Types.DECIMAL || type == Types.NUMERIC) {
 			((java.math.BigDecimal) x).setScale(scale);
 		}
@@ -5047,7 +4871,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      this rowset's rows or its insert row, or (3) this rowset
 	 *                      is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateBytes(String columnName, byte x[]) throws SQLException {
+	public void updateBytes(String columnName, byte[] x) throws SQLException {
 		updateBytes(getColIdxByName(columnName), x);
 	}
 
@@ -5151,14 +4975,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param x          the new column value
 	 * @param length     the number of one-byte ASCII characters in the stream
 	 */
-	public void updateAsciiStream(String columnName, java.io.InputStream x, int length) throws SQLException {
+	public void updateAsciiStream(String columnName, InputStream x, int length) throws SQLException {
 		updateAsciiStream(getColIdxByName(columnName), x, length);
 	}
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
 	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.io.InputStream</code> object.
+	 * <code>InputStream</code> object.
 	 * <P>
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -5170,9 +4994,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
-	 * @param x          the new column value; must be a
-	 *                   <code>java.io.InputStream</code> containing
-	 *                   <code>BINARY</code>, <code>VARBINARY</code>, or
+	 * @param x          the new column value; must be a <code>InputStream</code>
+	 *                   containing <code>BINARY</code>, <code>VARBINARY</code>, or
 	 *                   <code>LONGVARBINARY</code> data
 	 * @param length     the length of the stream in bytes
 	 * @throws SQLException if (1) the given column name does not match the name of
@@ -5181,14 +5004,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      the stream is not binary, or (4) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateBinaryStream(String columnName, java.io.InputStream x, int length) throws SQLException {
+	public void updateBinaryStream(String columnName, InputStream x, int length) throws SQLException {
 		updateBinaryStream(getColIdxByName(columnName), x, length);
 	}
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.io.Reader</code> object.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Reader</code>
+	 * object.
 	 * <P>
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -5200,7 +5023,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
-	 * @param reader     the new column value; must be a <code>java.io.Reader</code>
+	 * @param reader     the new column value; must be a <code>Reader</code>
 	 *                   containing <code>BINARY</code>, <code>VARBINARY</code>,
 	 *                   <code>LONGVARBINARY</code>, <code>CHAR</code>,
 	 *                   <code>VARCHAR</code>, or <code>LONGVARCHAR</code> data
@@ -5211,7 +5034,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      the stream is not a binary or character type, or (4)
 	 *                      this rowset is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateCharacterStream(String columnName, java.io.Reader reader, int length) throws SQLException {
+	public void updateCharacterStream(String columnName, Reader reader, int length) throws SQLException {
 		updateCharacterStream(getColIdxByName(columnName), reader, length);
 	}
 
@@ -5287,8 +5110,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	public void insertRow() throws SQLException {
 		int pos;
 
-		if (onInsertRow == false || insertRow.isCompleteRow(RowSetMD) == false) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.failedins").toString());
+		if (!onInsertRow || !insertRow.isCompleteRow(rowSetMetaData)) {
+			throw new SQLException("Failed on insert row");
 		}
 		// Added the setting of parameters that are passed
 		// to setXXX methods after an empty CRS Object is
@@ -5299,7 +5122,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			insertRow.setColumnObject(i + 1, toInsert[i]);
 		}
 
-		Row insRow = new Row(RowSetMD.getColumnCount(), insertRow.getOrigRow());
+		Row insRow = new Row(rowSetMetaData.getColumnCount(), insertRow.getOrigRow());
 		insRow.setInserted();
 		/*
 		 * The new row is inserted into the RowSet immediately following the current
@@ -5333,8 +5156,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void updateRow() throws SQLException {
 		// make sure we aren't on the insert row
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.updateins").toString());
+		if (onInsertRow) {
+			throw new SQLException("pdateRow called while on insert row");
 		}
 
 		((Row) getCurrentRow()).setUpdated();
@@ -5382,14 +5205,12 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkCursor();
 
 		// don't want this to happen...
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
-		Row currentRow = (Row) getCurrentRow();
 		// just undo any changes made to this row.
-		currentRow.clearUpdated();
-
+		((Row) getCurrentRow()).clearUpdated();
 	}
 
 	/**
@@ -5409,13 +5230,13 @@ public class CachedRowSetImpl extends BaseRowSet
 		checkCursor();
 
 		// don't want this to happen...
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcp").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_CURSOR_POSITION);
 		}
 
-		Row currentRow = (Row) getCurrentRow();
-		if (currentRow.getUpdated() == true) {
-			currentRow.clearUpdated();
+		Row row = (Row) getCurrentRow();
+		if (row.getUpdated()) {
+			row.clearUpdated();
 			notifyRowChanged();
 		}
 	}
@@ -5446,16 +5267,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void moveToInsertRow() throws SQLException {
 		if (getConcurrency() == ResultSet.CONCUR_READ_ONLY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.movetoins").toString());
+			throw new SQLException("moveToInsertRow: CONCUR_READ_ONLY");
 		}
 		if (insertRow == null) {
-			if (RowSetMD == null)
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.movetoins1").toString());
-			int numCols = RowSetMD.getColumnCount();
+			if (rowSetMetaData == null)
+				throw new SQLException("moveToInsertRow: no meta data");
+			int numCols = rowSetMetaData.getColumnCount();
 			if (numCols > 0) {
 				insertRow = new InsertRow(numCols);
 			} else {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.movetoins2").toString());
+				throw new SQLException("moveToInsertRow: invalid number of columns");
 			}
 		}
 		onInsertRow = true;
@@ -5478,9 +5299,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs
 	 */
 	public void moveToCurrentRow() throws SQLException {
-		if (onInsertRow == false) {
-			return;
-		} else {
+		if (onInsertRow) {
 			cursorPos = currentRow;
 			onInsertRow = false;
 		}
@@ -5545,12 +5364,12 @@ public class CachedRowSetImpl extends BaseRowSet
 					throw new SQLException("Unable to Instantiate: ", ex);
 				}
 				// get the attributes from the struct
-				Object attribs[] = s.getAttributes(map);
+				Object[] attribs = s.getAttributes(map);
 				// create the SQLInput "stream"
 				SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
 				// read the values...
 				obj.readSQL(sqlInput, s.getSQLTypeName());
-				return (Object) obj;
+				return obj;
 			}
 		}
 		return value;
@@ -5580,8 +5399,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (RowSetMD.getColumnType(columnIndex) != java.sql.Types.REF) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.REF) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
@@ -5621,10 +5440,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (RowSetMD.getColumnType(columnIndex) != java.sql.Types.BLOB) {
-			System.out.println(MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.type").toString(),
-					RowSetMD.getColumnType(columnIndex)));
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.BLOB) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
@@ -5664,10 +5481,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (RowSetMD.getColumnType(columnIndex) != java.sql.Types.CLOB) {
-			System.out.println(MessageFormat.format(resBundle.handleGetObject("cachedrowsetimpl.type").toString(),
-					RowSetMD.getColumnType(columnIndex)));
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.CLOB) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
@@ -5707,8 +5522,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (RowSetMD.getColumnType(columnIndex) != java.sql.Types.ARRAY) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.ARRAY) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
@@ -5855,7 +5670,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			return null;
 		}
 
-		value = convertTemporal(value, RowSetMD.getColumnType(columnIndex), java.sql.Types.DATE);
+		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.DATE);
 
 		// create a default calendar
 		Calendar defaultCal = Calendar.getInstance();
@@ -5936,7 +5751,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			return null;
 		}
 
-		value = convertTemporal(value, RowSetMD.getColumnType(columnIndex), java.sql.Types.TIME);
+		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIME);
 
 		// create a default calendar
 		Calendar defaultCal = Calendar.getInstance();
@@ -6013,7 +5828,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			return null;
 		}
 
-		value = convertTemporal(value, RowSetMD.getColumnType(columnIndex), java.sql.Types.TIMESTAMP);
+		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIMESTAMP);
 
 		// create a default calendar
 		Calendar defaultCal = Calendar.getInstance();
@@ -6082,7 +5897,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if invalid meta data is supplied to the rowset
 	 */
 	public void setMetaData(RowSetMetaData md) throws SQLException {
-		RowSetMD = (RowSetMetaDataImpl) md;
+		rowSetMetaData = (RowSetMetaDataImpl) md;
 	}
 
 	/**
@@ -6101,22 +5916,20 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public ResultSet getOriginal() throws SQLException {
 		CachedRowSetImpl crs = new CachedRowSetImpl();
-		crs.RowSetMD = RowSetMD;
+		crs.rowSetMetaData = rowSetMetaData;
 		crs.numRows = numRows;
 		crs.cursorPos = 0;
 
 		// make sure we don't get someone playing with these
 		// %%% is this now necessary ???
-		// crs.setReader(null);
-		// crs.setWriter(null);
-		int colCount = RowSetMD.getColumnCount();
+		int colCount = rowSetMetaData.getColumnCount();
 		Row orig;
 
 		for (Iterator<?> i = rvh.iterator(); i.hasNext();) {
 			orig = new Row(colCount, ((Row) i.next()).getOrigRow());
 			crs.rvh.add(orig);
 		}
-		return (ResultSet) crs;
+		return crs;
 	}
 
 	/**
@@ -6131,21 +5944,19 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public ResultSet getOriginalRow() throws SQLException {
 		CachedRowSetImpl crs = new CachedRowSetImpl();
-		crs.RowSetMD = RowSetMD;
+		crs.rowSetMetaData = rowSetMetaData;
 		crs.numRows = 1;
 		crs.cursorPos = 0;
 		crs.setTypeMap(this.getTypeMap());
 
 		// make sure we don't get someone playing with these
 		// %%% is this now necessary ???
-		// crs.setReader(null);
-		// crs.setWriter(null);
 
-		Row orig = new Row(RowSetMD.getColumnCount(), getCurrentRow().getOrigRow());
+		Row orig = new Row(rowSetMetaData.getColumnCount(), getCurrentRow().getOrigRow());
 
 		crs.rvh.add(orig);
 
-		return (ResultSet) crs;
+		return crs;
 
 	}
 
@@ -6156,15 +5967,15 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getOriginalRow
 	 */
 	public void setOriginalRow() throws SQLException {
-		if (onInsertRow == true) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow) {
+			throw new SQLException(MESSAGE_INVALID_OPERATION);
 		}
 
 		Row row = (Row) getCurrentRow();
 		makeRowOriginal(row);
 
 		// this can happen if deleted rows are being shown
-		if (row.getDeleted() == true) {
+		if (row.getDeleted()) {
 			removeCurrentRow();
 		}
 	}
@@ -6178,11 +5989,11 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param row the row to be made the original row
 	 */
 	private void makeRowOriginal(Row row) {
-		if (row.getInserted() == true) {
+		if (row.getInserted()) {
 			row.clearInserted();
 		}
 
-		if (row.getUpdated() == true) {
+		if (row.getUpdated()) {
 			row.moveCurrentToOrig();
 		}
 	}
@@ -6199,7 +6010,7 @@ public class CachedRowSetImpl extends BaseRowSet
 			Row row = (Row) i.next();
 			makeRowOriginal(row);
 			// remove deleted rows from the collection.
-			if (row.getDeleted() == true) {
+			if (row.getDeleted()) {
 				i.remove();
 				--numRows;
 			}
@@ -6232,7 +6043,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void setTableName(String tabName) throws SQLException {
 		if (tabName == null)
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.tablename").toString());
+			throw new SQLException("Table name cannot be null");
 		else
 			tableName = tabName;
 	}
@@ -6268,15 +6079,15 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void setKeyColumns(int[] keys) throws SQLException {
 		int numCols = 0;
-		if (RowSetMD != null) {
-			numCols = RowSetMD.getColumnCount();
+		if (rowSetMetaData != null) {
+			numCols = rowSetMetaData.getColumnCount();
 			if (keys.length > numCols)
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.keycols").toString());
+				throw new SQLException("Invalid key columns");
 		}
 		keyCols = new int[keys.length];
 		for (int i = 0; i < keys.length; i++) {
-			if (RowSetMD != null && (keys[i] <= 0 || keys[i] > numCols)) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidcol").toString() + keys[i]);
+			if (rowSetMetaData != null && (keys[i] <= 0 || keys[i] > numCols)) {
+				throw new SQLException("Invalid column index " + keys[i]);
 			}
 			keyCols[i] = keys[i];
 		}
@@ -6378,7 +6189,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		if (dbmslocatorsUpdateCopy) {
 			getCurrentRow().setColumnObject(columnIndex, new SerialClob(c));
 		} else {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.opnotsupp").toString());
+			throw new SQLException(MESSAGE_OPERATION_NOT_SUPPORTED);
 		}
 	}
 
@@ -6443,7 +6254,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		if (dbmslocatorsUpdateCopy) {
 			getCurrentRow().setColumnObject(columnIndex, new SerialBlob(b));
 		} else {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.opnotsupp").toString());
+			throw new SQLException(MESSAGE_OPERATION_NOT_SUPPORTED);
 		}
 	}
 
@@ -6546,21 +6357,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getURL(String)
 	 */
 	public java.net.URL getURL(int columnIndex) throws SQLException {
-		// throw new SQLException("Operation not supported");
-
-		java.net.URL value;
-
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (RowSetMD.getColumnType(columnIndex) != java.sql.Types.DATALINK) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.dtypemismt").toString());
+		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.DATALINK) {
+			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
-		value = (java.net.URL) (getCurrentRow().getColumnObject(columnIndex));
+		java.net.URL value = (java.net.URL) (getCurrentRow().getColumnObject(columnIndex));
 
 		// check for SQL NULL
 		if (value == null) {
@@ -6613,7 +6420,8 @@ public class CachedRowSetImpl extends BaseRowSet
 		try {
 			notifyCursorMoved();
 		} catch (SQLException e) {
-		} // mask exception
+			// mask exception
+		}
 		return rowsetWarning;
 	}
 
@@ -6625,13 +6433,14 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @return the tablename if only one table in query else return ""
 	 */
-	private String buildTableName(String command) throws SQLException {
+	private String buildTableName(String command) {
 
 		// If we have a query from one table,
 		// we set the table name implicitly
 		// else user has to explicitly set the table name.
 
-		int indexFrom, indexComma;
+		int indexFrom;
+		int indexComma;
 		String strTablename = "";
 		command = command.trim();
 
@@ -6664,14 +6473,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 				strTablename = tabName;
 
-			} else {
-				// strTablename="";
 			}
-
-		} else if (command.toLowerCase().startsWith("insert")) {
-			// strTablename="";
-		} else if (command.toLowerCase().startsWith("update")) {
-			// strTablename="";
 		}
 		return strTablename;
 	}
@@ -6719,11 +6521,11 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void unsetMatchColumn(int[] columnIdxes) throws SQLException {
 
-		int i_val;
+		int intValue;
 		for (int j = 0; j < columnIdxes.length; j++) {
-			i_val = (Integer.parseInt(iMatchColumns.get(j).toString()));
-			if (columnIdxes[j] != i_val) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols").toString());
+			intValue = (Integer.parseInt(iMatchColumns.get(j).toString()));
+			if (columnIdxes[j] != intValue) {
+				throw new SQLException(MESSAGE_MATCH_COLUMNS);
 			}
 		}
 
@@ -6749,7 +6551,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		for (int j = 0; j < columnIdxes.length; j++) {
 			if (!columnIdxes[j].equals(strMatchColumns.get(j))) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols").toString());
+				throw new SQLException(MESSAGE_MATCH_COLUMNS);
 			}
 		}
 
@@ -6768,15 +6570,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if an error occurs or column name is not set
 	 */
 	public String[] getMatchColumnNames() throws SQLException {
-
-		String[] str_temp = new String[strMatchColumns.size()];
-
-		if (strMatchColumns.get(0) == null) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.setmatchcols").toString());
+		if (strMatchColumns == null || strMatchColumns.isEmpty() || strMatchColumns.get(0) == null) {
+			throw new SQLException("Set Match columns before getting them");
 		}
-
-		strMatchColumns.copyInto(str_temp);
-		return str_temp;
+		return strMatchColumns.toArray(String[]::new);
 	}
 
 	/**
@@ -6790,23 +6587,21 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public int[] getMatchColumnIndexes() throws SQLException {
 
-		Integer[] int_temp = new Integer[iMatchColumns.size()];
-		int[] i_temp = new int[iMatchColumns.size()];
-		int i_val;
+		int[] intTemp = new int[iMatchColumns.size()];
+		int intValue;
 
-		i_val = iMatchColumns.get(0);
+		intValue = iMatchColumns.get(0);
 
-		if (i_val == -1) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.setmatchcols").toString());
+		if (intValue == -1) {
+			throw new SQLException("Set Match columns before getting them");
+		}
+		Integer[] integerTemp = iMatchColumns.toArray(Integer[]::new);
+
+		for (int i = 0; i < integerTemp.length; i++) {
+			intTemp[i] = (integerTemp[i]).intValue();
 		}
 
-		iMatchColumns.copyInto(int_temp);
-
-		for (int i = 0; i < int_temp.length; i++) {
-			i_temp[i] = (int_temp[i]).intValue();
-		}
-
-		return i_temp;
+		return intTemp;
 	}
 
 	/**
@@ -6829,7 +6624,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		for (int j = 0; j < columnIdxes.length; j++) {
 			if (columnIdxes[j] < 0) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols1").toString());
+				throw new SQLException("Match columns should be greater than 0");
 			}
 		}
 		for (int i = 0; i < columnIdxes.length; i++) {
@@ -6855,7 +6650,7 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		for (int j = 0; j < columnNames.length; j++) {
 			if (columnNames[j] == null || columnNames[j].isEmpty()) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols2").toString());
+				throw new SQLException("Match columns should be empty or null string");
 			}
 		}
 		for (int i = 0; i < columnNames.length; i++) {
@@ -6881,11 +6676,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	public void setMatchColumn(int columnIdx) throws SQLException {
 		// validate, if col is ok to be set
 		if (columnIdx < 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols1").toString());
+			throw new SQLException("Match columns should be greater than 0");
 		} else {
-			// set iMatchColumn
 			iMatchColumns.set(0, columnIdx);
-			// strMatchColumn = null;
 		}
 	}
 
@@ -6905,12 +6698,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void setMatchColumn(String columnName) throws SQLException {
 		// validate, if col is ok to be set
-		if (columnName == null || (columnName = columnName.trim()).isEmpty()) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.matchcols2").toString());
+		if (columnName == null || columnName.trim().isEmpty()) {
+			throw new SQLException("Match columns should not be empty or null string");
 		} else {
-			// set strMatchColumn
-			strMatchColumns.set(0, columnName);
-			// iMatchColumn = -1;
+			strMatchColumns.set(0, columnName.trim());
 		}
 	}
 
@@ -6930,9 +6721,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	public void unsetMatchColumn(int columnIdx) throws SQLException {
 		// check if we are unsetting the SAME column
 		if (!iMatchColumns.get(0).equals(Integer.valueOf(columnIdx))) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.unsetmatch").toString());
+			throw new SQLException("Columns being unset are not the same as set");
 		} else if (strMatchColumns.get(0) != null) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.unsetmatch1").toString());
+			throw new SQLException("Use column name as argument to unsetMatchColumn");
 		} else {
 			// that is, we are unsetting it.
 			iMatchColumns.set(0, -1);
@@ -6957,9 +6748,9 @@ public class CachedRowSetImpl extends BaseRowSet
 		columnName = columnName.trim();
 
 		if (!((strMatchColumns.get(0)).equals(columnName))) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.unsetmatch").toString());
+			throw new SQLException("Columns being unset are not the same as set");
 		} else if (iMatchColumns.get(0) > 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.unsetmatch2").toString());
+			throw new SQLException("Use column ID as argument to unsetMatchColumn");
 		} else {
 			strMatchColumns.set(0, null); // that is, we are unsetting it.
 		}
@@ -6983,12 +6774,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	public void rowSetPopulated(RowSetEvent event, int numRows) throws SQLException {
 
 		if (numRows < 0 || numRows < getFetchSize()) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.numrows").toString());
+			throw new SQLException("Number of rows is less than zero or less than fetch size");
 		}
 
 		if (size() % numRows == 0) {
-			RowSetEvent event_temp = new RowSetEvent(this);
-			event = event_temp;
 			notifyRowSetChanged();
 		}
 	}
@@ -7022,10 +6811,11 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      is negative.
 	 * @see #execute
 	 */
+	@Override
 	public void populate(ResultSet data, int start) throws SQLException {
 
 		int rowsFetched;
-		Row currentRow;
+		Row row;
 		int numCols;
 		int i;
 		Map<String, Class<?>> map = getTypeMap();
@@ -7035,7 +6825,7 @@ public class CachedRowSetImpl extends BaseRowSet
 		cursorPos = 0;
 		if (populatecallcount == 0) {
 			if (start < 0) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.startpos").toString());
+				throw new SQLException("Start position cannot be negative");
 			}
 			if (getMaxRows() == 0) {
 				data.absolute(start);
@@ -7071,30 +6861,23 @@ public class CachedRowSetImpl extends BaseRowSet
 		} else {
 			resultSet.absolute(start - 1);
 		}
-		if (pageSize == 0) {
-			rvh = new Vector<Object>(getMaxRows());
-
-		} else {
-			rvh = new Vector<Object>(getPageSize());
-		}
-
+		rvh = new ArrayList<>(pageSize == 0 ? getMaxRows() : getPageSize());
 		if (data == null) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.populate").toString());
+			throw new SQLException("Invalid ResultSet object supplied to populate method");
 		}
 
 		// get the meta data for this ResultSet
-		RSMD = data.getMetaData();
+		resultSetMetaData = data.getMetaData();
 
 		// set up the metadata
-		RowSetMD = new RowSetMetaDataImpl();
-		initMetaData(RowSetMD, RSMD);
+		rowSetMetaData = new RowSetMetaDataImpl();
+		initMetaData(rowSetMetaData, resultSetMetaData);
 
 		// release the meta-data so that aren't tempted to use it.
-		RSMD = null;
-		numCols = RowSetMD.getColumnCount();
+		resultSetMetaData = null;
+		numCols = rowSetMetaData.getColumnCount();
 		mRows = this.getMaxRows();
 		rowsFetched = 0;
-		currentRow = null;
 
 		if (!data.next() && mRows == 0) {
 			endPos = prevEndPos;
@@ -7106,17 +6889,15 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		while (data.next()) {
 
-			currentRow = new Row(numCols);
+			row = new Row(numCols);
 			if (pageSize == 0) {
 				if (rowsFetched >= mRows && mRows > 0) {
-					rowsetWarning.setNextException(
-							new SQLException("Populating rows " + "setting has exceeded max row setting"));
+					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
 					break;
 				}
 			} else {
 				if ((rowsFetched >= pageSize) || (maxRowsreached >= mRows && mRows > 0)) {
-					rowsetWarning.setNextException(
-							new SQLException("Populating rows " + "setting has exceeded max row setting"));
+					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
 					break;
 				}
 			}
@@ -7148,11 +6929,11 @@ public class CachedRowSetImpl extends BaseRowSet
 					obj = new SerialArray((java.sql.Array) obj, map);
 				}
 
-				currentRow.initColumnObject(i, obj);
+				row.initColumnObject(i, obj);
 			}
 			rowsFetched++;
 			maxRowsreached++;
-			rvh.add(currentRow);
+			rvh.add(row);
 		}
 		numRows = rowsFetched;
 		// Also rowsFetched should be equal to rvh.size()
@@ -7173,11 +6954,11 @@ public class CachedRowSetImpl extends BaseRowSet
 	public boolean nextPage() throws SQLException {
 
 		if (populatecallcount == 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.nextpage").toString());
+			throw new SQLException("Populate data before calling");
 		}
 		// Fix for 6554186
 		onFirstPage = false;
-	    populate(resultSet, endPos);
+		populate(resultSet, endPos);
 		return pagenotend;
 	}
 
@@ -7190,10 +6971,10 @@ public class CachedRowSetImpl extends BaseRowSet
 	 */
 	public void setPageSize(int size) throws SQLException {
 		if (size < 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.pagesize").toString());
+			throw new SQLException("Page size cannot be less than zero");
 		}
 		if (size > getMaxRows() && getMaxRows() != 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.pagesize1").toString());
+			throw new SQLException("Page size cannot be greater than maxRows");
 		}
 		pageSize = size;
 	}
@@ -7226,13 +7007,11 @@ public class CachedRowSetImpl extends BaseRowSet
 		mR = maxRowsreached;
 
 		if (populatecallcount == 0) {
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.nextpage").toString());
+			throw new SQLException("Populate data before calling");
 		}
 
-		if (!callWithCon) {
-			if (resultSet.getType() == ResultSet.TYPE_FORWARD_ONLY) {
-				throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.fwdonly").toString());
-			}
+		if (!callWithCon && resultSet.getType() == ResultSet.TYPE_FORWARD_ONLY) {
+			throw new SQLException("ResultSet is forward only");
 		}
 
 		pagenotend = true;
@@ -7260,105 +7039,6 @@ public class CachedRowSetImpl extends BaseRowSet
 	}
 
 	/**
-	 * Goes to the page number passed as the parameter
-	 * 
-	 * @param page , the page loaded on a call to this function
-	 * @return true if the page exists false otherwise
-	 * @throws SQLException if an error occurs
-	 */
-	/*
-	 * public boolean absolutePage(int page) throws SQLException{
-	 * 
-	 * boolean isAbs = true, retVal = true; int counter;
-	 * 
-	 * if( page <= 0 ){ throw new SQLException("Absolute positoin is invalid"); }
-	 * counter = 0;
-	 * 
-	 * firstPage(); counter++; while((counter < page) && isAbs) { isAbs =
-	 * nextPage(); counter ++; }
-	 * 
-	 * if( !isAbs && counter < page){ retVal = false; } else if(counter == page){
-	 * retVal = true; }
-	 * 
-	 * return retVal; }
-	 */
-
-	/**
-	 * Goes to the page number passed as the parameter from the current page. The
-	 * parameter can take postive or negative value accordingly.
-	 * 
-	 * @param page , the page loaded on a call to this function
-	 * @return true if the page exists false otherwise
-	 * @throws SQLException if an error occurs
-	 */
-	/*
-	 * public boolean relativePage(int page) throws SQLException {
-	 * 
-	 * boolean isRel = true,retVal = true; int counter;
-	 * 
-	 * if(page > 0){ counter = 0; while((counter < page) && isRel){ isRel =
-	 * nextPage(); counter++; }
-	 * 
-	 * if(!isRel && counter < page){ retVal = false; } else if( counter == page){
-	 * retVal = true; } return retVal; } else { counter = page; isRel = true;
-	 * while((counter < 0) && isRel){ isRel = previousPage(); counter++; }
-	 * 
-	 * if( !isRel && counter < 0){ retVal = false; } else if(counter == 0){ retVal =
-	 * true; } return retVal; } }
-	 */
-
-	/**
-	 * Retrieves the first page of data as specified by the page size.
-	 * 
-	 * @return boolean value true if present on first page, false otherwise
-	 * @throws SQLException if it called before populate or ResultSet is of type
-	 *                      <code>ResultSet.TYPE_FORWARD_ONLY</code> or an error
-	 *                      occurs
-	 */
-	/*
-	 * public boolean firstPage() throws SQLException { if (populatecallcount == 0){
-	 * throw new SQLException("Populate the data before calling "); } if(
-	 * !callWithCon){ if(resultSet.getType() == ResultSet.TYPE_FORWARD_ONLY) { throw
-	 * new SQLException("Result of type forward only"); } } endPos = 0;
-	 * maxRowsreached = 0; pagenotend = true; if(callWithCon){
-	 * crsReader.setStartPosition(startPos);
-	 * crsReader.readData((RowSetInternal)this); resultSet = null; } else {
-	 * populate(resultSet,startPos); } onFirstPage = true; return onFirstPage; }
-	 */
-
-	/**
-	 * Retrives the last page of data as specified by the page size.
-	 * 
-	 * @return boolean value tur if present on the last page, false otherwise
-	 * @throws SQLException if called before populate or if an error occurs.
-	 */
-	/*
-	 * public boolean lastPage() throws SQLException{ int pS; int mR; int quo; int
-	 * rem;
-	 * 
-	 * pS = getPageSize(); mR = getMaxRows();
-	 * 
-	 * if(pS == 0){ onLastPage = true; return onLastPage; }
-	 * 
-	 * if(getMaxRows() == 0){ mR = totalRows; }
-	 * 
-	 * if (populatecallcount == 0){ throw new
-	 * SQLException("Populate the data before calling "); }
-	 * 
-	 * onFirstPage = false;
-	 * 
-	 * if((mR % pS) == 0){ quo = mR / pS; int start = startPos + (pS * (quo - 1));
-	 * maxRowsreached = mR - pS; if(callWithCon){ crsReader.setStartPosition(start);
-	 * crsReader.readData((RowSetInternal)this); resultSet = null; } else {
-	 * populate(resultSet,start); } onLastPage = true; return onLastPage; } else {
-	 * quo = mR /pS; rem = mR % pS; int start = startPos + (pS * quo);
-	 * maxRowsreached = mR - (rem); if(callWithCon){
-	 * crsReader.setStartPosition(start); crsReader.readData((RowSetInternal)this);
-	 * resultSet = null; } else { populate(resultSet,start); } onLastPage = true;
-	 * return onLastPage; } }
-	 */
-
-	/**
 	 * Sets the status for the row on which the cursor is positioned. The insertFlag
 	 * is used to mention the toggle status for this row
 	 * 
@@ -7370,8 +7050,8 @@ public class CachedRowSetImpl extends BaseRowSet
 
 		checkCursor();
 
-		if (onInsertRow == true)
-			throw new SQLException(resBundle.handleGetObject("cachedrowsetimpl.invalidop").toString());
+		if (onInsertRow)
+			throw new SQLException(MESSAGE_INVALID_OPERATION);
 
 		if (insertFlag) {
 			((Row) getCurrentRow()).setInserted();
@@ -7390,7 +7070,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public SQLXML getSQLXML(int columnIndex) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7402,7 +7082,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if a database access error occurs
 	 */
 	public SQLXML getSQLXML(String colName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7417,7 +7097,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public RowId getRowId(int columnIndex) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7432,7 +7112,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public RowId getRowId(String columnName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7448,7 +7128,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateRowId(int columnIndex, RowId x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7464,7 +7144,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateRowId(String columnName, RowId x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7476,7 +7156,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public int getHoldability() throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7489,7 +7169,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public boolean isClosed() throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7502,7 +7182,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNString(int columnIndex, String nString) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7515,7 +7195,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNString(String columnName, String nString) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/*
@@ -7531,7 +7211,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(int columnIndex, NClob nClob) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7544,7 +7224,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(String columnName, NClob nClob) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7559,7 +7239,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public NClob getNClob(int i) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7574,7 +7254,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public NClob getNClob(String colName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	public <T> T unwrap(java.lang.Class<T> iface) throws java.sql.SQLException {
@@ -7596,8 +7276,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7611,8 +7292,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setSQLXML(String parameterName, SQLXML xmlObject) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7626,8 +7308,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setRowId(int parameterIndex, RowId x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7640,8 +7323,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @throws SQLException if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setRowId(String parameterName, RowId x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7671,8 +7355,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -7687,42 +7372,43 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(String parameterName, NClob value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>ResultSet</code> object as a <code>java.io.Reader</code> object. It is
-	 * intended for use when accessing <code>NCHAR</code>,<code>NVARCHAR</code> and
+	 * <code>ResultSet</code> object as a <code>Reader</code> object. It is intended
+	 * for use when accessing <code>NCHAR</code>,<code>NVARCHAR</code> and
 	 * <code>LONGNVARCHAR</code> columns.
 	 *
-	 * @return a <code>java.io.Reader</code> object that contains the column value;
-	 *         if the value is SQL <code>NULL</code>, the value returned is
+	 * @return a <code>Reader</code> object that contains the column value; if the
+	 *         value is SQL <code>NULL</code>, the value returned is
 	 *         <code>null</code> in the Java programming language.
 	 * @param columnIndex the first column is 1, the second is 2, ...
 	 * @exception SQLException if a database access error occurs
 	 * @since 1.6
 	 */
-	public java.io.Reader getNCharacterStream(int columnIndex) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+	public Reader getNCharacterStream(int columnIndex) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>ResultSet</code> object as a <code>java.io.Reader</code> object. It is
-	 * intended for use when accessing <code>NCHAR</code>,<code>NVARCHAR</code> and
+	 * <code>ResultSet</code> object as a <code>Reader</code> object. It is intended
+	 * for use when accessing <code>NCHAR</code>,<code>NVARCHAR</code> and
 	 * <code>LONGNVARCHAR</code> columns.
 	 *
 	 * @param columnName the name of the column
-	 * @return a <code>java.io.Reader</code> object that contains the column value;
-	 *         if the value is SQL <code>NULL</code>, the value returned is
+	 * @return a <code>Reader</code> object that contains the column value; if the
+	 *         value is SQL <code>NULL</code>, the value returned is
 	 *         <code>null</code> in the Java programming language
 	 * @exception SQLException if a database access error occurs
 	 * @since 1.6
 	 */
-	public java.io.Reader getNCharacterStream(String columnName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+	public Reader getNCharacterStream(String columnName) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7738,7 +7424,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateSQLXML(int columnIndex, SQLXML xmlObject) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7754,7 +7440,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateSQLXML(String columnName, SQLXML xmlObject) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7771,7 +7457,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public String getNString(int columnIndex) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7788,7 +7474,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public String getNString(String columnName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7806,8 +7492,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @exception SQLException if a database access error occurs
 	 * @since 1.6
 	 */
-	public void updateNCharacterStream(int columnIndex, java.io.Reader x, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+	public void updateNCharacterStream(int columnIndex, Reader x, long length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7825,8 +7511,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @exception SQLException if a database access error occurs
 	 * @since 1.6
 	 */
-	public void updateNCharacterStream(String columnName, java.io.Reader x, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.opnotysupp").toString());
+	public void updateNCharacterStream(String columnName, Reader x, long length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
 	/**
@@ -7857,8 +7543,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateNCharacterStream(int columnIndex, java.io.Reader x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateNCharacterStream(int columnIndex, Reader x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -7881,8 +7567,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param columnLabel the label for the column specified with the SQL AS clause.
 	 *                    If the SQL AS clause was not specified, then the la bel is
 	 *                    the name of the column
-	 * @param reader      the <code>java.io.Reader</code> object containing the new
-	 *                    column value
+	 * @param reader      the <code>Reader</code> object containing the new column
+	 *                    value
 	 * @exception SQLException                    if a database access error occurs,
 	 *                                            the result set concurrency is
 	 *                                            <code>CONCUR_READ_ONLY</code> or
@@ -7892,19 +7578,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateNCharacterStream(String columnLabel, java.io.Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateNCharacterStream(String columnLabel, Reader reader) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
-
-//////////////////////////
 
 	/**
 	 * Updates the designated column using the given input stream, which will have
 	 * the specified number of bytes. When a very large ASCII value is input to a
 	 * <code>LONGVARCHAR</code> parameter, it may be more practical to send it via a
-	 * <code>java.io.InputStream</code>. Data will be read from the stream as needed
-	 * until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from ASCII to the database char format.
+	 * <code>InputStream</code>. Data will be read from the stream as needed until
+	 * end-of-file is reached. The JDBC driver will do any necessary conversion from
+	 * ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -7929,16 +7613,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateBlob(int columnIndex, InputStream inputStream, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given input stream, which will have
 	 * the specified number of bytes. When a very large ASCII value is input to a
 	 * <code>LONGVARCHAR</code> parameter, it may be more practical to send it via a
-	 * <code>java.io.InputStream</code>. Data will be read from the stream as needed
-	 * until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from ASCII to the database char format.
+	 * <code>InputStream</code>. Data will be read from the stream as needed until
+	 * end-of-file is reached. The JDBC driver will do any necessary conversion from
+	 * ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -7965,15 +7649,15 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateBlob(String columnLabel, InputStream inputStream, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given input stream. When a very large
 	 * ASCII value is input to a <code>LONGVARCHAR</code> parameter, it may be more
-	 * practical to send it via a <code>java.io.InputStream</code>. Data will be
-	 * read from the stream as needed until end-of-file is reached. The JDBC driver
-	 * will do any necessary conversion from ASCII to the database char format.
+	 * practical to send it via a <code>InputStream</code>. Data will be read from
+	 * the stream as needed until end-of-file is reached. The JDBC driver will do
+	 * any necessary conversion from ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8002,15 +7686,15 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateBlob(int columnIndex, InputStream inputStream) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given input stream. When a very large
 	 * ASCII value is input to a <code>LONGVARCHAR</code> parameter, it may be more
-	 * practical to send it via a <code>java.io.InputStream</code>. Data will be
-	 * read from the stream as needed until end-of-file is reached. The JDBC driver
-	 * will do any necessary conversion from ASCII to the database char format.
+	 * practical to send it via a <code>InputStream</code>. Data will be read from
+	 * the stream as needed until end-of-file is reached. The JDBC driver will do
+	 * any necessary conversion from ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8040,16 +7724,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateBlob(String columnLabel, InputStream inputStream) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object,
 	 * which is the given number of characters long. When a very large UNICODE value
 	 * is input to a <code>LONGVARCHAR</code> parameter, it may be more practical to
-	 * send it via a <code>java.io.Reader</code> object. The data will be read from
-	 * the stream as needed until end-of-file is reached. The JDBC driver will do
-	 * any necessary conversion from UNICODE to the database char format.
+	 * send it via a <code>Reader</code> object. The data will be read from the
+	 * stream as needed until end-of-file is reached. The JDBC driver will do any
+	 * necessary conversion from UNICODE to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8074,16 +7758,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateClob(int columnIndex, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object,
 	 * which is the given number of characters long. When a very large UNICODE value
 	 * is input to a <code>LONGVARCHAR</code> parameter, it may be more practical to
-	 * send it via a <code>java.io.Reader</code> object. The data will be read from
-	 * the stream as needed until end-of-file is reached. The JDBC driver will do
-	 * any necessary conversion from UNICODE to the database char format.
+	 * send it via a <code>Reader</code> object. The data will be read from the
+	 * stream as needed until end-of-file is reached. The JDBC driver will do any
+	 * necessary conversion from UNICODE to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8110,16 +7794,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateClob(String columnLabel, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object.
 	 * When a very large UNICODE value is input to a <code>LONGVARCHAR</code>
-	 * parameter, it may be more practical to send it via a
-	 * <code>java.io.Reader</code> object. The data will be read from the stream as
-	 * needed until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from UNICODE to the database char format.
+	 * parameter, it may be more practical to send it via a <code>Reader</code>
+	 * object. The data will be read from the stream as needed until end-of-file is
+	 * reached. The JDBC driver will do any necessary conversion from UNICODE to the
+	 * database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8147,16 +7831,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateClob(int columnIndex, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object.
 	 * When a very large UNICODE value is input to a <code>LONGVARCHAR</code>
-	 * parameter, it may be more practical to send it via a
-	 * <code>java.io.Reader</code> object. The data will be read from the stream as
-	 * needed until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from UNICODE to the database char format.
+	 * parameter, it may be more practical to send it via a <code>Reader</code>
+	 * object. The data will be read from the stream as needed until end-of-file is
+	 * reached. The JDBC driver will do any necessary conversion from UNICODE to the
+	 * database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8186,16 +7870,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateClob(String columnLabel, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object,
 	 * which is the given number of characters long. When a very large UNICODE value
 	 * is input to a <code>LONGVARCHAR</code> parameter, it may be more practical to
-	 * send it via a <code>java.io.Reader</code> object. The data will be read from
-	 * the stream as needed until end-of-file is reached. The JDBC driver will do
-	 * any necessary conversion from UNICODE to the database char format.
+	 * send it via a <code>Reader</code> object. The data will be read from the
+	 * stream as needed until end-of-file is reached. The JDBC driver will do any
+	 * necessary conversion from UNICODE to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8220,16 +7904,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(int columnIndex, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object,
 	 * which is the given number of characters long. When a very large UNICODE value
 	 * is input to a <code>LONGVARCHAR</code> parameter, it may be more practical to
-	 * send it via a <code>java.io.Reader</code> object. The data will be read from
-	 * the stream as needed until end-of-file is reached. The JDBC driver will do
-	 * any necessary conversion from UNICODE to the database char format.
+	 * send it via a <code>Reader</code> object. The data will be read from the
+	 * stream as needed until end-of-file is reached. The JDBC driver will do any
+	 * necessary conversion from UNICODE to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8256,16 +7940,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(String columnLabel, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object.
 	 * When a very large UNICODE value is input to a <code>LONGVARCHAR</code>
-	 * parameter, it may be more practical to send it via a
-	 * <code>java.io.Reader</code> object. The data will be read from the stream as
-	 * needed until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from UNICODE to the database char format.
+	 * parameter, it may be more practical to send it via a <code>Reader</code>
+	 * object. The data will be read from the stream as needed until end-of-file is
+	 * reached. The JDBC driver will do any necessary conversion from UNICODE to the
+	 * database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8293,16 +7977,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(int columnIndex, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Updates the designated column using the given <code>Reader</code> object.
 	 * When a very large UNICODE value is input to a <code>LONGVARCHAR</code>
-	 * parameter, it may be more practical to send it via a
-	 * <code>java.io.Reader</code> object. The data will be read from the stream as
-	 * needed until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from UNICODE to the database char format.
+	 * parameter, it may be more practical to send it via a <code>Reader</code>
+	 * object. The data will be read from the stream as needed until end-of-file is
+	 * reached. The JDBC driver will do any necessary conversion from UNICODE to the
+	 * database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -8332,7 +8016,7 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @since 1.6
 	 */
 	public void updateNClob(String columnLabel, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8354,8 +8038,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateAsciiStream(int columnIndex, java.io.InputStream x, long length) throws SQLException {
-
+	@Override
+	public void updateAsciiStream(int columnIndex, InputStream x, long length) throws SQLException {
+		// ignore
 	}
 
 	/**
@@ -8377,7 +8062,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateBinaryStream(int columnIndex, java.io.InputStream x, long length) throws SQLException {
+	@Override
+	public void updateBinaryStream(int columnIndex, InputStream x, long length) throws SQLException {
+		// ignore
 	}
 
 	/**
@@ -8399,8 +8086,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateCharacterStream(int columnIndex, java.io.Reader x, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateCharacterStream(int columnIndex, Reader x, long length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8413,8 +8100,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param columnLabel the label for the column specified with the SQL AS clause.
 	 *                    If the SQL AS clause was not specified, then the la bel is
 	 *                    the name of the column
-	 * @param reader      the <code>java.io.Reader</code> object containing the new
-	 *                    column value
+	 * @param reader      the <code>Reader</code> object containing the new column
+	 *                    value
 	 * @param length      the length of the stream
 	 * @exception SQLException                    if a database access error occurs,
 	 *                                            the result set concurrency is
@@ -8425,8 +8112,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateCharacterStream(String columnLabel, java.io.Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateCharacterStream(String columnLabel, Reader reader, long length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8450,7 +8137,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateAsciiStream(String columnLabel, java.io.InputStream x, long length) throws SQLException {
+	@Override
+	public void updateAsciiStream(String columnLabel, InputStream x, long length) throws SQLException {
+		// ignore
 	}
 
 	/**
@@ -8474,7 +8163,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateBinaryStream(String columnLabel, java.io.InputStream x, long length) throws SQLException {
+	@Override
+	public void updateBinaryStream(String columnLabel, InputStream x, long length) throws SQLException {
+		// ignore
 	}
 
 	/**
@@ -8500,8 +8191,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateBinaryStream(int columnIndex, java.io.InputStream x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateBinaryStream(int columnIndex, InputStream x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8529,8 +8220,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateBinaryStream(String columnLabel, java.io.InputStream x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateBinaryStream(String columnLabel, InputStream x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8556,8 +8247,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateCharacterStream(int columnIndex, java.io.Reader x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateCharacterStream(int columnIndex, Reader x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8575,8 +8266,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @param columnLabel the label for the column specified with the SQL AS clause.
 	 *                    If the SQL AS clause was not specified, then the la bel is
 	 *                    the name of the column
-	 * @param reader      the <code>java.io.Reader</code> object containing the new
-	 *                    column value
+	 * @param reader      the <code>Reader</code> object containing the new column
+	 *                    value
 	 * @exception SQLException                    if a database access error occurs,
 	 *                                            the result set concurrency is
 	 *                                            <code>CONCUR_READ_ONLY</code> or
@@ -8586,8 +8277,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateCharacterStream(String columnLabel, java.io.Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateCharacterStream(String columnLabel, Reader reader) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8613,8 +8304,8 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateAsciiStream(int columnIndex, java.io.InputStream x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	public void updateAsciiStream(int columnIndex, InputStream x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8642,8 +8333,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
-	public void updateAsciiStream(String columnLabel, java.io.InputStream x) throws SQLException {
-
+	@Override
+	public void updateAsciiStream(String columnLabel, InputStream x) throws SQLException {
+		// ignore
 	}
 
 	/**
@@ -8659,8 +8351,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.4
 	 */
+	@Override
 	public void setURL(int parameterIndex, java.net.URL x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8693,8 +8386,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(int parameterIndex, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8724,8 +8418,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(String parameterName, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8756,8 +8451,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(String parameterName, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8791,8 +8487,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8807,8 +8504,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur ; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNClob(int parameterIndex, NClob value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8825,8 +8523,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur ; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNString(int parameterIndex, String value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8841,8 +8540,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNString(String parameterName, String value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8859,8 +8559,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur ; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8877,8 +8578,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                      could occur; or if a database access error occurs
 	 * @since 1.6
 	 */
+	@Override
 	public void setNCharacterStream(String parameterName, Reader value, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8908,8 +8610,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setNCharacterStream(String parameterName, Reader value) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8935,8 +8638,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getTimestamp
 	 * @since 1.4
 	 */
+	@Override
 	public void setTimestamp(String parameterName, java.sql.Timestamp x, Calendar cal) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8965,8 +8669,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setClob(String parameterName, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -8985,8 +8690,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setClob(String parameterName, Clob x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9014,8 +8720,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setClob(String parameterName, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9035,8 +8742,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getDate
 	 * @since 1.4
 	 */
+	@Override
 	public void setDate(String parameterName, java.sql.Date x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9062,8 +8770,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getDate
 	 * @since 1.4
 	 */
+	@Override
 	public void setDate(String parameterName, java.sql.Date x, Calendar cal) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9082,8 +8791,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getTime
 	 * @since 1.4
 	 */
+	@Override
 	public void setTime(String parameterName, java.sql.Time x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9109,8 +8819,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getTime
 	 * @since 1.4
 	 */
+	@Override
 	public void setTime(String parameterName, java.sql.Time x, Calendar cal) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9141,8 +8852,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setClob(int parameterIndex, Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9173,8 +8885,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9207,8 +8920,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9239,8 +8953,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9271,8 +8986,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setBlob(String parameterName, InputStream inputStream, long length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9291,8 +9007,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.6
 	 */
+	@Override
 	public void setBlob(String parameterName, Blob x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9320,8 +9037,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *
 	 * @since 1.6
 	 */
+	@Override
 	public void setBlob(String parameterName, InputStream inputStream) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9377,8 +9095,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getObject
 	 * @since 1.4
 	 */
+	@Override
 	public void setObject(String parameterName, Object x, int targetSqlType, int scale) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9413,8 +9132,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getObject
 	 * @since 1.4
 	 */
+	@Override
 	public void setObject(String parameterName, Object x, int targetSqlType) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9455,17 +9175,18 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getObject
 	 * @since 1.4
 	 */
+	@Override
 	public void setObject(String parameterName, Object x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given input stream, which will have the
 	 * specified number of bytes. When a very large ASCII value is input to a
 	 * <code>LONGVARCHAR</code> parameter, it may be more practical to send it via a
-	 * <code>java.io.InputStream</code>. Data will be read from the stream as needed
-	 * until end-of-file is reached. The JDBC driver will do any necessary
-	 * conversion from ASCII to the database char format.
+	 * <code>InputStream</code>. Data will be read from the stream as needed until
+	 * end-of-file is reached. The JDBC driver will do any necessary conversion from
+	 * ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -9483,16 +9204,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
-	public void setAsciiStream(String parameterName, java.io.InputStream x, int length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setAsciiStream(String parameterName, InputStream x, int length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given input stream, which will have the
 	 * specified number of bytes. When a very large binary value is input to a
 	 * <code>LONGVARBINARY</code> parameter, it may be more practical to send it via
-	 * a <code>java.io.InputStream</code> object. The data will be read from the
-	 * stream as needed until end-of-file is reached.
+	 * a <code>InputStream</code> object. The data will be read from the stream as
+	 * needed until end-of-file is reached.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -9510,25 +9232,26 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
-	public void setBinaryStream(String parameterName, java.io.InputStream x, int length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setBinaryStream(String parameterName, InputStream x, int length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given <code>Reader</code> object, which
 	 * is the given number of characters long. When a very large UNICODE value is
 	 * input to a <code>LONGVARCHAR</code> parameter, it may be more practical to
-	 * send it via a <code>java.io.Reader</code> object. The data will be read from
-	 * the stream as needed until end-of-file is reached. The JDBC driver will do
-	 * any necessary conversion from UNICODE to the database char format.
+	 * send it via a <code>Reader</code> object. The data will be read from the
+	 * stream as needed until end-of-file is reached. The JDBC driver will do any
+	 * necessary conversion from UNICODE to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
 	 * or your own subclass that implements the standard interface.
 	 *
 	 * @param parameterName the name of the parameter
-	 * @param reader        the <code>java.io.Reader</code> object that contains the
-	 *                      UNICODE data used as the designated parameter
+	 * @param reader        the <code>Reader</code> object that contains the UNICODE
+	 *                      data used as the designated parameter
 	 * @param length        the number of characters in the stream
 	 * @exception SQLException                    if a database access error occurs
 	 *                                            or this method is called on a
@@ -9538,16 +9261,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
-	public void setCharacterStream(String parameterName, java.io.Reader reader, int length) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setCharacterStream(String parameterName, Reader reader, int length) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given input stream. When a very large
 	 * ASCII value is input to a <code>LONGVARCHAR</code> parameter, it may be more
-	 * practical to send it via a <code>java.io.InputStream</code>. Data will be
-	 * read from the stream as needed until end-of-file is reached. The JDBC driver
-	 * will do any necessary conversion from ASCII to the database char format.
+	 * practical to send it via a <code>InputStream</code>. Data will be read from
+	 * the stream as needed until end-of-file is reached. The JDBC driver will do
+	 * any necessary conversion from ASCII to the database char format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -9566,15 +9290,16 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
-	public void setAsciiStream(String parameterName, java.io.InputStream x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setAsciiStream(String parameterName, InputStream x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given input stream. When a very large
 	 * binary value is input to a <code>LONGVARBINARY</code> parameter, it may be
-	 * more practical to send it via a <code>java.io.InputStream</code> object. The
-	 * data will be read from the stream as needed until end-of-file is reached.
+	 * more practical to send it via a <code>InputStream</code> object. The data
+	 * will be read from the stream as needed until end-of-file is reached.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -9593,17 +9318,18 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                         this method
 	 * @since 1.6
 	 */
-	public void setBinaryStream(String parameterName, java.io.InputStream x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setBinaryStream(String parameterName, InputStream x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
 	 * Sets the designated parameter to the given <code>Reader</code> object. When a
 	 * very large UNICODE value is input to a <code>LONGVARCHAR</code> parameter, it
-	 * may be more practical to send it via a <code>java.io.Reader</code> object.
-	 * The data will be read from the stream as needed until end-of-file is reached.
-	 * The JDBC driver will do any necessary conversion from UNICODE to the database
-	 * char format.
+	 * may be more practical to send it via a <code>Reader</code> object. The data
+	 * will be read from the stream as needed until end-of-file is reached. The JDBC
+	 * driver will do any necessary conversion from UNICODE to the database char
+	 * format.
 	 *
 	 * <P>
 	 * <B>Note:</B> This stream object can either be a standard Java stream object
@@ -9614,16 +9340,17 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * takes a length parameter.
 	 *
 	 * @param parameterName the name of the parameter
-	 * @param reader        the <code>java.io.Reader</code> object that contains the
-	 *                      Unicode data
+	 * @param reader        the <code>Reader</code> object that contains the Unicode
+	 *                      data
 	 * @exception SQLException if a database access error occurs or this method is
 	 *                         called on a closed <code>CallableStatement</code>
 	 * @throws SQLFeatureNotSupportedException if the JDBC driver does not support
 	 *                                         this method
 	 * @since 1.6
 	 */
-	public void setCharacterStream(String parameterName, java.io.Reader reader) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setCharacterStream(String parameterName, Reader reader) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9642,8 +9369,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getBigDecimal
 	 * @since 1.4
 	 */
+	@Override
 	public void setBigDecimal(String parameterName, BigDecimal x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9664,8 +9392,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getString
 	 * @since 1.4
 	 */
+	@Override
 	public void setString(String parameterName, String x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9685,8 +9414,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getBytes
 	 * @since 1.4
 	 */
-	public void setBytes(String parameterName, byte x[]) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+	@Override
+	public void setBytes(String parameterName, byte[] x) throws SQLException {
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9705,8 +9435,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getTimestamp
 	 * @since 1.4
 	 */
+	@Override
 	public void setTimestamp(String parameterName, java.sql.Timestamp x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9725,8 +9456,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
+	@Override
 	public void setNull(String parameterName, int sqlType) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9761,8 +9493,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
+	@Override
 	public void setNull(String parameterName, int sqlType, String typeName) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9779,8 +9512,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 *                                            support this method
 	 * @since 1.4
 	 */
+	@Override
 	public void setBoolean(String parameterName, boolean x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9799,8 +9533,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getByte
 	 * @since 1.4
 	 */
+	@Override
 	public void setByte(String parameterName, byte x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9819,8 +9554,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getShort
 	 * @since 1.4
 	 */
+	@Override
 	public void setShort(String parameterName, short x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9839,8 +9575,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getInt
 	 * @since 1.4
 	 */
+	@Override
 	public void setInt(String parameterName, int x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9859,8 +9596,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getLong
 	 * @since 1.4
 	 */
+	@Override
 	public void setLong(String parameterName, long x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9879,8 +9617,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getFloat
 	 * @since 1.4
 	 */
+	@Override
 	public void setFloat(String parameterName, float x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9899,8 +9638,9 @@ public class CachedRowSetImpl extends BaseRowSet
 	 * @see #getDouble
 	 * @since 1.4
 	 */
+	@Override
 	public void setDouble(String parameterName, double x) throws SQLException {
-		throw new SQLFeatureNotSupportedException(resBundle.handleGetObject("cachedrowsetimpl.featnotsupp").toString());
+		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
@@ -9911,12 +9651,6 @@ public class CachedRowSetImpl extends BaseRowSet
 		// Default state initialization happens here
 		ois.defaultReadObject();
 		// Initialization of transient Res Bundle happens here .
-		try {
-			resBundle = JdbcRowSetResourceBundle.getJdbcRowSetResourceBundle();
-		} catch (IOException ioe) {
-			throw new RuntimeException(ioe);
-		}
-
 	}
 
 	// ------------------------- JDBC 4.1 -----------------------------------

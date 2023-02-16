@@ -8,20 +8,24 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
-import javax.sql.rowset.RowSetProvider;
 
 public class RowSetBuilder {
 
-	public static final JDBCType[] SUPPORTED_TYPES = { JDBCType.BIT, JDBCType.TINYINT, JDBCType.SMALLINT,
+	private static final JDBCType[] SUPPORTED_TYPES = { JDBCType.BIT, JDBCType.TINYINT, JDBCType.SMALLINT,
 			JDBCType.INTEGER, JDBCType.BIGINT, JDBCType.FLOAT, JDBCType.REAL, JDBCType.DOUBLE, JDBCType.NUMERIC,
 			JDBCType.DECIMAL, JDBCType.CHAR, JDBCType.VARCHAR, JDBCType.LONGVARCHAR, JDBCType.NCHAR, JDBCType.NVARCHAR,
 			JDBCType.LONGNVARCHAR, JDBCType.DATE, JDBCType.TIME, JDBCType.TIMESTAMP };
+	public static final int DEFAULT_ROW_COUNT = 1000;
+	public static final int DEFAULT_COLUMN_COUNT = 10;
+	private static final List<JDBCType> DEFAULT_TYPES = Arrays.asList(SUPPORTED_TYPES);
 
 	private final Random random = new Random();
 	private int leftLimit = 48; // numeral '0'
@@ -37,45 +41,53 @@ public class RowSetBuilder {
 	private String tableName = "mytable";
 
 	private final RowSetFactory rowSetFactory;
-
-	public RowSetBuilder() throws SQLException {
-		this(RowSetProvider.newFactory());
-	}
+	private int rowCount = DEFAULT_ROW_COUNT;
+	private int columnCount = DEFAULT_COLUMN_COUNT;
+	private List<JDBCType> jdbcTypes = DEFAULT_TYPES;
 
 	public RowSetBuilder(RowSetFactory rowSetFactory) {
 		this.rowSetFactory = rowSetFactory;
 	}
 
-	public RowSetFactory getRowSetFactory() {
-		return rowSetFactory;
+	public static RowSetBuilder of(RowSetFactory rowSetFactory) {
+		return new RowSetBuilder(rowSetFactory);
 	}
 
-	public RowSetMetaData metaData(int columnCount, JDBCType... jdbcTypes) throws SQLException {
+	public RowSetBuilder rowCount(int count) {
+		this.rowCount = count;
+		return this;
+	}
+
+	public RowSetBuilder columnCount(int count) {
+		this.columnCount = count;
+		return this;
+	}
+
+	public RowSetBuilder jdbcTypes(JDBCType... types) {
+		this.jdbcTypes = Arrays.asList(types);
+		return this;
+	}
+
+	public CachedRowSet build() throws SQLException {
+		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+		rowSet.setMetaData(metaData());
+		for (int index = 0; index < rowCount; index++) {
+			rowSet.moveToInsertRow();
+			for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+				rowSet.updateObject(columnIndex, value(rowSet.getMetaData().getColumnType(columnIndex)));
+			}
+			rowSet.insertRow();
+		}
+		rowSet.moveToCurrentRow();
+		rowSet.beforeFirst();
+		return rowSet;
+	}
+
+	public RowSetMetaData metaData() throws SQLException {
 		JDBCType[] columnTypes = new JDBCType[columnCount];
 		for (int index = 0; index < columnCount; index++) {
-			columnTypes[index] = jdbcTypes[index % jdbcTypes.length];
+			columnTypes[index] = jdbcTypes.get(index % jdbcTypes.size());
 		}
-		return metaData(columnTypes);
-	}
-
-	public CachedRowSet build(RowSetMetaData metaData, int rows) throws SQLException {
-		CachedRowSet cachedRowSet = rowSetFactory.createCachedRowSet();
-		cachedRowSet.setMetaData(metaData);
-		int columnCount = metaData.getColumnCount();
-		for (int index = 0; index < rows; index++) {
-			cachedRowSet.moveToInsertRow();
-			for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-				cachedRowSet.updateObject(columnIndex, value(metaData.getColumnType(columnIndex)));
-			}
-			cachedRowSet.insertRow();
-		}
-		cachedRowSet.moveToCurrentRow();
-		cachedRowSet.beforeFirst();
-		cachedRowSet.beforeFirst();
-		return cachedRowSet;
-	}
-
-	public RowSetMetaData metaData(JDBCType... columnTypes) throws SQLException {
 		RowSetMetaDataImpl metaData = new RowSetMetaDataImpl();
 		metaData.setColumnCount(columnTypes.length);
 		for (int index = 0; index < columnTypes.length; index++) {
@@ -102,7 +114,7 @@ public class RowSetBuilder {
 		return metaData;
 	}
 
-	private Object value(int type) throws SQLException {
+	private Object value(int type) {
 		switch (type) {
 		case Types.BIT:
 		case Types.BOOLEAN:
@@ -149,5 +161,9 @@ public class RowSetBuilder {
 		return random.ints(leftLimit, rightLimit + 1).filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
 				.limit(length).collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
 				.toString();
+	}
+
+	public static JDBCType[] supportedTypes() {
+		return SUPPORTED_TYPES;
 	}
 }
