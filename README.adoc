@@ -12,7 +12,7 @@
 
 ++++
 <p align="center">
-  <img alt="Redis Smart Cache" src="https://github.com/redis-field-engineering/redis-smart-cache/raw/master/src/media/redis-smart-cache-banner.png">
+  <img alt="Redis Smart Cache" src="https://github.com/redis-field-engineering/redis-smart-cache/raw/master/src/media/Redis Smart Cache Github Banner Light.jpg">
 
   <p align="center">
     Redis Smart Cache is a JDBC query cache for <a href='https://redis.io/docs/stack/'>Redis Stack</a>, <a href='https://redis.com/redis-enterprise-cloud/overview/'>Redis Cloud</a>, and <a href='https://redis.com/redis-enterprise-software/overview/'>Redis Enterprise</a>.
