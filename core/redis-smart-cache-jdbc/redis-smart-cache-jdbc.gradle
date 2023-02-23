@@ -4,7 +4,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
-    implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRtsVersion
+    implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRedisVersion
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
     testImplementation project(':redis-smart-cache-test')
@@ -57,4 +57,8 @@ jmh {
 
 jmhJar {
     exclude('org/slf4j/impl/**')
+}
+
+compileJava {
+    options.release = 8
 }
