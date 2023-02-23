@@ -41,6 +41,7 @@ class OracleTests extends AbstractIntegrationTests {
 	void testSimpleStatement(RedisTestContext redis) throws Exception {
 		testSimpleStatement(ORACLE, redis, "SELECT * FROM employees");
 		testSimpleStatement(ORACLE, redis, "SELECT * FROM emp_details_view");
+		testSimpleStatement(ORACLE, redis, "SELECT * FROM locations");
 	}
 
 	@ParameterizedTest

@@ -29,7 +29,7 @@ ADD ( CONSTRAINT countr_reg_fk
     ) ;
 
 CREATE TABLE locations
-    ( location_id    NUMBER(4)
+    ( location_id    NUMBER(4, 0)
     , street_address VARCHAR2(40)
     , postal_code    VARCHAR2(12)
     , city       VARCHAR2(30)
