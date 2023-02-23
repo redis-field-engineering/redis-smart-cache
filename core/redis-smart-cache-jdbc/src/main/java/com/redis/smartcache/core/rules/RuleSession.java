@@ -1,14 +1,20 @@
 package com.redis.smartcache.core.rules;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import com.redis.smartcache.core.rules.Rule.Control;
 
 public class RuleSession<L, R> {
 
-	protected final List<Rule<L, R>> rules;
+	private final Collection<Rule<L, R>> rules;
 
-	public RuleSession(List<Rule<L, R>> rules) {
+	public RuleSession() {
+		this(new ArrayList<>());
+	}
+
+	public RuleSession(Collection<Rule<L, R>> rules) {
 		this.rules = rules;
 	}
 
@@ -22,6 +28,13 @@ public class RuleSession<L, R> {
 					}
 				}
 			}
+		}
+	}
+
+	public void setRules(List<Rule<L, R>> rules) {
+		synchronized (this.rules) {
+			this.rules.clear();
+			this.rules.addAll(rules);
 		}
 	}
 

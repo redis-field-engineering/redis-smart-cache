@@ -33,14 +33,14 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	private final String sql;
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
 
-	protected SmartPreparedStatement(SmartConnection connection, PreparedStatement statement, String sql) {
+	public SmartPreparedStatement(SmartConnection connection, PreparedStatement statement, String sql) {
 		super(connection, statement);
 		this.sql = sql;
 	}
 
 	@Override
-	protected String key(Query query) {
-		StringBuilder builder = new StringBuilder(query.getKey());
+	protected String id(Query query) {
+		StringBuilder builder = new StringBuilder(query.getId());
 		for (String parameter : parameters.values()) {
 			builder.append(PARAMETER_SEPARATOR).append(parameter);
 		}
@@ -49,7 +49,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		return executeQuery(sql, s -> ((PreparedStatement) statement).executeQuery());
+		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
 	}
 
 	@Override

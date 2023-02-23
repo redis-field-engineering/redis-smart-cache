@@ -19,12 +19,14 @@ public class Config {
 	public static final Duration DEFAULT_METRICS_STEP = Duration.ofSeconds(60);
 	public static final int DEFAULT_POOL_SIZE = 8;
 	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
+	private static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
 
 	private String keyspace = DEFAULT_KEYSPACE;
 	private String keySeparator = DEFAULT_KEY_SEPARATOR;
 	private DataSize codecBufferSize = DEFAULT_BYTE_BUFFER_CAPACITY;
 	private Duration configStep = DEFAULT_CONFIG_STEP;
 	private Duration metricsStep = DEFAULT_METRICS_STEP;
+	private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
 	private DriverConfig driver = new DriverConfig();
 	private RulesetConfig ruleset = new RulesetConfig();
 	private RedisConfig redis = new RedisConfig();
@@ -35,6 +37,14 @@ public class Config {
 			builder.append(keySeparator).append(id);
 		}
 		return builder.toString();
+	}
+
+	public int getQueryCacheCapacity() {
+		return queryCacheCapacity;
+	}
+
+	public void setQueryCacheCapacity(int queryCacheCapacity) {
+		this.queryCacheCapacity = queryCacheCapacity;
 	}
 
 	public String getKeyspace() {

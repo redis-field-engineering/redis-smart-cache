@@ -34,8 +34,8 @@ public class SmartCallableStatement extends SmartPreparedStatement implements Ca
 	}
 
 	@Override
-	protected String key(Query query) {
-		StringBuilder builder = new StringBuilder(query.getKey());
+	protected String id(Query query) {
+		StringBuilder builder = new StringBuilder(query.getId());
 		for (Entry<String, String> entry : parameters.entrySet()) {
 			builder.append(PARAMETER_SEPARATOR).append(entry.getKey() + "=" + entry.getValue());
 		}

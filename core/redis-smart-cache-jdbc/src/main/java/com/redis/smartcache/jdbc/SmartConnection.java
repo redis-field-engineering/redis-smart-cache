@@ -16,59 +16,60 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 import java.util.zip.CRC32;
 
+import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.core.RowSetCache;
+import com.redis.smartcache.core.ResultSetCache;
+import com.redis.smartcache.core.util.EvictingLinkedHashMap;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.trino.sql.parser.ParsingException;
 import io.trino.sql.parser.ParsingOptions;
 import io.trino.sql.parser.SqlParser;
 
 public class SmartConnection implements Connection {
 
+	private static final String METER_PREFIX_CACHE = "cache";
+	private static final String METER_QUERY = "query";
+	private static final String METER_BACKEND = "backend";
+	private static final String METER_CACHE_GET = METER_PREFIX_CACHE + ".get";
+	private static final String METER_CACHE_PUT = METER_PREFIX_CACHE + ".put";
+	private static final String TAG_RESULT = "result";
+	private static final String TAG_MISS = "miss";
+	private static final String TAG_HIT = "hit";
+	private static final String TAG_QUERY = "query";
 	private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
 
 	private final SqlParser parser = new SqlParser();
-	private final Map<String, Query> queryCache = new HashMap<>();
+	private final Map<String, Query> queryCache;
 
 	private final Connection connection;
 	private final QueryRuleSession ruleSession;
 	private final RowSetFactory rowSetFactory;
-	private final RowSetCache rowSetCache;
+	private final ResultSetCache resultSetCache;
 	private final MeterRegistry meterRegistry;
 
 	public SmartConnection(Connection connection, QueryRuleSession ruleSession, RowSetFactory rowSetFactory,
-			RowSetCache rowSetCache, MeterRegistry meterRegistry) {
+			ResultSetCache resultSetCache, MeterRegistry meterRegistry, int queryCacheCapacity) {
 		this.connection = connection;
 		this.ruleSession = ruleSession;
 		this.rowSetFactory = rowSetFactory;
-		this.rowSetCache = rowSetCache;
+		this.resultSetCache = resultSetCache;
 		this.meterRegistry = meterRegistry;
+		this.queryCache = new EvictingLinkedHashMap<>(queryCacheCapacity);
 	}
 
-	public RowSetCache getRowSetCache() {
-		return rowSetCache;
-	}
-
-	public RowSetFactory getRowSetFactory() {
-		return rowSetFactory;
-	}
-
-	public QueryRuleSession getRuleSession() {
-		return ruleSession;
-	}
-
-	public MeterRegistry getMeterRegistry() {
-		return meterRegistry;
+	public ResultSetCache getResultSetCache() {
+		return resultSetCache;
 	}
 
 	@Override
@@ -88,17 +89,20 @@ public class SmartConnection implements Connection {
 
 	@Override
 	public Statement createStatement() throws SQLException {
-		return new SmartStatement(this, connection.createStatement());
+		Statement statement = connection.createStatement();
+		return new SmartStatement(this, statement);
 	}
 
 	@Override
 	public PreparedStatement prepareStatement(String sql) throws SQLException {
-		return new SmartPreparedStatement(this, connection.prepareStatement(sql), sql);
+		PreparedStatement statement = connection.prepareStatement(sql);
+		return new SmartPreparedStatement(this, statement, sql);
 	}
 
 	@Override
 	public CallableStatement prepareCall(String sql) throws SQLException {
-		return new SmartCallableStatement(this, connection.prepareCall(sql), sql);
+		CallableStatement statement = connection.prepareCall(sql);
+		return new SmartCallableStatement(this, statement, sql);
 	}
 
 	@Override
@@ -352,28 +356,47 @@ public class SmartConnection implements Connection {
 	}
 
 	public Query getQuery(String sql) {
-		String key = crc32(sql);
-		if (queryCache.containsKey(key)) {
-			return queryCache.get(key);
+		String id = crc32(sql);
+		if (queryCache.containsKey(id)) {
+			return queryCache.get(id);
 		}
-		Query query = new Query(key, sql, parse(sql));
-		queryCache.put(key, query);
-		return query;
+		return new Query(id, sql, parse(sql), timer(METER_QUERY, id), timer(METER_BACKEND, id),
+				timer(METER_CACHE_GET, id), timer(METER_CACHE_PUT, id),
+				counter(METER_CACHE_GET, id, TAG_RESULT, TAG_HIT), counter(METER_CACHE_GET, id, TAG_RESULT, TAG_MISS));
+	}
+
+	private Timer timer(String name, String queryId) {
+		return Timer.builder(name).tag(TAG_QUERY, queryId).publishPercentiles(0.9, 0.99).register(meterRegistry);
+	}
+
+	private Counter counter(String name, String queryId, String... tags) {
+		return Counter.builder(name).tag(TAG_QUERY, queryId).tags(tags).register(meterRegistry);
 	}
 
 	private io.trino.sql.tree.Statement parse(String sql) {
 		try {
 			return parser.createStatement(sql, PARSING_OPTIONS);
 		} catch (ParsingException e) {
-			// Fail gracefully
+			// This statement cannot be parsed. Only rules like regex can trigger
 			return null;
 		}
+
 	}
 
 	public static String crc32(String string) {
 		CRC32 crc = new CRC32();
 		crc.update(string.getBytes(StandardCharsets.UTF_8));
 		return String.valueOf(crc.getValue());
+	}
+
+	public Query fireRules(String sql) {
+		Query query = getQuery(sql);
+		ruleSession.fire(query);
+		return query;
+	}
+
+	public CachedRowSet createCachedRowSet() throws SQLException {
+		return rowSetFactory.createCachedRowSet();
 	}
 
 }

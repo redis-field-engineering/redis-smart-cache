@@ -1,35 +1,68 @@
 package com.redis.smartcache.core;
 
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import com.redis.smartcache.jdbc.SmartConnection;
-
-import io.trino.sql.parser.ParsingException;
-import io.trino.sql.parser.ParsingOptions;
-import io.trino.sql.parser.SqlParser;
-import io.trino.sql.tree.AstVisitor;
-import io.trino.sql.tree.Node;
-import io.trino.sql.tree.QualifiedName;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 import io.trino.sql.tree.Statement;
-import io.trino.sql.tree.Table;
 
 public class Query {
 
 	public static final long TTL_NO_CACHING = 0;
 	public static final long TTL_NO_EXPIRATION = -1;
 
-	private final String key;
+	private final String id;
 	private final String sql;
 	private final Statement statement;
+	private final Timer timer;
+	private final Timer backendTimer;
+	private final Timer cacheGetTimer;
+	private final Timer cachePutTimer;
+	private final Counter cacheHitCounter;
+	private final Counter cacheMissCounter;
 	private long ttl = TTL_NO_CACHING;
 
-	public Query(String key, String sql, Statement statement) {
-		this.key = key;
+	public Query(String id, String sql, Statement statement, Timer timer, Timer backendTimer, Timer cacheGetTimer,
+			Timer cachePutTimer, Counter cacheHitCounter, Counter cacheMissCounter) {
+		this.id = id;
 		this.sql = sql;
 		this.statement = statement;
+		this.timer = timer;
+		this.backendTimer = backendTimer;
+		this.cacheGetTimer = cacheGetTimer;
+		this.cachePutTimer = cachePutTimer;
+		this.cacheHitCounter = cacheHitCounter;
+		this.cacheMissCounter = cacheMissCounter;
+	}
+
+	public Counter getCacheHitCounter() {
+		return cacheHitCounter;
+	}
+
+	public Counter getCacheMissCounter() {
+		return cacheMissCounter;
+	}
+
+	public Timer getTimer() {
+		return timer;
+	}
+
+	public Timer getBackendTimer() {
+		return backendTimer;
+	}
+
+	public Timer getCacheGetTimer() {
+		return cacheGetTimer;
+	}
+
+	public Timer getCachePutTimer() {
+		return cachePutTimer;
+	}
+
+	public boolean hasStatement() {
+		return statement != null;
+	}
+
+	public Statement getStatement() {
+		return statement;
 	}
 
 	public long getTtl() {
@@ -44,61 +77,12 @@ public class Query {
 		return ttl != TTL_NO_CACHING;
 	}
 
-	public String getKey() {
-		return key;
+	public String getId() {
+		return id;
 	}
 
 	public String getSql() {
 		return sql;
-	}
-
-	public Stream<Table> getTables() throws ParsingException {
-		if (statement == null) {
-			return Stream.empty();
-		}
-		return statement.accept(DepthFirstVisitor.by(new TableVisitor()), null);
-	}
-
-	public Set<String> getTableNames() {
-		return getTables().map(Table::getName).map(QualifiedName::toString).collect(Collectors.toSet());
-	}
-
-	public static Query of(String key, String sql) {
-		SqlParser parser = new SqlParser();
-		return new Query(key, sql, parser.createStatement(sql, new ParsingOptions()));
-	}
-
-	public static Query of(String sql) {
-		return of(SmartConnection.crc32(sql), sql);
-	}
-
-	static class DepthFirstVisitor<R, C> extends AstVisitor<Stream<R>, C> {
-
-		private final AstVisitor<R, C> visitor;
-
-		public DepthFirstVisitor(AstVisitor<R, C> visitor) {
-			this.visitor = visitor;
-		}
-
-		public static <R, C> DepthFirstVisitor<R, C> by(AstVisitor<R, C> visitor) {
-			return new DepthFirstVisitor<>(visitor);
-		}
-
-		@Override
-		public final Stream<R> visitNode(Node node, C context) {
-			Stream<R> nodeResult = Stream.of(visitor.process(node, context));
-			Stream<R> childrenResult = node.getChildren().stream().flatMap(child -> process(child, context));
-
-			return Stream.concat(nodeResult, childrenResult).filter(Objects::nonNull);
-		}
-	}
-
-	static class TableVisitor extends AstVisitor<Table, Object> {
-
-		@Override
-		protected Table visitTable(Table node, Object context) {
-			return node;
-		}
 	}
 
 }

@@ -15,7 +15,6 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.sql.RowSet;
 import javax.sql.rowset.RowSetFactory;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -38,14 +37,13 @@ import com.redis.smartcache.core.Config.RedisConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
 import com.redis.smartcache.core.ConfigManager;
 import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.core.RedisRowSetCache;
-import com.redis.smartcache.core.RowSetCache;
-import com.redis.smartcache.core.codec.RowSetCodec;
+import com.redis.smartcache.core.RedisResultSetCache;
+import com.redis.smartcache.core.ResultSetCache;
+import com.redis.smartcache.core.codec.ResultSetCodec;
 import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.jdbc.SmartConnection;
 
 import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.codec.RedisCodec;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -83,12 +81,12 @@ public class Driver implements java.sql.Driver {
 			.addModule(new JavaTimeModule()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 			.disable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS).build();
 
-	private static final RowSetFactory ROW_SET_FACTORY = new CachedRowSetFactory();
+	private static final RowSetFactory rowSetFactory = new CachedRowSetFactory();
 	private static final Map<String, java.sql.Driver> drivers = new HashMap<>();
-	private static final Map<Config, MeterRegistry> meterRegistries = new HashMap<>();
-	private static final Map<Config, QueryRuleSession> ruleSessions = new HashMap<>();
+	private static final Map<Config, MeterRegistry> registries = new HashMap<>();
+	private static final Map<Config, QueryRuleSession> sessions = new HashMap<>();
 	private static final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
-	private static final Map<RedisConfig, AbstractRedisClient> redisClients = new HashMap<>();
+	private static final Map<RedisConfig, AbstractRedisClient> clients = new HashMap<>();
 
 	static {
 		try {
@@ -139,25 +137,19 @@ public class Driver implements java.sql.Driver {
 		return makeConnection(config, info);
 	}
 
-	private static SmartConnection makeConnection(Config config, Properties info) throws SQLException {
-		Connection backendConnection = backendConnection(config.getDriver(), info);
-		QueryRuleSession ruleSession = getRuleSession(config);
-		RowSetCache rowSetCache = rowSetCache(config);
-		MeterRegistry meterRegistry = getMeterRegistry(config);
-		return new SmartConnection(backendConnection, ruleSession, ROW_SET_FACTORY, rowSetCache, meterRegistry);
+	private static SmartConnection makeConnection(Config conf, Properties info) throws SQLException {
+		Connection backend = backendConnection(conf.getDriver(), info);
+		AbstractRedisClient client = clients.computeIfAbsent(conf.getRedis(), Driver::redisClient);
+		QueryRuleSession session = sessions.computeIfAbsent(conf, c -> ruleSession(c, client));
+		ResultSetCodec codec = new ResultSetCodec(rowSetFactory, Math.toIntExact(conf.getCodecBufferSize().toBytes()));
+		String prefix = conf.key(CACHE_KEY_PREFIX) + conf.getKeySeparator();
+		ResultSetCache cache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec), prefix);
+		MeterRegistry registry = registries.computeIfAbsent(conf, c -> registry(c, client));
+		return new SmartConnection(backend, session, rowSetFactory, cache, registry, conf.getQueryCacheCapacity());
 	}
 
-	private static RowSetCache rowSetCache(Config config) {
-		String prefix = config.key(CACHE_KEY_PREFIX) + config.getKeySeparator();
-		return new RedisRowSetCache(redisConnection(config), prefix, getMeterRegistry(config));
-	}
-
-	private static StatefulRedisModulesConnection<String, RowSet> redisConnection(Config config) {
-		return RedisModulesUtils.connection(getRedisClient(config), rowSetCodec(config));
-	}
-
-	private static RedisCodec<String, RowSet> rowSetCodec(Config config) {
-		return new RowSetCodec(ROW_SET_FACTORY, Math.toIntExact(config.getCodecBufferSize().toBytes()));
+	private static RedisTimeSeriesMeterRegistry registry(Config conf, AbstractRedisClient client) {
+		return new RedisTimeSeriesMeterRegistry(new MeterRegistryConfig(conf), Clock.SYSTEM, client);
 	}
 
 	private static Connection backendConnection(DriverConfig config, Properties info) throws SQLException {
@@ -249,14 +241,14 @@ public class Driver implements java.sql.Driver {
 		drivers.clear();
 		configManagers.values().forEach(ConfigManager::close);
 		configManagers.clear();
-		meterRegistries.values().forEach(MeterRegistry::close);
-		meterRegistries.clear();
-		ruleSessions.clear();
-		redisClients.values().forEach(c -> {
+		registries.values().forEach(MeterRegistry::close);
+		registries.clear();
+		sessions.clear();
+		clients.values().forEach(c -> {
 			c.shutdown();
 			c.getResources().shutdown();
 		});
-		redisClients.clear();
+		clients.clear();
 		DriverManager.deregisterDriver(registeredDriver);
 		registeredDriver = null;
 	}
@@ -265,18 +257,13 @@ public class Driver implements java.sql.Driver {
 		return registeredDriver != null;
 	}
 
-	public static QueryRuleSession getRuleSession(Config config) {
-		return ruleSessions.computeIfAbsent(config, Driver::ruleSession);
-	}
-
-	private static QueryRuleSession ruleSession(Config config) {
+	private static QueryRuleSession ruleSession(Config config, AbstractRedisClient redisClient) {
 		QueryRuleSession ruleSession = QueryRuleSession.of(config.getRuleset());
 		config.getRuleset().addPropertyChangeListener(ruleSession);
 		if (configManagers.containsKey(config)) {
 			throw new IllegalStateException(
 					MessageFormat.format("Config manager already exists for config {0}", config));
 		}
-		AbstractRedisClient redisClient = getRedisClient(config);
 		StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(redisClient);
 		try {
 			configManagers.put(config,
@@ -287,21 +274,9 @@ public class Driver implements java.sql.Driver {
 		return ruleSession;
 	}
 
-	public static MeterRegistry getMeterRegistry(Config config) {
-		return meterRegistries.computeIfAbsent(config, Driver::meterRegistry);
-	}
-
-	private static MeterRegistry meterRegistry(Config config) {
-		return new RedisTimeSeriesMeterRegistry(new MeterRegistryConfig(config), Clock.SYSTEM, getRedisClient(config));
-	}
-
-	private static AbstractRedisClient getRedisClient(Config config) {
-		return redisClients.computeIfAbsent(config.getRedis(), Driver::redisClient);
-	}
-
 	private static AbstractRedisClient redisClient(RedisConfig config) {
 		RedisURIBuilder redisURI = RedisURIBuilder.create();
-		redisURI.uriString(config.getUri());
+		redisURI.uri(config.getUri());
 		redisURI.username(config.getUsername());
 		redisURI.password(config.getPassword());
 		redisURI.sslVerifyMode(config.getTls().getVerify());

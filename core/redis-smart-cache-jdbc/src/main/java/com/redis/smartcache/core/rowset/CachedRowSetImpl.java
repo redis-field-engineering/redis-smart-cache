@@ -70,6 +70,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Function;
 
 import javax.sql.RowSet;
 import javax.sql.RowSetEvent;
@@ -130,7 +131,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * 
 	 * @serial
 	 */
-	private RowSetMetaDataImpl rowSetMetaData;
+	private RowSetMetaData rowSetMetaData;
 
 	// Properties of this RowSet
 
@@ -575,7 +576,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *             for md will be read
 	 * @throws SQLException if an error occurs
 	 */
-	private void initMetaData(RowSetMetaDataImpl md, ResultSetMetaData rsmd) throws SQLException {
+	private void initMetaData(RowSetMetaData md, ResultSetMetaData rsmd) throws SQLException {
 		int numCols = rsmd.getColumnCount();
 
 		md.setColumnCount(numCols);
@@ -1428,23 +1429,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      designates the recommended return type.
 	 */
 	public String getString(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-
-		return value.toString();
+		return getValue(columnIndex, null, Object::toString);
 	}
 
 	/**
@@ -1465,33 +1450,20 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getBoolean(String)
 	 */
 	public boolean getBoolean(int columnIndex) throws SQLException {
-		Object value;
+		return getValue(columnIndex, false, value -> {
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
+			// check for Boolean...
+			if (value instanceof Boolean) {
+				return ((Boolean) value).booleanValue();
+			}
 
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return false;
-		}
-
-		// check for Boolean...
-		if (value instanceof Boolean) {
-			return ((Boolean) value).booleanValue();
-		}
-
-		// convert to a Double and compare to zero
-		try {
-			return Double.compare(Double.parseDouble(value.toString()), 0) != 0;
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getBoolean", value, columnIndex));
-		}
+			// convert to a Double and compare to zero
+			try {
+				return Double.compare(Double.parseDouble(value.toString()), 0) != 0;
+			} catch (NumberFormatException ex) {
+				throw new SQLException(failMessage("getBoolean", value, columnIndex));
+			}
+		});
 	}
 
 	private String failMessage(String methodName, Object value, int columnIndex) {
@@ -1520,26 +1492,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getByte(String)
 	 */
 	public byte getByte(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return (byte) 0;
-		}
-		try {
-			return ((Byte.valueOf(value.toString())).byteValue());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getByte", value, columnIndex));
-		}
+		return getNumber("getByte", columnIndex, (byte) 0, Number::byteValue, Byte::parseByte);
 	}
 
 	/**
@@ -1562,27 +1515,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getShort(String)
 	 */
 	public short getShort(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return (short) 0;
-		}
-
-		try {
-			return ((Short.valueOf(value.toString().trim())).shortValue());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getShort", value, columnIndex));
-		}
+		return getNumber("getShort", columnIndex, (short) 0, Number::shortValue, Short::parseShort);
 	}
 
 	/**
@@ -1604,27 +1537,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      designates the recommended return type.
 	 */
 	public int getInt(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return 0;
-		}
-
-		try {
-			return ((Integer.valueOf(value.toString().trim())).intValue());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getInt", value, columnIndex));
-		}
+		return getNumber("getInt", columnIndex, 0, Number::intValue, Integer::parseInt);
 	}
 
 	/**
@@ -1647,26 +1560,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getLong(String)
 	 */
 	public long getLong(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return 0;
-		}
-		try {
-			return ((Long.valueOf(value.toString().trim())).longValue());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getLong", value, columnIndex));
-		}
+		return getNumber("getLong", columnIndex, 0l, Number::longValue, Long::parseLong);
 	}
 
 	/**
@@ -1689,26 +1583,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getFloat(String)
 	 */
 	public float getFloat(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return 0;
-		}
-		try {
-			return Float.parseFloat(value.toString());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getFloat", value, columnIndex));
-		}
+		return getNumber("getFloat", columnIndex, 0f, Number::floatValue, Float::parseFloat);
 	}
 
 	/**
@@ -1732,26 +1607,21 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *
 	 */
 	public double getDouble(int columnIndex) throws SQLException {
-		Object value;
+		return getNumber("getDouble", columnIndex, 0d, Number::doubleValue, Double::parseDouble);
+	}
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return 0;
-		}
-		try {
-			return Double.parseDouble(value.toString().trim());
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getDouble", value, columnIndex));
-		}
+	private <T extends Number> T getNumber(String methodName, int columnIndex, T defaultValue,
+			Function<Number, T> numberConverter, Function<String, T> converter) throws SQLException {
+		return getValue(columnIndex, defaultValue, value -> {
+			if (value instanceof Number) {
+				return numberConverter.apply((Number) value);
+			}
+			try {
+				return converter.apply(value.toString().trim());
+			} catch (NumberFormatException ex) {
+				throw new SQLException(failMessage(methodName, value, columnIndex));
+			}
+		});
 	}
 
 	/**
@@ -1777,29 +1647,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 */
 	@Override
 	public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-		Object value;
-		BigDecimal bDecimal;
-		BigDecimal retVal;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return (new BigDecimal(0));
-		}
-
-		bDecimal = this.getBigDecimal(columnIndex);
-
-		retVal = bDecimal.setScale(scale);
-
-		return retVal;
+		return getValue(columnIndex, new BigDecimal(0), value -> getBigDecimal(columnIndex).setScale(scale));
 	}
 
 	/**
@@ -1849,49 +1697,35 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      is not on a valid row, or this method fails
 	 */
 	public java.sql.Date getDate(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-
-		/*
-		 * The object coming back from the db could be a date, a timestamp, or a char
-		 * field variety. If it's a date type return it, a timestamp we turn into a long
-		 * and then into a date, char strings we try to parse. Yuck.
-		 */
-		switch (rowSetMetaData.getColumnType(columnIndex)) {
-		case java.sql.Types.DATE: {
-			long sec = ((java.sql.Date) value).getTime();
-			return new java.sql.Date(sec);
-		}
-		case java.sql.Types.TIMESTAMP: {
-			long sec = ((java.sql.Timestamp) value).getTime();
-			return new java.sql.Date(sec);
-		}
-		case java.sql.Types.CHAR:
-		case java.sql.Types.VARCHAR:
-		case java.sql.Types.LONGVARCHAR:
-			try {
-				DateFormat df = DateFormat.getDateInstance();
-				return ((java.sql.Date) (df.parse(value.toString())));
-			} catch (ParseException ex) {
+		return getValue(columnIndex, null, value -> {
+			/*
+			 * The object coming back from the db could be a date, a timestamp, or a char
+			 * field variety. If it's a date type return it, a timestamp we turn into a long
+			 * and then into a date, char strings we try to parse. Yuck.
+			 */
+			switch (rowSetMetaData.getColumnType(columnIndex)) {
+			case java.sql.Types.DATE: {
+				long sec = ((java.sql.Date) value).getTime();
+				return new java.sql.Date(sec);
+			}
+			case java.sql.Types.TIMESTAMP: {
+				long sec = ((java.sql.Timestamp) value).getTime();
+				return new java.sql.Date(sec);
+			}
+			case java.sql.Types.CHAR:
+			case java.sql.Types.VARCHAR:
+			case java.sql.Types.LONGVARCHAR:
+				try {
+					DateFormat df = DateFormat.getDateInstance();
+					return ((java.sql.Date) (df.parse(value.toString())));
+				} catch (ParseException ex) {
+					throw new SQLException(getDateFailed(value, columnIndex));
+				}
+			default: {
 				throw new SQLException(getDateFailed(value, columnIndex));
 			}
-		default: {
-			throw new SQLException(getDateFailed(value, columnIndex));
-		}
-		}
+			}
+		});
 	}
 
 	private String getDateFailed(Object value, int columnIndex) {
@@ -1912,49 +1746,36 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      is not on a valid row, or this method fails
 	 */
 	public java.sql.Time getTime(int columnIndex) throws SQLException {
-		Object value;
+		return getValue(columnIndex, null, value -> {
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-
-		/*
-		 * The object coming back from the db could be a date, a timestamp, or a char
-		 * field variety. If it's a date type return it, a timestamp we turn into a long
-		 * and then into a date, char strings we try to parse. Yuck.
-		 */
-		switch (rowSetMetaData.getColumnType(columnIndex)) {
-		case java.sql.Types.TIME: {
-			return (java.sql.Time) value;
-		}
-		case java.sql.Types.TIMESTAMP: {
-			long sec = ((java.sql.Timestamp) value).getTime();
-			return new java.sql.Time(sec);
-		}
-		case java.sql.Types.CHAR:
-		case java.sql.Types.VARCHAR:
-		case java.sql.Types.LONGVARCHAR: {
-			try {
-				DateFormat tf = DateFormat.getTimeInstance();
-				return ((java.sql.Time) (tf.parse(value.toString())));
-			} catch (ParseException ex) {
+			/*
+			 * The object coming back from the db could be a date, a timestamp, or a char
+			 * field variety. If it's a date type return it, a timestamp we turn into a long
+			 * and then into a date, char strings we try to parse. Yuck.
+			 */
+			switch (rowSetMetaData.getColumnType(columnIndex)) {
+			case java.sql.Types.TIME: {
+				return (java.sql.Time) value;
+			}
+			case java.sql.Types.TIMESTAMP: {
+				long sec = ((java.sql.Timestamp) value).getTime();
+				return new java.sql.Time(sec);
+			}
+			case java.sql.Types.CHAR:
+			case java.sql.Types.VARCHAR:
+			case java.sql.Types.LONGVARCHAR: {
+				try {
+					DateFormat tf = DateFormat.getTimeInstance();
+					return ((java.sql.Time) (tf.parse(value.toString())));
+				} catch (ParseException ex) {
+					throw new SQLException(failMessage("getTime", value, columnIndex));
+				}
+			}
+			default: {
 				throw new SQLException(failMessage("getTime", value, columnIndex));
 			}
-		}
-		default: {
-			throw new SQLException(failMessage("getTime", value, columnIndex));
-		}
-		}
+			}
+		});
 	}
 
 	/**
@@ -1972,53 +1793,39 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      is not on a valid row, or this method fails
 	 */
 	public java.sql.Timestamp getTimestamp(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-
-		/*
-		 * The object coming back from the db could be a date, a timestamp, or a char
-		 * field variety. If it's a date type return it; a timestamp we turn into a long
-		 * and then into a date; char strings we try to parse. Yuck.
-		 */
-		switch (rowSetMetaData.getColumnType(columnIndex)) {
-		case java.sql.Types.TIMESTAMP: {
-			return (java.sql.Timestamp) value;
-		}
-		case java.sql.Types.TIME: {
-			long sec = ((java.sql.Time) value).getTime();
-			return new java.sql.Timestamp(sec);
-		}
-		case java.sql.Types.DATE: {
-			long sec = ((java.sql.Date) value).getTime();
-			return new java.sql.Timestamp(sec);
-		}
-		case java.sql.Types.CHAR:
-		case java.sql.Types.VARCHAR:
-		case java.sql.Types.LONGVARCHAR: {
-			try {
-				DateFormat tf = DateFormat.getTimeInstance();
-				return ((java.sql.Timestamp) (tf.parse(value.toString())));
-			} catch (ParseException ex) {
+		return getValue(columnIndex, null, value -> {
+			/*
+			 * The object coming back from the db could be a date, a timestamp, or a char
+			 * field variety. If it's a date type return it; a timestamp we turn into a long
+			 * and then into a date; char strings we try to parse. Yuck.
+			 */
+			switch (rowSetMetaData.getColumnType(columnIndex)) {
+			case java.sql.Types.TIMESTAMP: {
+				return (java.sql.Timestamp) value;
+			}
+			case java.sql.Types.TIME: {
+				long sec = ((java.sql.Time) value).getTime();
+				return new java.sql.Timestamp(sec);
+			}
+			case java.sql.Types.DATE: {
+				long sec = ((java.sql.Date) value).getTime();
+				return new java.sql.Timestamp(sec);
+			}
+			case java.sql.Types.CHAR:
+			case java.sql.Types.VARCHAR:
+			case java.sql.Types.LONGVARCHAR: {
+				try {
+					DateFormat tf = DateFormat.getTimeInstance();
+					return ((java.sql.Timestamp) (tf.parse(value.toString())));
+				} catch (ParseException ex) {
+					throw new SQLException(failMessage("getTimestamp", value, columnIndex));
+				}
+			}
+			default: {
 				throw new SQLException(failMessage("getTimestamp", value, columnIndex));
 			}
-		}
-		default: {
-			throw new SQLException(failMessage("getTimestamp", value, columnIndex));
-		}
-		}
+			}
+		});
 	}
 
 	/**
@@ -2056,29 +1863,15 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getAsciiStream(String)
 	 */
 	public InputStream getAsciiStream(int columnIndex) throws SQLException {
-		Object value;
+		return getValue(columnIndex, null, value -> {
+			if (isString(rowSetMetaData.getColumnType(columnIndex))) {
+				asciiStream = new ByteArrayInputStream(((String) value).getBytes(US_ASCII));
+			} else {
+				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
+			}
 
-		// always free an old stream
-		asciiStream = null;
-
-		// sanity check
-		checkIndex(columnIndex);
-		// make sure the cursor is on a vlid row
-		checkCursor();
-
-		value = getCurrentRow().getColumnObject(columnIndex);
-		if (value == null) {
-			lastValueNull = true;
-			return null;
-		}
-
-		if (isString(rowSetMetaData.getColumnType(columnIndex))) {
-			asciiStream = new ByteArrayInputStream(((String) value).getBytes(US_ASCII));
-		} else {
-			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
-		}
-
-		return asciiStream;
+			return asciiStream;
+		});
 	}
 
 	/**
@@ -2676,47 +2469,33 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getObject(String)
 	 */
 	public Object getObject(int columnIndex) throws SQLException {
-		Object value;
-		Map<String, Class<?>> map;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-		if (value instanceof Struct) {
-			Struct s = (Struct) value;
-			map = getTypeMap();
-			// look up the class in the map
-			Class<?> c = map.get(s.getSQLTypeName());
-			if (c != null) {
-				// create new instance of the class
-				SQLData obj = null;
-				try {
-					@SuppressWarnings("deprecation")
-					Object tmp = c.newInstance();
-					obj = (SQLData) tmp;
-				} catch (Exception ex) {
-					throw new SQLException("Unable to Instantiate: ", ex);
+		return getValue(columnIndex, null, value -> {
+			if (value instanceof Struct) {
+				Struct s = (Struct) value;
+				Map<String, Class<?>> map = getTypeMap();
+				// look up the class in the map
+				Class<?> c = map.get(s.getSQLTypeName());
+				if (c != null) {
+					// create new instance of the class
+					SQLData obj = null;
+					try {
+						@SuppressWarnings("deprecation")
+						Object tmp = c.newInstance();
+						obj = (SQLData) tmp;
+					} catch (Exception ex) {
+						throw new SQLException("Unable to Instantiate: ", ex);
+					}
+					// get the attributes from the struct
+					Object[] attribs = s.getAttributes(map);
+					// create the SQLInput "stream"
+					SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
+					// read the values...
+					obj.readSQL(sqlInput, s.getSQLTypeName());
+					return obj;
 				}
-				// get the attributes from the struct
-				Object[] attribs = s.getAttributes(map);
-				// create the SQLInput "stream"
-				SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
-				// read the values...
-				obj.readSQL(sqlInput, s.getSQLTypeName());
-				return obj;
 			}
-		}
-		return value;
+			return value;
+		});
 	}
 
 	/**
@@ -2874,26 +2653,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getBigDecimal(String)
 	 */
 	public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
-		Object value;
-
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-		try {
-			return (new BigDecimal(value.toString().trim()));
-		} catch (NumberFormatException ex) {
-			throw new SQLException(failMessage("getBigDecimal", value, columnIndex));
-		}
+		return getValue(columnIndex, null, value -> {
+			try {
+				return (new BigDecimal(value.toString().trim()));
+			} catch (NumberFormatException ex) {
+				throw new SQLException(failMessage("getBigDecimal", value, columnIndex));
+			}
+		});
 	}
 
 	/**
@@ -5333,46 +5099,33 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      is not on one of this rowset's rows or its insert row
 	 */
 	public Object getObject(int columnIndex, java.util.Map<String, Class<?>> map) throws SQLException {
-		Object value;
+		return getValue(columnIndex, null, value -> {
+			if (value instanceof Struct) {
+				Struct s = (Struct) value;
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
-
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
-
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
-		if (value instanceof Struct) {
-			Struct s = (Struct) value;
-
-			// look up the class in the map
-			Class<?> c = map.get(s.getSQLTypeName());
-			if (c != null) {
-				// create new instance of the class
-				SQLData obj = null;
-				try {
-					@SuppressWarnings("deprecation")
-					Object tmp = c.newInstance();
-					obj = (SQLData) tmp;
-				} catch (Exception ex) {
-					throw new SQLException("Unable to Instantiate: ", ex);
+				// look up the class in the map
+				Class<?> c = map.get(s.getSQLTypeName());
+				if (c != null) {
+					// create new instance of the class
+					SQLData obj = null;
+					try {
+						@SuppressWarnings("deprecation")
+						Object tmp = c.newInstance();
+						obj = (SQLData) tmp;
+					} catch (Exception ex) {
+						throw new SQLException("Unable to Instantiate: ", ex);
+					}
+					// get the attributes from the struct
+					Object[] attribs = s.getAttributes(map);
+					// create the SQLInput "stream"
+					SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
+					// read the values...
+					obj.readSQL(sqlInput, s.getSQLTypeName());
+					return obj;
 				}
-				// get the attributes from the struct
-				Object[] attribs = s.getAttributes(map);
-				// create the SQLInput "stream"
-				SQLInputImpl sqlInput = new SQLInputImpl(attribs, map);
-				// read the values...
-				obj.readSQL(sqlInput, s.getSQLTypeName());
-				return obj;
 			}
-		}
-		return value;
+			return value;
+		});
 	}
 
 	/**
@@ -5654,6 +5407,39 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code> value
 	 */
 	public java.sql.Date getDate(int columnIndex, Calendar cal) throws SQLException {
+
+		return getValue(columnIndex, null, value -> {
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.DATE);
+
+			// create a default calendar
+			Calendar defaultCal = Calendar.getInstance();
+			// set this Calendar to the time we have
+			defaultCal.setTime((java.util.Date) value);
+
+			/*
+			 * Now we can pull the pieces of the date out of the default calendar and put
+			 * them into the user provided calendar
+			 */
+			cal.set(Calendar.YEAR, defaultCal.get(Calendar.YEAR));
+			cal.set(Calendar.MONTH, defaultCal.get(Calendar.MONTH));
+			cal.set(Calendar.DAY_OF_MONTH, defaultCal.get(Calendar.DAY_OF_MONTH));
+
+			/*
+			 * This looks a little odd but it is correct - Calendar.getTime() returns a
+			 * Date...
+			 */
+			return new java.sql.Date(cal.getTime().getTime());
+		});
+
+	}
+
+	interface ValueConverter<T> {
+
+		T convert(Object value) throws SQLException;
+
+	}
+
+	private <T> T getValue(int columnIndex, T defaultValue, ValueConverter<T> converter) throws SQLException {
 		Object value;
 
 		// sanity check.
@@ -5667,29 +5453,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// check for SQL NULL
 		if (value == null) {
 			setLastValueNull(true);
-			return null;
+			return defaultValue;
 		}
-
-		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.DATE);
-
-		// create a default calendar
-		Calendar defaultCal = Calendar.getInstance();
-		// set this Calendar to the time we have
-		defaultCal.setTime((java.util.Date) value);
-
-		/*
-		 * Now we can pull the pieces of the date out of the default calendar and put
-		 * them into the user provided calendar
-		 */
-		cal.set(Calendar.YEAR, defaultCal.get(Calendar.YEAR));
-		cal.set(Calendar.MONTH, defaultCal.get(Calendar.MONTH));
-		cal.set(Calendar.DAY_OF_MONTH, defaultCal.get(Calendar.DAY_OF_MONTH));
-
-		/*
-		 * This looks a little odd but it is correct - Calendar.getTime() returns a
-		 * Date...
-		 */
-		return new java.sql.Date(cal.getTime().getTime());
+		return converter.convert(value);
 	}
 
 	/**
@@ -5735,38 +5501,25 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code> value
 	 */
 	public java.sql.Time getTime(int columnIndex, Calendar cal) throws SQLException {
-		Object value;
+		return getValue(columnIndex, null, value -> {
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIME);
 
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
+			// create a default calendar
+			Calendar defaultCal = Calendar.getInstance();
+			// set the time in the default calendar
+			defaultCal.setTime((java.util.Date) value);
 
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
+			/*
+			 * Now we can pull the pieces of the date out of the default calendar and put
+			 * them into the user provided calendar
+			 */
+			cal.set(Calendar.HOUR_OF_DAY, defaultCal.get(Calendar.HOUR_OF_DAY));
+			cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
+			cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
 
-		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIME);
-
-		// create a default calendar
-		Calendar defaultCal = Calendar.getInstance();
-		// set the time in the default calendar
-		defaultCal.setTime((java.util.Date) value);
-
-		/*
-		 * Now we can pull the pieces of the date out of the default calendar and put
-		 * them into the user provided calendar
-		 */
-		cal.set(Calendar.HOUR_OF_DAY, defaultCal.get(Calendar.HOUR_OF_DAY));
-		cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
-		cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
-
-		return new java.sql.Time(cal.getTime().getTime());
+			return new java.sql.Time(cal.getTime().getTime());
+		});
 	}
 
 	/**
@@ -5812,41 +5565,28 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code> value
 	 */
 	public java.sql.Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
-		Object value;
+		return getValue(columnIndex, null, value -> {
 
-		// sanity check.
-		checkIndex(columnIndex);
-		// make sure the cursor is on a valid row
-		checkCursor();
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIMESTAMP);
 
-		setLastValueNull(false);
-		value = getCurrentRow().getColumnObject(columnIndex);
+			// create a default calendar
+			Calendar defaultCal = Calendar.getInstance();
+			// set the time in the default calendar
+			defaultCal.setTime((java.util.Date) value);
 
-		// check for SQL NULL
-		if (value == null) {
-			setLastValueNull(true);
-			return null;
-		}
+			/*
+			 * Now we can pull the pieces of the date out of the default calendar and put
+			 * them into the user provided calendar
+			 */
+			cal.set(Calendar.YEAR, defaultCal.get(Calendar.YEAR));
+			cal.set(Calendar.MONTH, defaultCal.get(Calendar.MONTH));
+			cal.set(Calendar.DAY_OF_MONTH, defaultCal.get(Calendar.DAY_OF_MONTH));
+			cal.set(Calendar.HOUR_OF_DAY, defaultCal.get(Calendar.HOUR_OF_DAY));
+			cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
+			cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
 
-		value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIMESTAMP);
-
-		// create a default calendar
-		Calendar defaultCal = Calendar.getInstance();
-		// set the time in the default calendar
-		defaultCal.setTime((java.util.Date) value);
-
-		/*
-		 * Now we can pull the pieces of the date out of the default calendar and put
-		 * them into the user provided calendar
-		 */
-		cal.set(Calendar.YEAR, defaultCal.get(Calendar.YEAR));
-		cal.set(Calendar.MONTH, defaultCal.get(Calendar.MONTH));
-		cal.set(Calendar.DAY_OF_MONTH, defaultCal.get(Calendar.DAY_OF_MONTH));
-		cal.set(Calendar.HOUR_OF_DAY, defaultCal.get(Calendar.HOUR_OF_DAY));
-		cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
-		cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
-
-		return new java.sql.Timestamp(cal.getTime().getTime());
+			return new java.sql.Timestamp(cal.getTime().getTime());
+		});
 	}
 
 	/**
@@ -6573,7 +6313,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		if (strMatchColumns == null || strMatchColumns.isEmpty() || strMatchColumns.get(0) == null) {
 			throw new SQLException("Set Match columns before getting them");
 		}
-		return strMatchColumns.toArray(String[]::new);
+		return strMatchColumns.toArray(new String[0]);
 	}
 
 	/**
@@ -6595,7 +6335,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		if (intValue == -1) {
 			throw new SQLException("Set Match columns before getting them");
 		}
-		Integer[] integerTemp = iMatchColumns.toArray(Integer[]::new);
+		Integer[] integerTemp = iMatchColumns.toArray(new Integer[0]);
 
 		for (int i = 0; i < integerTemp.length; i++) {
 			intTemp[i] = (integerTemp[i]).intValue();

@@ -11,7 +11,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import com.redis.smartcache.core.codec.RowSetCodec;
+import com.redis.smartcache.core.codec.ResultSetCodec;
 import com.redis.smartcache.core.codec.SerializedResultSetCodec;
 import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
@@ -26,7 +26,7 @@ public class CodecExecutionPlan {
 	@Param({ "10", "100", "1000" })
 	private int rows;
 
-	private RowSetCodec codec;
+	private ResultSetCodec codec;
 	private SerializedResultSetCodec serializedCodec;
 	private ByteBuffer byteBuffer;
 	private ByteBuffer serializedByteBuffer;
@@ -34,7 +34,7 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = new RowSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
+		this.codec = new ResultSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
 		this.serializedCodec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY);
 	}
 
@@ -61,7 +61,7 @@ public class CodecExecutionPlan {
 		return rowSet;
 	}
 
-	public RowSetCodec getCodec() {
+	public ResultSetCodec getCodec() {
 		return codec;
 	}
 

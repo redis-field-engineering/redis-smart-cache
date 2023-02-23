@@ -13,12 +13,12 @@ public class StringColumnCodec extends NullableColumnCodec<String> {
 
 	@Override
 	protected void updateValue(ByteBuf byteBuf, ResultSet resultSet) throws SQLException {
-		resultSet.updateString(columnIndex, RowSetCodec.readString(byteBuf));
+		resultSet.updateString(columnIndex, ResultSetCodec.readString(byteBuf));
 	}
 
 	@Override
 	protected void write(ByteBuf byteBuf, String value) throws SQLException {
-		RowSetCodec.writeString(byteBuf, value);
+		ResultSetCodec.writeString(byteBuf, value);
 	}
 
 	@Override

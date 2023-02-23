@@ -2,6 +2,7 @@ package com.redis.smartcache.core.codec;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
@@ -19,7 +20,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
-public class RowSetCodec implements RedisCodec<String, RowSet> {
+public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 	public static final String EMPTY_STRING = "";
@@ -28,7 +29,7 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public RowSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
+	public ResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
 		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
@@ -48,7 +49,7 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 		try {
 			return decodeRowSet(Unpooled.wrappedBuffer(bytes));
 		} catch (SQLException e) {
-			throw new IllegalStateException("Could not decode RowSet", e);
+			throw new IllegalStateException("Could not decode ResultSet", e);
 		}
 	}
 
@@ -148,7 +149,7 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 	}
 
 	@Override
-	public ByteBuffer encodeValue(RowSet rowSet) {
+	public ByteBuffer encodeValue(ResultSet rowSet) {
 		try {
 			if (rowSet == null) {
 				return ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
@@ -164,7 +165,7 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 		}
 	}
 
-	public void encode(RowSet rowSet, ByteBuf byteBuf) throws SQLException {
+	public void encode(ResultSet rowSet, ByteBuf byteBuf) throws SQLException {
 		ResultSetMetaData metaData = rowSet.getMetaData();
 		encode(metaData, byteBuf);
 		int columnCount = metaData.getColumnCount();

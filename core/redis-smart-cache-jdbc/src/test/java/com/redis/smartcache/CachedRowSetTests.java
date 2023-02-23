@@ -1,18 +1,18 @@
 package com.redis.smartcache;
 
+import java.sql.JDBCType;
 import java.sql.SQLException;
 
 import javax.sql.RowSet;
+import javax.sql.rowset.CachedRowSet;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.core.rowset.CachedRowSetImpl;
 import com.redis.smartcache.test.RowSetBuilder;
 
-@TestInstance(Lifecycle.PER_CLASS)
 class CachedRowSetTests {
 
 	@Test
@@ -23,6 +23,17 @@ class CachedRowSetTests {
 		actual.populate(rowSet);
 		rowSet.beforeFirst();
 		TestUtils.assertEquals(rowSet, actual);
+	}
+
+	@Test
+	void getInt() throws SQLException {
+		RowSetBuilder builder = RowSetBuilder.of(new CachedRowSetFactory());
+		builder.columns(JDBCType.NUMERIC);
+		double value = 123.0;
+		builder.columnUpdater((r, i) -> r.updateObject(i, value));
+		CachedRowSet rowSet = builder.build();
+		rowSet.next();
+		Assertions.assertEquals(value, rowSet.getInt(1));
 	}
 
 }
