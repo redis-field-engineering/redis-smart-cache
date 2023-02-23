@@ -170,11 +170,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=query stat=mean",
           "keyName": "smartcache:metrics:query:mean",
           "query": "",
           "refId": "A",
@@ -242,11 +243,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=query stat=mean",
           "keyName": "smartcache:metrics:query:mean",
           "query": "",
           "refId": "A",
@@ -316,13 +318,14 @@
       "pluginVersion": "9.3.2",
       "targets": [
         {
-          "aggregation": "avg",
+          "aggregation": "max",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=query quantile=0.99",
           "keyName": "smartcache:metrics:query:quantile:0.99",
           "query": "",
           "refId": "A",
@@ -422,11 +425,12 @@
         {
           "aggregation": "sum",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=cache.get stat=count",
           "keyName": "smartcache:metrics:cache:get:count",
           "query": "",
           "refId": "A",
@@ -487,11 +491,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=cache.get result=hit",
           "keyName": "smartcache:metrics:cache:get:result:hit",
           "query": "",
           "refId": "A",
@@ -564,11 +569,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=cache.get result=miss",
           "keyName": "smartcache:metrics:cache:get:result:miss",
           "query": "",
           "refId": "A",
@@ -668,11 +674,12 @@
         {
           "aggregation": "sum",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=backend stat=count",
           "keyName": "smartcache:metrics:db:count",
           "query": "",
           "refId": "A",
@@ -733,11 +740,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=backend stat=count",
           "keyName": "smartcache:metrics:db:count",
           "query": "",
           "refId": "A",
@@ -798,11 +806,12 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
+          "filter": "name=query stat=count",
           "keyName": "smartcache:metrics:query:count",
           "query": "",
           "refId": "A",
@@ -812,7 +821,7 @@
       "type": "stat"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -820,8 +829,278 @@
         "y": 21
       },
       "id": 31,
-      "panels": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 50,
+                "gradientMode": "scheme",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "Backend Latency",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 500
+                  },
+                  {
+                    "color": "red",
+                    "value": 10000
+                  },
+                  {
+                    "color": "orange",
+                    "value": 10000
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "id": 29,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "aggregation": "avg",
+              "bucket": 1000,
+              "command": "ts.mrange",
+              "datasource": {
+                "type": "redis-datasource",
+                "uid": "${DS_REDIS}"
+              },
+              "filter": "name=backend stat=mean",
+              "keyName": "smartcache:metrics:db:mean",
+              "query": "",
+              "refId": "A",
+              "type": "timeSeries"
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "displayName": "Backend Mean Latency",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 500
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 1000
+                  },
+                  {
+                    "color": "red",
+                    "value": 10000
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 22
+          },
+          "id": 32,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "pluginVersion": "9.3.2",
+          "targets": [
+            {
+              "aggregation": "avg",
+              "bucket": 1000,
+              "command": "ts.mrange",
+              "datasource": {
+                "type": "redis-datasource",
+                "uid": "${DS_REDIS}"
+              },
+              "filter": "name=backend stat=mean",
+              "keyName": "smartcache:metrics:db:mean",
+              "query": "",
+              "refId": "A",
+              "type": "timeSeries"
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "displayName": "Backend P99 Latency",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 500
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1000
+                  },
+                  {
+                    "color": "red",
+                    "value": 10000
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 18,
+            "y": 22
+          },
+          "id": 33,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "9.3.2",
+          "targets": [
+            {
+              "aggregation": "avg",
+              "bucket": 1000,
+              "command": "ts.mrange",
+              "datasource": {
+                "type": "redis-datasource",
+                "uid": "${DS_REDIS}"
+              },
+              "filter": "name=backend quantile=0.99",
+              "keyName": "smartcache:metrics:db:quantile:0.99",
+              "query": "",
+              "refId": "A",
+              "type": "timeSeries"
+            }
+          ],
+          "type": "stat"
+        }
+      ],
       "title": "Backend Latency",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 21,
+      "panels": [],
+      "title": "Cache Get Latency",
       "type": "row"
     },
     {
@@ -865,7 +1144,7 @@
               "mode": "off"
             }
           },
-          "displayName": "Backend Latency",
+          "displayName": "Cache Get Latency",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -876,15 +1155,15 @@
               },
               {
                 "color": "yellow",
-                "value": 500
-              },
-              {
-                "color": "red",
-                "value": 10000
+                "value": 5
               },
               {
                 "color": "orange",
-                "value": 10000
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 100
               }
             ]
           },
@@ -896,9 +1175,9 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 23
       },
-      "id": 29,
+      "id": 28,
       "options": {
         "legend": {
           "calcs": [],
@@ -915,12 +1194,13 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "keyName": "smartcache:metrics:db:mean",
+          "filter": "name=cache.get stat=mean",
+          "keyName": "smartcache:metrics:cache:get:mean",
           "query": "",
           "refId": "A",
           "type": "timeSeries"
@@ -938,7 +1218,7 @@
           "color": {
             "mode": "thresholds"
           },
-          "displayName": "Backend Mean Latency",
+          "displayName": "Cache Get Mean Latency",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -949,15 +1229,15 @@
               },
               {
                 "color": "yellow",
-                "value": 500
+                "value": 1
               },
               {
-                "color": "#EAB839",
-                "value": 1000
+                "color": "orange",
+                "value": 3
               },
               {
                 "color": "red",
-                "value": 10000
+                "value": 10
               }
             ]
           },
@@ -969,9 +1249,9 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 22
+        "y": 23
       },
-      "id": 32,
+      "id": 11,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
@@ -991,12 +1271,13 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "keyName": "smartcache:metrics:db:mean",
+          "filter": "name=cache.get stat=mean",
+          "keyName": "smartcache:metrics:cache:get:mean",
           "query": "",
           "refId": "A",
           "type": "timeSeries"
@@ -1014,7 +1295,7 @@
           "color": {
             "mode": "thresholds"
           },
-          "displayName": "Backend P99 Latency",
+          "displayName": "Cache Get P99 Latency",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1024,16 +1305,16 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
-                "value": 500
+                "color": "yellow",
+                "value": 10
               },
               {
                 "color": "orange",
-                "value": 1000
+                "value": 100
               },
               {
                 "color": "red",
-                "value": 10000
+                "value": 1000
               }
             ]
           },
@@ -1045,9 +1326,194 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 22
+        "y": 23
       },
-      "id": 33,
+      "id": 16,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "9.3.2",
+      "targets": [
+        {
+          "aggregation": "avg",
+          "bucket": 1000,
+          "command": "ts.mrange",
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "filter": "name=cache.get quantile=0.99",
+          "keyName": "smartcache:metrics:cache:get:quantile:0.99",
+          "query": "",
+          "refId": "A",
+          "type": "timeSeries"
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 25,
+      "panels": [],
+      "title": "Cache Put Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "${DS_REDIS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "aggregation": "sum",
+          "bucket": 1000,
+          "command": "ts.mrange",
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "filter": "name=cache.put stat=mean",
+          "keyName": "smartcache:metrics:cache:put:count",
+          "query": "",
+          "refId": "A",
+          "type": "timeSeries"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "${DS_REDIS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "displayName": "Cache Put Mean Latency",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 30
+      },
+      "id": 14,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
@@ -1067,12 +1533,13 @@
         {
           "aggregation": "avg",
           "bucket": 1000,
-          "command": "ts.range",
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "keyName": "smartcache:metrics:db:quantile:0.99",
+          "filter": "name=cache.put stat=mean",
+          "keyName": "smartcache:metrics:cache:put:mean",
           "query": "",
           "refId": "A",
           "type": "timeSeries"
@@ -1081,528 +1548,81 @@
       "type": "stat"
     },
     {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 28
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "${DS_REDIS}"
       },
-      "id": 21,
-      "panels": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "${DS_REDIS}"
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          "description": "",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
+          "displayName": "Cache Put P99",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
               },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 50,
-                "gradientMode": "scheme",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
+              {
+                "color": "yellow",
+                "value": 1
               },
-              "displayName": "Cache Get Latency",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 5
-                  },
-                  {
-                    "color": "orange",
-                    "value": 10
-                  },
-                  {
-                    "color": "red",
-                    "value": 100
-                  }
-                ]
+              {
+                "color": "orange",
+                "value": 3
               },
-              "unit": "ms"
-            },
-            "overrides": []
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
           },
-          "gridPos": {
-            "h": 6,
-            "w": 12,
-            "x": 0,
-            "y": 30
-          },
-          "id": 28,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "aggregation": "avg",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:get:mean",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
-          ],
-          "type": "timeseries"
+          "unit": "ms"
         },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "${DS_REDIS}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "displayName": "Cache Get Mean Latency",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 1
-                  },
-                  {
-                    "color": "orange",
-                    "value": 3
-                  },
-                  {
-                    "color": "red",
-                    "value": 10
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 6,
-            "w": 6,
-            "x": 12,
-            "y": 30
-          },
-          "id": 11,
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "value_and_name"
-          },
-          "pluginVersion": "9.3.2",
-          "targets": [
-            {
-              "aggregation": "avg",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:get:mean",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 30
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "type": "stat"
+          "fields": "",
+          "values": false
         },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.3.2",
+      "targets": [
         {
+          "aggregation": "avg",
+          "bucket": 1000,
+          "command": "ts.mrange",
           "datasource": {
             "type": "redis-datasource",
             "uid": "${DS_REDIS}"
           },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "displayName": "Cache Get P99 Latency",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 10
-                  },
-                  {
-                    "color": "orange",
-                    "value": 100
-                  },
-                  {
-                    "color": "red",
-                    "value": 1000
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 6,
-            "w": 6,
-            "x": 18,
-            "y": 30
-          },
-          "id": 16,
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "value_and_name"
-          },
-          "pluginVersion": "9.3.2",
-          "targets": [
-            {
-              "aggregation": "avg",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:get:quantile:0.99",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
-          ],
-          "type": "stat"
+          "filter": "name=cache.get quantile=0.99",
+          "keyName": "smartcache:metrics:cache:put:quantile:0.99",
+          "query": "",
+          "refId": "A",
+          "type": "timeSeries"
         }
       ],
-      "title": "Cache Get Latency",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 29
-      },
-      "id": 25,
-      "panels": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "${DS_REDIS}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 50,
-                "gradientMode": "scheme",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "red"
-                  },
-                  {
-                    "color": "green",
-                    "value": 100
-                  }
-                ]
-              },
-              "unit": "ops"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 6,
-            "w": 12,
-            "x": 0,
-            "y": 31
-          },
-          "id": 18,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "aggregation": "sum",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:put:count",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
-          ],
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "${DS_REDIS}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "displayName": "Cache Put Mean Latency",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 1
-                  },
-                  {
-                    "color": "orange",
-                    "value": 3
-                  },
-                  {
-                    "color": "red",
-                    "value": 10
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 6,
-            "w": 6,
-            "x": 12,
-            "y": 31
-          },
-          "id": 14,
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "pluginVersion": "9.3.2",
-          "targets": [
-            {
-              "aggregation": "avg",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:put:mean",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
-          ],
-          "type": "stat"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "${DS_REDIS}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "displayName": "Cache Put P99",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 1
-                  },
-                  {
-                    "color": "orange",
-                    "value": 3
-                  },
-                  {
-                    "color": "red",
-                    "value": 10
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 6,
-            "w": 6,
-            "x": 18,
-            "y": 31
-          },
-          "id": 17,
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "pluginVersion": "9.3.2",
-          "targets": [
-            {
-              "aggregation": "avg",
-              "bucket": 1000,
-              "command": "ts.range",
-              "datasource": {
-                "type": "redis-datasource",
-                "uid": "${DS_REDIS}"
-              },
-              "keyName": "smartcache:metrics:cache:put:quantile:0.99",
-              "query": "",
-              "refId": "A",
-              "type": "timeSeries"
-            }
-          ],
-          "type": "stat"
-        }
-      ],
-      "title": "Cache Put Latency",
-      "type": "row"
+      "type": "stat"
     }
   ],
   "refresh": "5s",
@@ -1620,6 +1640,6 @@
   "timezone": "",
   "title": "Redis Smart Cache",
   "uid": "7B6csWTVk",
-  "version": 4,
+  "version": 3,
   "weekStart": ""
 }
