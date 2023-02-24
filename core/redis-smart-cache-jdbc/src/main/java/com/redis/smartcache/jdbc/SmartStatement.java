@@ -48,12 +48,12 @@ public class SmartStatement implements Statement {
 	protected boolean execute(String sql, Callable<Boolean> executable) throws SQLException {
 		Query query = connection.fireRules(sql);
 		try {
-			return query.getTimer().recordCallable(() -> {
+			return connection.getQueryTimer(query).recordCallable(() -> {
 				queryExecution = getCachedExecution(query);
 				if (queryExecution.hasResultSet()) {
 					return true;
 				}
-				return query.getBackendTimer().recordCallable(executable);
+				return connection.getBackendTimer(query).recordCallable(executable);
 			});
 		} catch (SQLException e) {
 			throw e;
@@ -65,12 +65,12 @@ public class SmartStatement implements Statement {
 	protected ResultSet executeQuery(String sql, Callable<ResultSet> callable) throws SQLException {
 		Query query = connection.fireRules(sql);
 		try {
-			return query.getTimer().recordCallable(() -> {
+			return connection.getQueryTimer(query).recordCallable(() -> {
 				QueryExecution execution = getCachedExecution(query);
 				if (execution.hasResultSet()) {
 					return execution.getResultSet();
 				}
-				return cacheResultSet(execution.getQuery(), query.getBackendTimer().recordCallable(callable));
+				return cacheResultSet(execution.getQuery(), connection.getBackendTimer(query).recordCallable(callable));
 			});
 		} catch (SQLException e) {
 			throw e;
@@ -90,7 +90,7 @@ public class SmartStatement implements Statement {
 			CachedRowSet cachedRowSet = connection.createCachedRowSet();
 			cachedRowSet.populate(resultSet);
 			cachedRowSet.beforeFirst();
-			query.getCachePutTimer()
+			connection.getCachePutTimer(query)
 					.record(() -> connection.getResultSetCache().put(id(query), query.getTtl(), cachedRowSet));
 			cachedRowSet.beforeFirst();
 			return cachedRowSet;
@@ -128,12 +128,12 @@ public class SmartStatement implements Statement {
 
 	private QueryExecution getCachedExecution(Query query) throws Exception {
 		if (query.isCaching()) {
-			ResultSet resultSet = query.getCacheGetTimer()
+			ResultSet resultSet = connection.getCacheGetTimer(query)
 					.recordCallable(() -> connection.getResultSetCache().get(id(query)));
 			if (resultSet == null) {
-				query.getCacheMissCounter().increment();
+				connection.getCacheMissCounter(query).increment();
 			} else {
-				query.getCacheHitCounter().increment();
+				connection.getCacheHitCounter(query).increment();
 			}
 			return new QueryExecution(query, resultSet);
 		}

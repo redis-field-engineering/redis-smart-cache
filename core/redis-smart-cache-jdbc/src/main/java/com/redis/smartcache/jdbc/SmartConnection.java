@@ -31,6 +31,7 @@ import com.redis.smartcache.core.util.EvictingLinkedHashMap;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import io.trino.sql.parser.ParsingException;
 import io.trino.sql.parser.ParsingOptions;
@@ -360,17 +361,58 @@ public class SmartConnection implements Connection {
 		if (queryCache.containsKey(id)) {
 			return queryCache.get(id);
 		}
-		return new Query(id, sql, parse(sql), timer(METER_QUERY, id), timer(METER_BACKEND, id),
-				timer(METER_CACHE_GET, id), timer(METER_CACHE_PUT, id),
-				counter(METER_CACHE_GET, id, TAG_RESULT, TAG_HIT), counter(METER_CACHE_GET, id, TAG_RESULT, TAG_MISS));
+		Query query = new Query(id, sql, parse(sql));
+		createTimer(METER_QUERY, query);
+		createTimer(METER_BACKEND, query);
+		createTimer(METER_CACHE_GET, query);
+		createTimer(METER_CACHE_PUT, query);
+		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
+		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
+		return query;
 	}
 
-	private Timer timer(String name, String queryId) {
-		return Timer.builder(name).tag(TAG_QUERY, queryId).publishPercentiles(0.9, 0.99).register(meterRegistry);
+	public Timer getQueryTimer(Query query) {
+		return getTimer(METER_QUERY, query);
 	}
 
-	private Counter counter(String name, String queryId, String... tags) {
-		return Counter.builder(name).tag(TAG_QUERY, queryId).tags(tags).register(meterRegistry);
+	public Timer getBackendTimer(Query query) {
+		return getTimer(METER_BACKEND, query);
+	}
+
+	public Timer getCacheGetTimer(Query query) {
+		return getTimer(METER_CACHE_GET, query);
+	}
+
+	public Timer getCachePutTimer(Query query) {
+		return getTimer(METER_CACHE_PUT, query);
+	}
+
+	public Counter getCacheHitCounter(Query query) {
+		return getCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
+	}
+
+	public Counter getCacheMissCounter(Query query) {
+		return getCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
+	}
+
+	private Counter getCounter(String name, Query query, String... tags) {
+		return meterRegistry.get(name).tags(tags(query)).tags(tags).counter();
+	}
+
+	private Timer getTimer(String name, Query query) {
+		return meterRegistry.get(name).tags(tags(query)).timer();
+	}
+
+	private Timer createTimer(String name, Query query) {
+		return Timer.builder(name).tags(tags(query)).publishPercentiles(0.9, 0.99).register(meterRegistry);
+	}
+
+	private Tags tags(Query query) {
+		return Tags.of(TAG_QUERY, query.getId());
+	}
+
+	private Counter createCounter(String name, Query query, String... tags) {
+		return Counter.builder(name).tags(tags(query)).tags(tags).register(meterRegistry);
 	}
 
 	private io.trino.sql.tree.Statement parse(String sql) {

@@ -77,8 +77,7 @@ class RulesTests {
 	}
 
 	private Query query(String sql) {
-		return new Query(SmartConnection.crc32(sql), sql, PARSER.createStatement(sql, PARSING_OPTIONS), null, null,
-				null, null, null, null);
+		return new Query(SmartConnection.crc32(sql), sql, PARSER.createStatement(sql, PARSING_OPTIONS));
 	}
 
 }
