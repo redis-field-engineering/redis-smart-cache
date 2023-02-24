@@ -1,15 +1,19 @@
 name: 'Benchmark'
 
 on:
-  push:
-    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch'
+        default: 'master'
+        required: false
 
 jobs:
-  earlyaccess:
-    name: 'Benchmark'
-    if: github.repository == 'redis-field-engineering/redis-smart-cache' && startsWith(github.event.head_commit.message, 'Releasing version') == true
+  benchmark:
+    name: Benchmark
     uses: redis-field-engineering/redis-github-workflows/.github/workflows/benchmark.yml@main
     with:
+      branch: ${{ github.event.inputs.branch }}
       jmh-results-path: core/redis-smart-cache-test/build/results/jmh/results.txt
     secrets:
       github-token: ${{ secrets.GIT_ACCESS_TOKEN }}
