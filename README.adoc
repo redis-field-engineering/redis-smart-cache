@@ -29,7 +29,7 @@ image:https://codecov.io/gh/{project-owner}/{project-name}/branch/master/graph/b
 {product-name} lets you add caching to your application without changing the code.
 
 Implemented as a wrapper around your backend database's JDBC driver, {product-name} can cache
-slow, repeated queries from Redis, bypassing expensive database calls and greatly
+slow, repeated SQL queries in Redis, bypassing expensive database calls and greatly
 improving response times.
 
 == Table of Contents
