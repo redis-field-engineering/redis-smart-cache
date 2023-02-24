@@ -23,7 +23,7 @@
  * questions.
  */
 
-package com.redis.smartcache.core.rowset;
+package com.redis.smartcache.jdbc.rowset;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 

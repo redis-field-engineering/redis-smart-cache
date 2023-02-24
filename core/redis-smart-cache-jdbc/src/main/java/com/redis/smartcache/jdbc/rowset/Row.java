@@ -23,7 +23,7 @@
  * questions.
  */
 
-package com.redis.smartcache.core.rowset;
+package com.redis.smartcache.jdbc.rowset;
 
 import java.io.Serializable;
 import java.sql.SQLException;
@@ -43,7 +43,7 @@ import java.util.BitSet;
  * the argument for <code>setColumnUpdated</code> refers to the index
  * into the rowset's internal bitset (the first bit is <code>0</code>).
  */
-public class Row extends BaseRow implements Serializable, Cloneable {
+public class Row extends BaseRow implements Serializable {
 
 static final long serialVersionUID = 5047859032611314762L;
 

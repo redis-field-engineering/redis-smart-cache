@@ -1,4 +1,4 @@
-package com.redis.smartcache.core.rowset;
+package com.redis.smartcache.jdbc.rowset;
 
 import java.sql.SQLException;
 

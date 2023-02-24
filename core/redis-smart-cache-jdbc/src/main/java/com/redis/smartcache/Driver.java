@@ -40,8 +40,8 @@ import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RedisResultSetCache;
 import com.redis.smartcache.core.ResultSetCache;
 import com.redis.smartcache.core.codec.ResultSetCodec;
-import com.redis.smartcache.core.rowset.CachedRowSetFactory;
 import com.redis.smartcache.jdbc.SmartConnection;
+import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.micrometer.core.instrument.Clock;

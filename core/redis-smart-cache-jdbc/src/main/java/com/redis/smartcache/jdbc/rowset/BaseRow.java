@@ -23,10 +23,10 @@
  * questions.
  */
 
-package com.redis.smartcache.core.rowset;
+package com.redis.smartcache.jdbc.rowset;
 
-import java.sql.*;
-import java.io.*;
+import java.io.Serializable;
+import java.sql.SQLException;
 import java.util.Arrays;
 
 /**
@@ -48,7 +48,7 @@ import java.util.Arrays;
  * conditions under which an exception is thrown or the bounds for index
  * parameters.
  */
-public abstract class BaseRow implements Serializable, Cloneable {
+public abstract class BaseRow implements Serializable {
 
 	/**
 	 * Specify the serialVersionUID

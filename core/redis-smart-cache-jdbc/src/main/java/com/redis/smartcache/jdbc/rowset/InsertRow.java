@@ -23,7 +23,7 @@
  * questions.
  */
 
-package com.redis.smartcache.core.rowset;
+package com.redis.smartcache.jdbc.rowset;
 
 import java.sql.*;
 import javax.sql.*;
@@ -46,7 +46,7 @@ public class InsertRow extends BaseRow implements Serializable {
 	private BitSet colsInserted;
 
 	/**
-	 * The number of columns in this <code>InsertRow</code> object.
+	 * The number of columns in this <code>InsertRow</code> object
 	 */
 	private int cols;
 

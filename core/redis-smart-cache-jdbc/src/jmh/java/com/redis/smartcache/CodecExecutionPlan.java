@@ -13,7 +13,7 @@ import org.openjdk.jmh.annotations.State;
 
 import com.redis.smartcache.core.codec.ResultSetCodec;
 import com.redis.smartcache.core.codec.SerializedResultSetCodec;
-import com.redis.smartcache.core.rowset.CachedRowSetFactory;
+import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
 
 @State(Scope.Benchmark)
