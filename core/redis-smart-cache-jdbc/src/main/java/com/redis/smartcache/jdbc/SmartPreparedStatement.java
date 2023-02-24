@@ -40,7 +40,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	protected String key(Query query) {
-		return query.getId() + connection.getConfig().getKeySeparator() + SmartConnection.crc32(paramString());
+		return query.getId() + connection.getConfig().getKeySeparator() + connection.hash(paramString());
 	}
 
 	protected String paramString() {

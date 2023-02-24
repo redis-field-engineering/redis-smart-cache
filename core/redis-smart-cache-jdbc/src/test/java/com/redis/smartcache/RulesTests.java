@@ -7,10 +7,9 @@ import com.redis.smartcache.core.Config.RulesetConfig;
 import com.redis.smartcache.core.Config.RulesetConfig.RuleConfig;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.jdbc.SmartConnection;
-
-import io.trino.sql.parser.ParsingOptions;
-import io.trino.sql.parser.SqlParser;
+import com.redis.smartcache.core.util.CRC32HashingFunction;
+import com.redis.smartcache.core.util.HashingFunction;
+import com.redis.smartcache.core.util.SQLParser;
 
 class RulesTests {
 
@@ -21,8 +20,8 @@ class RulesTests {
 	private static final String ORDERS = "orders";
 	private static final String ORDERS_O = ORDERS + " o";
 
-	private static final SqlParser PARSER = new SqlParser();
-	private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
+	private static final SQLParser PARSER = new SQLParser();
+	private static final HashingFunction HASHING_FUNCTION = new CRC32HashingFunction();
 
 	@Test
 	void testTables() {
@@ -77,7 +76,7 @@ class RulesTests {
 	}
 
 	private Query query(String sql) {
-		return new Query(SmartConnection.crc32(sql), sql, PARSER.createStatement(sql, PARSING_OPTIONS));
+		return new Query(HASHING_FUNCTION.hash(sql), sql, PARSER.extractTableNames(sql));
 	}
 
 }

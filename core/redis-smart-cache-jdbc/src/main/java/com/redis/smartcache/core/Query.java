@@ -1,6 +1,6 @@
 package com.redis.smartcache.core;
 
-import io.trino.sql.tree.Statement;
+import java.util.Set;
 
 public class Query {
 
@@ -9,21 +9,25 @@ public class Query {
 
 	private final String id;
 	private final String sql;
-	private final Statement statement;
+	private final Set<String> tables;
 	private long ttl = TTL_NO_CACHING;
 
-	public Query(String id, String sql, Statement statement) {
+	public Query(String id, String sql, Set<String> tables) {
 		this.id = id;
 		this.sql = sql;
-		this.statement = statement;
+		this.tables = tables;
 	}
 
-	public boolean hasStatement() {
-		return statement != null;
+	public String getId() {
+		return id;
 	}
 
-	public Statement getStatement() {
-		return statement;
+	public String getSql() {
+		return sql;
+	}
+
+	public Set<String> getTables() {
+		return tables;
 	}
 
 	public long getTtl() {
@@ -36,14 +40,6 @@ public class Query {
 
 	public boolean isCaching() {
 		return ttl != TTL_NO_CACHING;
-	}
-
-	public String getId() {
-		return id;
-	}
-
-	public String getSql() {
-		return sql;
 	}
 
 }

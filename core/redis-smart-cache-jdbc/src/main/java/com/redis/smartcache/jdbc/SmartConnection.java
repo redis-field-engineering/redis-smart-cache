@@ -1,6 +1,5 @@
 package com.redis.smartcache.jdbc;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -18,8 +17,8 @@ import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.zip.CRC32;
 
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
@@ -28,15 +27,15 @@ import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.ResultSetCache;
+import com.redis.smartcache.core.util.CRC32HashingFunction;
 import com.redis.smartcache.core.util.EvictingLinkedHashMap;
+import com.redis.smartcache.core.util.HashingFunction;
+import com.redis.smartcache.core.util.SQLParser;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
-import io.trino.sql.parser.ParsingException;
-import io.trino.sql.parser.ParsingOptions;
-import io.trino.sql.parser.SqlParser;
 
 public class SmartConnection implements Connection {
 
@@ -49,11 +48,10 @@ public class SmartConnection implements Connection {
 	private static final String TAG_MISS = "miss";
 	private static final String TAG_HIT = "hit";
 	private static final String TAG_QUERY = "query";
-	private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
-
-	private final SqlParser parser = new SqlParser();
 	private final Map<String, Query> queryCache;
 
+	private final HashingFunction hashFunction = new CRC32HashingFunction();
+	private final SQLParser sqlParser = new SQLParser();
 	private final Connection connection;
 	private final QueryRuleSession ruleSession;
 	private final RowSetFactory rowSetFactory;
@@ -190,7 +188,8 @@ public class SmartConnection implements Connection {
 
 	@Override
 	public Statement createStatement(int rsType, int rsConcurrency) throws SQLException {
-		return new SmartStatement(this, connection.createStatement(rsType, rsConcurrency));
+		Statement statement = connection.createStatement(rsType, rsConcurrency);
+		return new SmartStatement(this, statement);
 	}
 
 	@Override
@@ -363,12 +362,17 @@ public class SmartConnection implements Connection {
 		return connection.getNetworkTimeout();
 	}
 
+	public String hash(String string) {
+		return hashFunction.hash(string);
+	}
+
 	public Query getQuery(String sql) {
-		String id = crc32(sql);
+		String id = hash(sql);
 		if (queryCache.containsKey(id)) {
 			return queryCache.get(id);
 		}
-		Query query = new Query(id, sql, parse(sql));
+		Set<String> tables = sqlParser.extractTableNames(sql);
+		Query query = new Query(id, sql, tables);
 		createTimer(METER_QUERY, query);
 		createTimer(METER_BACKEND, query);
 		createTimer(METER_CACHE_GET, query);
@@ -420,22 +424,6 @@ public class SmartConnection implements Connection {
 
 	private Counter createCounter(String name, Query query, String... tags) {
 		return Counter.builder(name).tags(tags(query)).tags(tags).register(meterRegistry);
-	}
-
-	private io.trino.sql.tree.Statement parse(String sql) {
-		try {
-			return parser.createStatement(sql, PARSING_OPTIONS);
-		} catch (ParsingException e) {
-			// This statement cannot be parsed. Only rules like regex can trigger
-			return null;
-		}
-
-	}
-
-	public static String crc32(String string) {
-		CRC32 crc = new CRC32();
-		crc.update(string.getBytes(StandardCharsets.UTF_8));
-		return String.valueOf(crc.getValue());
 	}
 
 	public Query fireRules(String sql) {

@@ -2,8 +2,6 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -19,8 +17,6 @@ import com.redis.smartcache.core.rules.Rule;
 import com.redis.smartcache.core.rules.RuleSession;
 
 public class QueryRuleSession extends RuleSession<Query, Query> implements PropertyChangeListener {
-
-	private static final Collection<String> EMPTY_TABLE_NAMES = Collections.emptyList();
 
 	public QueryRuleSession() {
 		super();
@@ -57,25 +53,18 @@ public class QueryRuleSession extends RuleSession<Query, Query> implements Prope
 	private static Rule<Query, Query> rule(RuleConfig rule) {
 		Consumer<Query> action = action(rule);
 		if (rule.getTables() != null) {
-			return CollectionRule.builder(QueryRuleSession::tableNames, action).exact(rule.getTables());
+			return CollectionRule.builder(Query::getTables, action).exact(rule.getTables());
 		}
 		if (rule.getTablesAll() != null) {
-			return CollectionRule.builder(QueryRuleSession::tableNames, action).all(rule.getTablesAll());
+			return CollectionRule.builder(Query::getTables, action).all(rule.getTablesAll());
 		}
 		if (rule.getTablesAny() != null) {
-			return CollectionRule.builder(QueryRuleSession::tableNames, action).any(rule.getTablesAny());
+			return CollectionRule.builder(Query::getTables, action).any(rule.getTablesAny());
 		}
 		if (rule.getRegex() != null) {
 			return new RegexRule<>(Pattern.compile(rule.getRegex()), Query::getSql, action);
 		}
 		return new PredicateRule<>(Predicates.alwaysTrue(), action);
-	}
-
-	private static Collection<String> tableNames(Query query) {
-		if (query.hasStatement()) {
-			return TableExtractor.tableNames(query.getStatement());
-		}
-		return EMPTY_TABLE_NAMES;
 	}
 
 	private static Consumer<Query> action(RuleConfig rule) {
