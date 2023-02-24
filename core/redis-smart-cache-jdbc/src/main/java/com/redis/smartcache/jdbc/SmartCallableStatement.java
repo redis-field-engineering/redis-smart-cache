@@ -19,9 +19,6 @@ import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import com.redis.smartcache.core.Query;
-
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -34,8 +31,8 @@ public class SmartCallableStatement extends SmartPreparedStatement implements Ca
 	}
 
 	@Override
-	protected String id(Query query) {
-		StringBuilder builder = new StringBuilder(query.getId());
+	protected String paramString() {
+		StringBuilder builder = new StringBuilder();
 		for (Entry<String, String> entry : parameters.entrySet()) {
 			builder.append(PARAMETER_SEPARATOR).append(entry.getKey() + "=" + entry.getValue());
 		}

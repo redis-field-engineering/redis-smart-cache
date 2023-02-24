@@ -10,7 +10,7 @@ import java.util.Date;
 
 import org.junit.jupiter.api.Assertions;
 
-public class TestUtils {
+public class Utils {
 
 	public static void assertEquals(ResultSet expected, ResultSet actual) throws SQLException {
 		ResultSetMetaData expectedMetaData = expected.getMetaData();

@@ -41,10 +41,6 @@ public class SmartStatement implements Statement {
 		return executeQuery(sql, () -> statement.executeQuery(sql));
 	}
 
-	protected String id(Query query) {
-		return query.getId();
-	}
-
 	protected boolean execute(String sql, Callable<Boolean> executable) throws SQLException {
 		Query query = connection.fireRules(sql);
 		try {
@@ -91,11 +87,15 @@ public class SmartStatement implements Statement {
 			cachedRowSet.populate(resultSet);
 			cachedRowSet.beforeFirst();
 			connection.getCachePutTimer(query)
-					.record(() -> connection.getResultSetCache().put(id(query), query.getTtl(), cachedRowSet));
+					.record(() -> connection.getResultSetCache().put(key(query), query.getTtl(), cachedRowSet));
 			cachedRowSet.beforeFirst();
 			return cachedRowSet;
 		}
 		return resultSet;
+	}
+
+	protected String key(Query query) {
+		return query.getId();
 	}
 
 	private static class QueryExecution {
@@ -129,7 +129,7 @@ public class SmartStatement implements Statement {
 	private QueryExecution getCachedExecution(Query query) throws Exception {
 		if (query.isCaching()) {
 			ResultSet resultSet = connection.getCacheGetTimer(query)
-					.recordCallable(() -> connection.getResultSetCache().get(id(query)));
+					.recordCallable(() -> connection.getResultSetCache().get(key(query)));
 			if (resultSet == null) {
 				connection.getCacheMissCounter(query).increment();
 			} else {

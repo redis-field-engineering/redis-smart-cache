@@ -24,6 +24,7 @@ import java.util.zip.CRC32;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
+import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.ResultSetCache;
@@ -58,15 +59,21 @@ public class SmartConnection implements Connection {
 	private final RowSetFactory rowSetFactory;
 	private final ResultSetCache resultSetCache;
 	private final MeterRegistry meterRegistry;
+	private final Config config;
 
 	public SmartConnection(Connection connection, QueryRuleSession ruleSession, RowSetFactory rowSetFactory,
-			ResultSetCache resultSetCache, MeterRegistry meterRegistry, int queryCacheCapacity) {
+			ResultSetCache resultSetCache, MeterRegistry meterRegistry, Config config) {
 		this.connection = connection;
 		this.ruleSession = ruleSession;
 		this.rowSetFactory = rowSetFactory;
 		this.resultSetCache = resultSetCache;
 		this.meterRegistry = meterRegistry;
-		this.queryCache = new EvictingLinkedHashMap<>(queryCacheCapacity);
+		this.config = config;
+		this.queryCache = new EvictingLinkedHashMap<>(config.getQueryCacheCapacity());
+	}
+
+	public Config getConfig() {
+		return config;
 	}
 
 	public ResultSetCache getResultSetCache() {

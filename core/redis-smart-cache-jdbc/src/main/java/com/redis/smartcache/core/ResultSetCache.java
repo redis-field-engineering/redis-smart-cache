@@ -7,19 +7,19 @@ public interface ResultSetCache {
 
 	/**
 	 * 
-	 * @param id SQL id to get the ResultSet for.
+	 * @param key key to get the ResultSet for.
 	 * @return ResultSet that was retrieved from cache or null if none found.
 	 */
-	ResultSet get(String id);
+	ResultSet get(String key);
 
 	/**
 	 * Adds a ResultSet to the cache.
 	 *
-	 * @param id        ID of the SQL statement to store the ResultSet under.
+	 * @param key       key to store the ResultSet under.
 	 * @param ttl       the key TTL in seconds.
 	 * @param resultSet the ResultSet to store under the key.
 	 * @throws SQLException if an error occurred while storing the ResultSet
 	 */
-	void put(String id, long ttl, ResultSet resultSet);
+	void put(String key, long ttl, ResultSet resultSet);
 
 }

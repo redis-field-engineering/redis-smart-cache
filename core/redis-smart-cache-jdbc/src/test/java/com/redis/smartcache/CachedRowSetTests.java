@@ -22,7 +22,7 @@ class CachedRowSetTests {
 		CachedRowSetImpl actual = new CachedRowSetImpl();
 		actual.populate(rowSet);
 		rowSet.beforeFirst();
-		TestUtils.assertEquals(rowSet, actual);
+		Utils.assertEquals(rowSet, actual);
 	}
 
 	@Test

@@ -145,7 +145,7 @@ public class Driver implements java.sql.Driver {
 		String prefix = conf.key(CACHE_KEY_PREFIX) + conf.getKeySeparator();
 		ResultSetCache cache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec), prefix);
 		MeterRegistry registry = registries.computeIfAbsent(conf, c -> registry(c, client));
-		return new SmartConnection(backend, session, rowSetFactory, cache, registry, conf.getQueryCacheCapacity());
+		return new SmartConnection(backend, session, rowSetFactory, cache, registry, conf);
 	}
 
 	private static RedisTimeSeriesMeterRegistry registry(Config conf, AbstractRedisClient client) {
@@ -157,12 +157,12 @@ public class Driver implements java.sql.Driver {
 		if (url == null || url.isEmpty()) {
 			throw new SQLException("No backend URL specified");
 		}
-		java.sql.Driver driver = getBackendDriver(config.getClassName());
+		java.sql.Driver driver = backendDriver(config.getClassName());
 		logger.log(Level.FINE, "Connecting to backend database with URL: {0}", url);
 		return driver.connect(url, info);
 	}
 
-	public static synchronized java.sql.Driver getBackendDriver(String className) throws SQLException {
+	public static synchronized java.sql.Driver backendDriver(String className) throws SQLException {
 		if (className == null || className.isEmpty()) {
 			throw new SQLException("No backend driver class specified");
 		}

@@ -21,7 +21,7 @@ class CodecTests {
 		ResultSetCodec codec = new ResultSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
-		TestUtils.assertEquals(rowSet, actual);
+		Utils.assertEquals(rowSet, actual);
 	}
 
 	private RowSetBuilder rowSetBuilder() {
@@ -34,7 +34,7 @@ class CodecTests {
 		SerializedResultSetCodec codec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
-		TestUtils.assertEquals(rowSet, actual);
+		Utils.assertEquals(rowSet, actual);
 	}
 
 	public String toString(RowSet rowSet) throws SQLException {

@@ -24,7 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
 import com.redis.smartcache.Driver;
-import com.redis.smartcache.TestUtils;
+import com.redis.smartcache.Utils;
 import com.redis.smartcache.core.Config;
 import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
@@ -145,7 +145,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 			StatementExecutor executor) throws Exception {
 		try (Connection databaseConnection = connection(databaseContainer);
 				SmartConnection connection = connection(databaseContainer, redis)) {
-			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
+			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
 			Awaitility.await().timeout(testTimeout).until(() -> {
 				try {
 					executor.execute(connection);
@@ -155,7 +155,7 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 				String keyPattern = new Config().key(Driver.CACHE_KEY_PREFIX, "*");
 				return !redis.sync().keys(keyPattern).isEmpty();
 			});
-			TestUtils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));
+			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));
 		}
 	}
 

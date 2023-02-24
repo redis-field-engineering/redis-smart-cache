@@ -27,8 +27,8 @@ import com.redis.smartcache.core.Query;
 
 public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
-	protected static final String PARAMETER_SEPARATOR = ":";
 	private static final String METHOD_CANNOT_BE_USED = "Cannot use query methods that take a query string on a PreparedStatement";
+	protected static final String PARAMETER_SEPARATOR = ",";
 
 	private final String sql;
 	private final SortedMap<Integer, String> parameters = new TreeMap<>();
@@ -39,8 +39,12 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	}
 
 	@Override
-	protected String id(Query query) {
-		StringBuilder builder = new StringBuilder(query.getId());
+	protected String key(Query query) {
+		return query.getId() + connection.getConfig().getKeySeparator() + SmartConnection.crc32(paramString());
+	}
+
+	protected String paramString() {
+		StringBuilder builder = new StringBuilder();
 		for (String parameter : parameters.values()) {
 			builder.append(PARAMETER_SEPARATOR).append(parameter);
 		}
