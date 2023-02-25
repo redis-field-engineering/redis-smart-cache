@@ -28,7 +28,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import io.lettuce.core.RedisURI;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarBuilder;
-import me.tongfei.progressbar.ProgressBarStyle;
 
 @Component
 public class QueryExecutor implements AutoCloseable {

@@ -5,14 +5,12 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.params.ParameterizedTest;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.junit.jupiter.Container;
-
-import com.redis.testcontainers.junit.RedisTestContext;
-import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 @EnabledOnOs(OS.LINUX)
 class MSSQLTests extends AbstractIntegrationTests {
@@ -21,43 +19,43 @@ class MSSQLTests extends AbstractIntegrationTests {
 	private static final MSSQLServerContainer<?> MSSQL = new MSSQLServerContainer<>(MSSQLServerContainer.IMAGE)
 			.acceptLicense();
 
+	@Override
+	protected JdbcDatabaseContainer<?> getBackend() {
+		return MSSQL;
+	}
+
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
-		Connection backendConnection = connection(MSSQL);
+	public static void setupAll() throws SQLException, IOException {
+		Connection backendConnection = backendConnection(MSSQL);
 		runScript(backendConnection, "mssql/create_tables.sql");
 		runScript(backendConnection, "mssql/populate_tables.sql");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(MSSQL, redis, "SELECT * FROM LOCATIONS");
-		testSimpleStatement(MSSQL, redis, "SELECT * FROM DEPARTMENTS");
-		testSimpleStatement(MSSQL, redis, "SELECT * FROM JOB_HISTORY");
-		testSimpleStatement(MSSQL, redis, "SELECT * FROM EMPLOYEES");
+	@Test
+	void testSimpleStatement() throws Exception {
+		testSimpleStatement(MSSQL, "SELECT * FROM LOCATIONS");
+		testSimpleStatement(MSSQL, "SELECT * FROM DEPARTMENTS");
+		testSimpleStatement(MSSQL, "SELECT * FROM JOB_HISTORY");
+		testSimpleStatement(MSSQL, "SELECT * FROM EMPLOYEES");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
-		testUpdateAndGetResultSet(MSSQL, redis, "SELECT * FROM LOCATIONS");
+	@Test
+	void testUpdateAndGetResultSet() throws Exception {
+		testUpdateAndGetResultSet(MSSQL, "SELECT * FROM LOCATIONS");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testPreparedStatement(RedisTestContext redis) throws Exception {
-		testPreparedStatement(MSSQL, redis, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = ?", "US");
+	@Test
+	void testPreparedStatement() throws Exception {
+		testPreparedStatement(MSSQL, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = ?", "US");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
-		testCallableStatementGetResultSet(MSSQL, redis, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = 'US'");
+	@Test
+	void testCallableStatementGetResultSet() throws Exception {
+		testCallableStatementGetResultSet(MSSQL, "SELECT * FROM LOCATIONS WHERE COUNTRY_ID = 'US'");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(MSSQL, redis, "SELECT * FROM LOCATIONS");
+	@Test
+	void testResultSetMetadata() throws Exception {
+		testResultSetMetaData(MSSQL, "SELECT * FROM LOCATIONS");
 	}
 }

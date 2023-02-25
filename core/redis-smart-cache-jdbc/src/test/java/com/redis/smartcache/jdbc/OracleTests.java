@@ -10,15 +10,13 @@ import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.params.ParameterizedTest;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
-
-import com.redis.testcontainers.junit.RedisTestContext;
-import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 @EnabledOnOs(OS.LINUX)
 class OracleTests extends AbstractIntegrationTests {
@@ -29,37 +27,38 @@ class OracleTests extends AbstractIntegrationTests {
 	@Container
 	private static final OracleContainer ORACLE = new OracleContainer(ORACLE_DOCKER_IMAGE_NAME);
 
+	@Override
+	protected JdbcDatabaseContainer<?> getBackend() {
+		return ORACLE;
+	}
+
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
-		Connection backendConnection = connection(ORACLE);
+	public static void setupAll() throws SQLException, IOException {
+		Connection backendConnection = backendConnection(ORACLE);
 		runScript(backendConnection, "oracle/hr.sql");
 		runScript(backendConnection, "oracle/employee.sql");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(ORACLE, redis, "SELECT * FROM employees");
-		testSimpleStatement(ORACLE, redis, "SELECT * FROM emp_details_view");
-		testSimpleStatement(ORACLE, redis, "SELECT * FROM locations");
+	@Test
+	void testSimpleStatement() throws Exception {
+		testSimpleStatement(ORACLE, "SELECT * FROM employees");
+		testSimpleStatement(ORACLE, "SELECT * FROM emp_details_view");
+		testSimpleStatement(ORACLE, "SELECT * FROM locations");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
-		testUpdateAndGetResultSet(ORACLE, redis, "SELECT * FROM employees");
+	@Test
+	void testUpdateAndGetResultSet() throws Exception {
+		testUpdateAndGetResultSet(ORACLE, "SELECT * FROM employees");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testPreparedStatement(RedisTestContext redis) throws Exception {
-		testPreparedStatement(ORACLE, redis, "SELECT * FROM employees WHERE department_id = ?", 30);
+	@Test
+	void testPreparedStatement() throws Exception {
+		testPreparedStatement(ORACLE, "SELECT * FROM employees WHERE department_id = ?", 30);
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatement(RedisTestContext redis) throws Exception {
-		try (Connection connection = connection(ORACLE, redis)) {
+	@Test
+	void testCallableStatement() throws Exception {
+		try (Connection connection = connection(ORACLE)) {
 			CallableStatement callableStatement = connection.prepareCall("{ call insert_employee(?,?,?) }");
 			callableStatement.setString(1, "julien");
 			callableStatement.setBigDecimal(2, new BigDecimal("99.99"));
@@ -68,16 +67,14 @@ class OracleTests extends AbstractIntegrationTests {
 		}
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
-		testCallableStatementGetResultSet(ORACLE, redis, "SELECT * FROM employees WHERE department_id = 30");
+	@Test
+	void testCallableStatementGetResultSet() throws Exception {
+		testCallableStatementGetResultSet(ORACLE, "SELECT * FROM employees WHERE department_id = 30");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(ORACLE, redis, "SELECT * FROM employees");
+	@Test
+	void testResultSetMetadata() throws Exception {
+		testResultSetMetaData(ORACLE, "SELECT * FROM employees");
 	}
 
 }

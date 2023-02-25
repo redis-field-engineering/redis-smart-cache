@@ -335,13 +335,13 @@ Here is the default rule configuration:
       "tablesAny": null,
       "tablesAll": null,
       "regex": null,
-      "ttl": 3600
+      "ttl": "1h"
     }
   ]
 }
 ----
 
-This default configuration contains a single passthrough rule where all SQL query results will be assigned a TTL of 3600 seconds.
+This default configuration contains a single passthrough rule where all SQL query results will be assigned a TTL of 1 hour.
 
 Rules are processed in order and consist of *criteria* (conditions) and *actions* (results).
 Only the first rule with matching criteria will be considered, and its action applied.
@@ -358,10 +358,7 @@ Only the first rule with matching criteria will be considered, and its action ap
 
 ==== Action
 
-`ttl`:: Sets the time-to-live (in seconds) for the corresponding cache entry (default: `3600`).
-[horizontal]
-`0`:::: No caching
-`-1`:::: No expiration
+`ttl`:: Sets the time-to-live for the corresponding cache entry (default: `1h`). Use `0s` to disable caching.
 
 ==== Examples
 

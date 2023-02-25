@@ -2,21 +2,22 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
+import io.airlift.units.Duration;
 import io.lettuce.core.SslVerifyMode;
 
 public class Config {
 
 	public static final String DEFAULT_KEYSPACE = "smartcache";
 	public static final String DEFAULT_KEY_SEPARATOR = ":";
-	public static final Duration DEFAULT_CONFIG_STEP = Duration.ofSeconds(10);
-	public static final Duration DEFAULT_METRICS_STEP = Duration.ofSeconds(60);
+	public static final Duration DEFAULT_CONFIG_STEP = new Duration(10, TimeUnit.SECONDS);
+	public static final Duration DEFAULT_METRICS_STEP = new Duration(60, TimeUnit.SECONDS);
 	public static final int DEFAULT_POOL_SIZE = 8;
 	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 	private static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
@@ -298,7 +299,7 @@ public class Config {
 
 		public static class RuleConfig {
 
-			public static final long DEFAULT_TTL = 3600;
+			public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
 
 			private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
@@ -306,7 +307,7 @@ public class Config {
 			private String[] tablesAny;
 			private String[] tablesAll;
 			private String regex;
-			private long ttl = DEFAULT_TTL;
+			private Duration ttl = DEFAULT_TTL;
 
 			public RuleConfig() {
 			}
@@ -365,14 +366,13 @@ public class Config {
 
 			/**
 			 * 
-			 * @return Key expiration duration in seconds. Use 0 for no caching, -1 for no
-			 *         expiration
+			 * @return Key expiration duration. Use a duration of zero for no caching
 			 */
-			public long getTtl() {
+			public Duration getTtl() {
 				return ttl;
 			}
 
-			public void setTtl(long ttl) {
+			public void setTtl(Duration ttl) {
 				support.firePropertyChange("ttl", this.ttl, ttl);
 				this.ttl = ttl;
 			}
@@ -417,12 +417,12 @@ public class Config {
 				private String[] tablesAny;
 				private String[] tablesAll;
 				private String regex;
-				private long ttl = DEFAULT_TTL;
+				private Duration ttl = DEFAULT_TTL;
 
 				private Builder() {
 				}
 
-				public Builder ttl(long ttl) {
+				public Builder ttl(Duration ttl) {
 					this.ttl = ttl;
 					return this;
 				}

@@ -2,6 +2,7 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -68,7 +69,8 @@ public class QueryRuleSession extends RuleSession<Query, Query> implements Prope
 	}
 
 	private static Consumer<Query> action(RuleConfig rule) {
-		return s -> s.setTtl(rule.getTtl());
+		Duration ttl = Duration.ofMillis(rule.getTtl().toMillis());
+		return s -> s.setTtl(ttl);
 	}
 
 }

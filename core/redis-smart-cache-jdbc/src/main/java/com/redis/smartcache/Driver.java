@@ -5,7 +5,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,15 +16,10 @@ import java.util.regex.Pattern;
 
 import javax.sql.rowset.RowSetFactory;
 
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.util.ClientBuilder;
 import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.lettucemod.util.RedisURIBuilder;
@@ -35,11 +29,12 @@ import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.DriverConfig;
 import com.redis.smartcache.core.Config.RedisConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
-import com.redis.smartcache.core.ConfigManager;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RedisResultSetCache;
 import com.redis.smartcache.core.ResultSetCache;
 import com.redis.smartcache.core.codec.ResultSetCodec;
+import com.redis.smartcache.core.config.ConfigManager;
+import com.redis.smartcache.core.config.ObjectMappers;
 import com.redis.smartcache.jdbc.SmartConnection;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
@@ -76,10 +71,8 @@ public class Driver implements java.sql.Driver {
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 	private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
-	private static final JavaPropsMapper PROPS_MAPPER = JavaPropsMapper.builder()
-			.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).serializationInclusion(Include.NON_NULL)
-			.addModule(new JavaTimeModule()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-			.disable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS).build();
+	private static final JavaPropsMapper PROPS_MAPPER = ObjectMappers.javaProps();
+	private static final JsonMapper JSON_MAPPER = ObjectMappers.json();
 
 	private static final RowSetFactory rowSetFactory = new CachedRowSetFactory();
 	private static final Map<String, java.sql.Driver> drivers = new HashMap<>();
@@ -137,10 +130,18 @@ public class Driver implements java.sql.Driver {
 		return makeConnection(config, info);
 	}
 
-	private static SmartConnection makeConnection(Config conf, Properties info) throws SQLException {
+	private SmartConnection makeConnection(Config conf, Properties info) throws SQLException {
 		Connection backend = backendConnection(conf.getDriver(), info);
 		AbstractRedisClient client = clients.computeIfAbsent(conf.getRedis(), Driver::redisClient);
-		QueryRuleSession session = sessions.computeIfAbsent(conf, c -> ruleSession(c, client));
+		QueryRuleSession session = sessions.computeIfAbsent(conf, this::ruleSession);
+		ConfigManager<RulesetConfig> configManager = configManagers.computeIfAbsent(conf,
+				config -> new ConfigManager<>(JSON_MAPPER, RedisModulesUtils.connection(client), config.key("config"),
+						config.getRuleset(), Duration.ofMillis(config.getConfigStep().toMillis())));
+		try {
+			configManager.start();
+		} catch (JsonProcessingException e) {
+			logger.log(Level.WARNING, "Could not initialize config manager", e);
+		}
 		ResultSetCodec codec = new ResultSetCodec(rowSetFactory, Math.toIntExact(conf.getCodecBufferSize().toBytes()));
 		String prefix = conf.key(CACHE_KEY_PREFIX) + conf.getKeySeparator();
 		ResultSetCache cache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec), prefix);
@@ -257,20 +258,9 @@ public class Driver implements java.sql.Driver {
 		return registeredDriver != null;
 	}
 
-	private static QueryRuleSession ruleSession(Config config, AbstractRedisClient redisClient) {
+	private QueryRuleSession ruleSession(Config config) {
 		QueryRuleSession ruleSession = QueryRuleSession.of(config.getRuleset());
 		config.getRuleset().addPropertyChangeListener(ruleSession);
-		if (configManagers.containsKey(config)) {
-			throw new IllegalStateException(
-					MessageFormat.format("Config manager already exists for config {0}", config));
-		}
-		StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(redisClient);
-		try {
-			configManagers.put(config,
-					new ConfigManager<>(connection, config.key("config"), config.getRuleset(), config.getConfigStep()));
-		} catch (JsonProcessingException e) {
-			logger.log(Level.WARNING, "Could not initialize config manager", e);
-		}
 		return ruleSession;
 	}
 
@@ -314,7 +304,7 @@ public class Driver implements java.sql.Driver {
 
 		@Override
 		public Duration step() {
-			return config.getMetricsStep();
+			return Duration.ofMillis(config.getMetricsStep().toMillis());
 		}
 
 	}

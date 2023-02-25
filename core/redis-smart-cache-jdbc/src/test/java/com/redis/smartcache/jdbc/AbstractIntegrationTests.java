@@ -11,82 +11,105 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.testcontainers.containers.JdbcDatabaseContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.redis.lettucemod.RedisModulesClient;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.Utils;
 import com.redis.smartcache.core.Config;
-import com.redis.testcontainers.RedisServer;
 import com.redis.testcontainers.RedisStackContainer;
-import com.redis.testcontainers.junit.AbstractTestcontainersRedisTestBase;
-import com.redis.testcontainers.junit.RedisTestContext;
 
-public abstract class AbstractIntegrationTests extends AbstractTestcontainersRedisTestBase {
+import io.airlift.units.Duration;
+
+@Testcontainers
+abstract class AbstractIntegrationTests {
 
 	private static final Logger log = Logger.getLogger(AbstractIntegrationTests.class.getName());
 
 	private static final int BUFFER_SIZE = 50000000;
 
-	private final RedisStackContainer redis = new RedisStackContainer(
+	@Container
+	protected static final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
 
-	private Driver driver;
-	private Duration testTimeout = Duration.ofSeconds(3);
+	private static Driver driver;
 
-	@Override
-	protected Collection<RedisServer> redisServers() {
-		return Arrays.asList(redis);
-	}
+	private RedisModulesClient client;
+	protected StatefulRedisModulesConnection<String, String> redisConnection;
 
 	@BeforeAll
-	private void setupDriver() {
+	public static void setupSmartCache() {
 		driver = new Driver();
 	}
 
-	protected void runScript(Connection backendConnection, String script) throws SQLException, IOException {
+	@AfterAll
+	public static void teardownSmartCache() throws SQLException {
+		driver = null;
+	}
+
+	@BeforeEach
+	void setupRedisClient() {
+		this.client = RedisModulesClient.create(redis.getRedisURI());
+		this.redisConnection = client.connect();
+		redisConnection.sync().flushall();
+	}
+
+	@AfterEach
+	void teardownRedisClient() {
+		this.redisConnection.close();
+		this.client.shutdown();
+		this.client.getResources().shutdown();
+	}
+
+	protected static void runScript(Connection backendConnection, String script) throws SQLException, IOException {
 		ScriptRunner scriptRunner = new ScriptRunner(backendConnection);
 		scriptRunner.setAutoCommit(false);
 		scriptRunner.setStopOnError(true);
-		try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(script)) {
+		try (InputStream inputStream = AbstractIntegrationTests.class.getClassLoader().getResourceAsStream(script)) {
 			scriptRunner.runScript(new InputStreamReader(inputStream));
 		}
 	}
 
-	protected Connection connection(JdbcDatabaseContainer<?> container) throws SQLException {
+	abstract protected JdbcDatabaseContainer<?> getBackend();
+
+	protected static Connection backendConnection(JdbcDatabaseContainer<?> backend) throws SQLException {
 		try {
-			Class.forName(container.getDriverClassName());
+			Class.forName(backend.getDriverClassName());
 		} catch (ClassNotFoundException e) {
 			throw new SQLException("Could not initialize driver", e);
 		}
-		return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
+		return DriverManager.getConnection(backend.getJdbcUrl(), backend.getUsername(), backend.getPassword());
 	}
 
-	protected SmartConnection connection(JdbcDatabaseContainer<?> database, RedisTestContext redis)
-			throws SQLException, IOException {
+	protected static SmartConnection connection(JdbcDatabaseContainer<?> database) throws SQLException, IOException {
 		Config config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
-		config.setConfigStep(Duration.ofHours(1));
+		config.setConfigStep(new Duration(1, TimeUnit.HOURS));
 		Properties info = Driver.properties(config);
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());
 		return driver.connect("jdbc:" + redis.getRedisURI(), info);
 	}
 
-	protected Config bootstrapConfig() {
+	protected static Config bootstrapConfig() {
 		Config config = new Config();
 		config.setCodecBufferSizeInBytes(BUFFER_SIZE);
-		config.setConfigStep(Duration.ofHours(1));
+		config.setConfigStep(new Duration(1, TimeUnit.HOURS));
 		return config;
 	}
 
@@ -96,23 +119,21 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 
 	}
 
-	protected void testSimpleStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
-			throws Exception {
-		test(databaseContainer, redis, c -> c.createStatement().executeQuery(sql));
+	protected void testSimpleStatement(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
+		test(databaseContainer, c -> c.createStatement().executeQuery(sql));
 	}
 
-	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			String sql) throws Exception {
-		test(databaseContainer, redis, c -> {
+	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
+		test(databaseContainer, c -> {
 			Statement statement = c.createStatement();
 			statement.execute(sql);
 			return statement.getResultSet();
 		});
 	}
 
-	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
-			Object... parameters) throws Exception {
-		test(databaseContainer, redis, c -> {
+	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
+			throws Exception {
+		test(databaseContainer, c -> {
 			PreparedStatement statement = c.prepareStatement(sql);
 			for (int index = 0; index < parameters.length; index++) {
 				statement.setObject(index + 1, parameters[index]);
@@ -121,9 +142,9 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 		});
 	}
 
-	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql,
-			Object... parameters) throws Exception {
-		test(databaseContainer, redis, c -> {
+	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
+			throws Exception {
+		test(databaseContainer, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			for (int index = 0; index < parameters.length; index++) {
 				statement.setObject(index + 1, parameters[index]);
@@ -132,36 +153,35 @@ public abstract class AbstractIntegrationTests extends AbstractTestcontainersRed
 		});
 	}
 
-	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			String sql, Object... parameters) throws Exception {
-		test(databaseContainer, redis, c -> {
+	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql,
+			Object... parameters) throws Exception {
+		test(databaseContainer, c -> {
 			CallableStatement statement = c.prepareCall(sql);
 			statement.execute();
 			return statement.getResultSet();
 		});
 	}
 
-	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis,
-			StatementExecutor executor) throws Exception {
+	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, StatementExecutor executor)
+			throws Exception {
 		try (Connection databaseConnection = connection(databaseContainer);
-				SmartConnection connection = connection(databaseContainer, redis)) {
+				SmartConnection connection = connection(databaseContainer)) {
 			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
-			Awaitility.await().timeout(testTimeout).until(() -> {
+			Awaitility.await().until(() -> {
 				try {
 					executor.execute(connection);
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
 				String keyPattern = new Config().key(Driver.CACHE_KEY_PREFIX, "*");
-				return !redis.sync().keys(keyPattern).isEmpty();
+				return !redisConnection.sync().keys(keyPattern).isEmpty();
 			});
 			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));
 		}
 	}
 
-	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, RedisTestContext redis, String sql)
-			throws Exception {
-		try (Connection connection = connection(databaseContainer, redis)) {
+	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
+		try (Connection connection = connection(databaseContainer)) {
 			Statement statement = connection.createStatement();
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();

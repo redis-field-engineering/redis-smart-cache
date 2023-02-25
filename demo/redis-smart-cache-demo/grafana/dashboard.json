@@ -581,20 +581,94 @@
         "type": "redis-datasource",
         "uid": "${DS_REDIS}"
       },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "displayName": "Query Latency",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
       "gridPos": {
-        "h": 15,
+        "h": 6,
         "w": 12,
         "x": 0,
         "y": 12
       },
-      "id": 38,
+      "id": 44,
       "options": {
-        "hideZero": true,
-        "interval": 1000,
-        "maxItemsPerSeries": 300,
-        "viewMode": "Table"
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "type": "redis-latency-panel"
+      "targets": [
+        {
+          "aggregation": "sum",
+          "bucket": 1000,
+          "command": "ts.mrange",
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "${DS_REDIS}"
+          },
+          "filter": "name=backend stat=count",
+          "keyName": "smartcache:metrics:query:mean",
+          "query": "",
+          "refId": "A",
+          "type": "timeSeries"
+        }
+      ],
+      "title": "Backend Throughput",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -634,7 +708,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 6,
         "x": 12,
         "y": 12
@@ -711,7 +785,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 6,
         "x": 18,
         "y": 12
@@ -755,6 +829,26 @@
         "type": "redis-datasource",
         "uid": "${DS_REDIS}"
       },
+      "gridPos": {
+        "h": 15,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 38,
+      "options": {
+        "hideZero": true,
+        "interval": 1000,
+        "maxItemsPerSeries": 300,
+        "viewMode": "Table"
+      },
+      "type": "redis-latency-panel"
+    },
+    {
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "${DS_REDIS}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -791,7 +885,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 17
+        "y": 18
       },
       "id": 14,
       "options": {
@@ -868,7 +962,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 17
+        "y": 18
       },
       "id": 17,
       "options": {
@@ -934,7 +1028,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 22
+        "y": 23
       },
       "id": 8,
       "options": {
@@ -1012,7 +1106,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 22
+        "y": 23
       },
       "id": 9,
       "options": {

@@ -13,15 +13,14 @@ import java.util.Properties;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
-import com.redis.testcontainers.junit.RedisTestContext;
-import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 class PostgresTests extends AbstractIntegrationTests {
 
@@ -29,54 +28,54 @@ class PostgresTests extends AbstractIntegrationTests {
 			.withTag(PostgreSQLContainer.DEFAULT_TAG);
 
 	@Container
-	private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>(POSTGRE_DOCKER_IMAGE_NAME);
+	private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(POSTGRE_DOCKER_IMAGE_NAME);
+
+	@Override
+	protected JdbcDatabaseContainer<?> getBackend() {
+		return POSTGRES;
+	}
 
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
-		Connection backendConnection = connection(POSTGRESQL);
+	public static void setupAll() throws SQLException, IOException {
+		Connection backendConnection = backendConnection(POSTGRES);
 		runScript(backendConnection, "postgres/northwind.sql");
 		runScript(backendConnection, "postgres/employee.sql");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM orders");
+	@Test
+	void testSimpleStatement() throws Exception {
+		testSimpleStatement(POSTGRES, "SELECT * FROM orders");
 		Config config = bootstrapConfig();
 		String cacheKeyPattern = config.key(Driver.CACHE_KEY_PREFIX, "*");
-		List<String> keys = redis.sync().keys(cacheKeyPattern);
+		List<String> keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(1, keys.size());
-		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM employees");
-		keys = redis.sync().keys(cacheKeyPattern);
+		testSimpleStatement(POSTGRES, "SELECT * FROM employees");
+		keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(2, keys.size());
-		testSimpleStatement(POSTGRESQL, redis, "SELECT * FROM products");
-		keys = redis.sync().keys(cacheKeyPattern);
+		testSimpleStatement(POSTGRES, "SELECT * FROM products");
+		keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(3, keys.size());
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
-		testUpdateAndGetResultSet(POSTGRESQL, redis, "SELECT * FROM orders");
+	@Test
+	void testUpdateAndGetResultSet() throws Exception {
+		testUpdateAndGetResultSet(POSTGRES, "SELECT * FROM orders");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testPreparedStatement(RedisTestContext redis) throws Exception {
-		testPreparedStatement(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+	@Test
+	void testPreparedStatement() throws Exception {
+		testPreparedStatement(POSTGRES, "SELECT * FROM orders WHERE employee_id = ?", 8);
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testSimpleCallableStatement(RedisTestContext redis) throws Exception {
-		testCallableStatement(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = ?", 8);
+	@Test
+	void testSimpleCallableStatement() throws Exception {
+		testCallableStatement(POSTGRES, "SELECT * FROM orders WHERE employee_id = ?", 8);
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementParams(RedisTestContext redis) throws Exception {
+	@Test
+	void testCallableStatementParams() throws Exception {
 		String runFunction = "{ ? = call hello( ? ) }";
-		try (Connection connection = connection(POSTGRESQL, redis);
+		try (Connection connection = connection(POSTGRES);
 				Statement statement = connection.createStatement();
 				CallableStatement callableStatement = connection.prepareCall(runFunction)) {
 			callableStatement.registerOutParameter(1, Types.VARCHAR);
@@ -86,11 +85,10 @@ class PostgresTests extends AbstractIntegrationTests {
 		}
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementRefCursor(RedisTestContext redis) throws Exception {
+	@Test
+	void testCallableStatementRefCursor() throws Exception {
 		String runFunction = "{? = call getUsers()}";
-		try (Connection connection = connection(POSTGRESQL, redis);
+		try (Connection connection = connection(POSTGRES);
 				Statement statement = connection.createStatement();
 				CallableStatement cs = connection.prepareCall(runFunction)) {
 			// We must be inside a transaction for cursors to work.
@@ -109,27 +107,24 @@ class PostgresTests extends AbstractIntegrationTests {
 		}
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
-		testCallableStatementGetResultSet(POSTGRESQL, redis, "SELECT * FROM orders WHERE employee_id = 8");
+	@Test
+	void testCallableStatementGetResultSet() throws Exception {
+		testCallableStatementGetResultSet(POSTGRES, "SELECT * FROM orders WHERE employee_id = 8");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(POSTGRESQL, redis, "SELECT * FROM orders");
+	@Test
+	void testResultSetMetadata() throws Exception {
+		testResultSetMetaData(POSTGRES, "SELECT * FROM orders");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testConnect(RedisTestContext redis) throws SQLException, IOException {
+	@Test
+	void testConnect() throws SQLException, IOException {
 		Config config = new Config();
-		config.getDriver().setClassName(POSTGRESQL.getDriverClassName());
-		config.getDriver().setUrl(POSTGRESQL.getJdbcUrl());
+		config.getDriver().setClassName(POSTGRES.getDriverClassName());
+		config.getDriver().setUrl(POSTGRES.getJdbcUrl());
 		Properties info = Driver.properties(config);
-		info.setProperty("user", POSTGRESQL.getUsername());
-		info.setProperty("password", POSTGRESQL.getPassword());
+		info.setProperty("user", POSTGRES.getUsername());
+		info.setProperty("password", POSTGRES.getPassword());
 		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());
 		Connection connection = driver.connect("jdbc:" + redis.getRedisURI(), info);
 		Assertions.assertInstanceOf(SmartConnection.class, connection);

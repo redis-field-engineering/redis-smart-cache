@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.jdbc;
 
 import java.sql.JDBCType;
 import java.sql.SQLException;
@@ -9,6 +9,7 @@ import javax.sql.rowset.CachedRowSet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.redis.smartcache.Utils;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
 import com.redis.smartcache.test.RowSetBuilder;

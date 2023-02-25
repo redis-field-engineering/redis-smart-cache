@@ -1,5 +1,6 @@
-package com.redis.smartcache.core;
+package com.redis.smartcache.core.config;
 
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,25 +15,31 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.json.SetMode;
 
-public class ConfigManager<T> implements AutoCloseable, Runnable {
+public class ConfigManager<T> implements AutoCloseable {
 
 	private static final Logger log = Logger.getLogger(ConfigManager.class.getName());
 
 	private static final String JSON_ROOT = "$";
 
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-	private final ObjectMapper mapper = new ObjectMapper();
+	private final ObjectMapper mapper;
 	private final StatefulRedisModulesConnection<String, String> connection;
 	private final String key;
 	private final T config;
-	private final ObjectReader reader;
-	private final ScheduledFuture<?> future;
+	private final Duration period;
+	private ObjectReader reader;
+	private ScheduledFuture<?> future;
 
-	public ConfigManager(StatefulRedisModulesConnection<String, String> connection, String key, T config,
-			Duration period) throws JsonProcessingException {
+	public ConfigManager(ObjectMapper mapper, StatefulRedisModulesConnection<String, String> connection, String key,
+			T config, Duration period) {
+		this.mapper = mapper;
 		this.connection = connection;
 		this.key = key;
 		this.config = config;
+		this.period = period;
+	}
+
+	public void start() throws JsonProcessingException {
 		log.log(Level.INFO, "Registering config under {0}", key);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		this.reader = mapper.readerForUpdating(config);
@@ -40,20 +47,16 @@ public class ConfigManager<T> implements AutoCloseable, Runnable {
 		if ("nil".equalsIgnoreCase(reply)) {
 			read();
 		}
-		future = executor.scheduleAtFixedRate(this, period.toMillis(), period.toMillis(), TimeUnit.MILLISECONDS);
-	}
-
-	@Override
-	public void run() {
-		try {
-			read();
-		} catch (Exception e) {
-			log.log(Level.SEVERE, String.format("Could not refresh JSON key %s", key), e);
-		}
+		future = executor.scheduleAtFixedRate(this::safeRead, 0, period.toMillis(), TimeUnit.MILLISECONDS);
 	}
 
 	public T getConfig() {
 		return config;
+	}
+
+	@Override
+	public void close() {
+		future.cancel(false);
 	}
 
 	public T read() throws JsonProcessingException {
@@ -64,9 +67,12 @@ public class ConfigManager<T> implements AutoCloseable, Runnable {
 		return reader.readValue(json);
 	}
 
-	@Override
-	public void close() {
-		future.cancel(false);
+	private void safeRead() {
+		try {
+			read();
+		} catch (Exception e) {
+			log.log(Level.SEVERE, e, () -> MessageFormat.format("Could not read JSON key {0}", key));
+		}
 	}
 
 }

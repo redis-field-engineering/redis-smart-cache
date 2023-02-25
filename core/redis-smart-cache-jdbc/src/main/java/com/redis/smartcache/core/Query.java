@@ -1,16 +1,17 @@
 package com.redis.smartcache.core;
 
+import java.time.Duration;
 import java.util.Set;
 
 public class Query {
 
-	public static final long TTL_NO_CACHING = 0;
+	public static final Duration TTL_NO_CACHING = Duration.ZERO;
 	public static final long TTL_NO_EXPIRATION = -1;
 
 	private final String id;
 	private final String sql;
 	private final Set<String> tables;
-	private long ttl = TTL_NO_CACHING;
+	private Duration ttl = TTL_NO_CACHING;
 
 	public Query(String id, String sql, Set<String> tables) {
 		this.id = id;
@@ -30,16 +31,19 @@ public class Query {
 		return tables;
 	}
 
-	public long getTtl() {
+	public Duration getTtl() {
 		return ttl;
 	}
 
-	public void setTtl(long ttl) {
+	public void setTtl(Duration ttl) {
+		if (ttl == null || ttl.isNegative()) {
+			throw new IllegalArgumentException("TTL duration must be greater than 0");
+		}
 		this.ttl = ttl;
 	}
 
 	public boolean isCaching() {
-		return ttl != TTL_NO_CACHING;
+		return !TTL_NO_CACHING.equals(ttl);
 	}
 
 }

@@ -5,14 +5,12 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.testcontainers.containers.Db2Container;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.junit.jupiter.Container;
-
-import com.redis.testcontainers.junit.RedisTestContext;
-import com.redis.testcontainers.junit.RedisTestContextsSource;
 
 @EnabledOnOs(OS.LINUX)
 class DB2Tests extends AbstractIntegrationTests {
@@ -21,40 +19,40 @@ class DB2Tests extends AbstractIntegrationTests {
 	@Container
 	private static final Db2Container DB2 = new Db2Container().acceptLicense();
 
+	@Override
+	protected JdbcDatabaseContainer<?> getBackend() {
+		return DB2;
+	}
+
 	@BeforeAll
-	public void setupAll() throws SQLException, IOException {
-		Connection backendConnection = connection(DB2);
+	public static void setupAll() throws SQLException, IOException {
+		Connection backendConnection = backendConnection(DB2);
 		runScript(backendConnection, "db2/create.sql");
 		runScript(backendConnection, "db2/data.sql");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testSimpleStatement(RedisTestContext redis) throws Exception {
-		testSimpleStatement(DB2, redis, "SELECT * FROM books");
+	@Test
+	void testSimpleStatement() throws Exception {
+		testSimpleStatement(DB2, "SELECT * FROM books");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testUpdateAndGetResultSet(RedisTestContext redis) throws Exception {
-		testUpdateAndGetResultSet(DB2, redis, "SELECT * FROM books");
+	@Test
+	void testUpdateAndGetResultSet() throws Exception {
+		testUpdateAndGetResultSet(DB2, "SELECT * FROM books");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testPreparedStatement(RedisTestContext redis) throws Exception {
-		testPreparedStatement(DB2, redis, "SELECT * FROM books WHERE publisher_id = ?", 5);
+	@Test
+	void testPreparedStatement() throws Exception {
+		testPreparedStatement(DB2, "SELECT * FROM books WHERE publisher_id = ?", 5);
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testCallableStatementGetResultSet(RedisTestContext redis) throws Exception {
-		testCallableStatementGetResultSet(DB2, redis, "SELECT * FROM books WHERE publisher_id = 5");
+	@Test
+	void testCallableStatementGetResultSet() throws Exception {
+		testCallableStatementGetResultSet(DB2, "SELECT * FROM books WHERE publisher_id = 5");
 	}
 
-	@ParameterizedTest
-	@RedisTestContextsSource
-	void testResultSetMetadata(RedisTestContext redis) throws Exception {
-		testResultSetMetaData(DB2, redis, "SELECT * FROM books");
+	@Test
+	void testResultSetMetadata() throws Exception {
+		testResultSetMetaData(DB2, "SELECT * FROM books");
 	}
 }
