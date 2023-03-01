@@ -116,40 +116,51 @@ abstract class AbstractIntegrationTests {
 
 	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
 		test(databaseContainer, c -> {
-			Statement statement = c.createStatement();
-			statement.execute(sql);
-			return statement.getResultSet();
+			try (Statement statement = c.createStatement()) {
+				statement.execute(sql);
+				return statement.getResultSet();
+			}
 		});
 	}
 
 	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
 			throws Exception {
 		test(databaseContainer, c -> {
-			PreparedStatement statement = c.prepareStatement(sql);
-			for (int index = 0; index < parameters.length; index++) {
-				statement.setObject(index + 1, parameters[index]);
+			try (PreparedStatement statement = c.prepareStatement(sql)) {
+				for (int index = 0; index < parameters.length; index++) {
+					statement.setObject(index + 1, parameters[index]);
+				}
+				return statement.executeQuery();
 			}
-			return statement.executeQuery();
 		});
+	}
+
+	protected boolean execute(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
+		try (SmartConnection connection = connection(databaseContainer);
+				Statement statement = connection.createStatement()) {
+			return statement.execute(sql);
+		}
 	}
 
 	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
 			throws Exception {
 		test(databaseContainer, c -> {
-			CallableStatement statement = c.prepareCall(sql);
-			for (int index = 0; index < parameters.length; index++) {
-				statement.setObject(index + 1, parameters[index]);
+			try (CallableStatement statement = c.prepareCall(sql)) {
+				for (int index = 0; index < parameters.length; index++) {
+					statement.setObject(index + 1, parameters[index]);
+				}
+				return statement.executeQuery();
 			}
-			return statement.executeQuery();
 		});
 	}
 
 	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql,
 			Object... parameters) throws Exception {
 		test(databaseContainer, c -> {
-			CallableStatement statement = c.prepareCall(sql);
-			statement.execute();
-			return statement.getResultSet();
+			try (CallableStatement statement = c.prepareCall(sql)) {
+				statement.execute();
+				return statement.getResultSet();
+			}
 		});
 	}
 
@@ -172,8 +183,8 @@ abstract class AbstractIntegrationTests {
 	}
 
 	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
-		try (Connection connection = connection(databaseContainer)) {
-			Statement statement = connection.createStatement();
+		try (Connection connection = connection(databaseContainer);
+				Statement statement = connection.createStatement()) {
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();
 			Assertions.assertNotNull(resultSet);
