@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.util.ClientBuilder;
 import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.lettucemod.util.RedisURIBuilder;
@@ -41,6 +42,7 @@ import com.redis.smartcache.core.codec.ResultSetCodec;
 import com.redis.smartcache.jdbc.SmartConnection;
 
 import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisURI;
 import io.lettuce.core.codec.RedisCodec;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -64,8 +66,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 public class Driver implements java.sql.Driver {
 
 	private static Driver registeredDriver;
-	private static final Logger parentLogger = Logger.getLogger("com.redis.smartcache");
-	private static final Logger logger = Logger.getLogger("com.redis.smartcache.Driver");
+	private static final Logger parentLog = Logger.getLogger("com.redis.smartcache");
+	private static final Logger log = Logger.getLogger("com.redis.smartcache.Driver");
 
 	public static final String PROPERTY_PREFIX = "smartcache";
 	public static final String PROPERTY_PREFIX_DRIVER = PROPERTY_PREFIX + ".driver";
@@ -130,10 +132,12 @@ public class Driver implements java.sql.Driver {
 		}
 		Matcher matcher = JDBC_URL_PATTERN.matcher(url);
 		if (!matcher.matches()) {
+			log.log(Level.FINE, "URL {0} does not match pattern {1}", new Object[] { url, JDBC_URL_PATTERN.pattern() });
 			return null;
 		}
 		String redisUri = matcher.group(1);
 		if (redisUri == null || redisUri.isEmpty()) {
+			log.fine("JDBC URL contains empty Redis URI");
 			return null;
 		}
 		Config config;
@@ -143,21 +147,40 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Could not load config", e);
 		}
 		config.getRedis().setUri(redisUri);
+		log.fine("Creating backend connection");
 		Connection backendConnection = backendConnection(config.getDriver(), info);
+		log.fine("Creating SmartCache connection");
 		return makeConnection(config, backendConnection);
 	}
 
-	private SmartConnection makeConnection(Config conf, Connection backendConnection) {
+	private SmartConnection makeConnection(Config conf, Connection backendConnection) throws SQLException {
 		QueryRuleSession ruleSession = sessions.computeIfAbsent(conf, this::ruleSession);
-		configManagers.computeIfAbsent(conf, this::configManager);
+		checkConfigManager(conf);
 		KeyBuilder cacheKeyBuilder = keyBuilder(conf, KEYSPACE_CACHE);
 		MeterRegistry meterRegistry = registries.computeIfAbsent(conf, this::createMeterRegistry);
 		QueryWriter queryWriter = queryWriters.computeIfAbsent(conf, this::createQueryWriter);
 		AbstractRedisClient client = redisClient(conf);
 		RedisCodec<String, ResultSet> codec = resultSetCodec(conf);
-		ResultSetCache resultSetCache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec),
-				meterRegistry, cacheKeyBuilder, ruleSession, queryWriter);
+		StatefulRedisModulesConnection<String, ResultSet> redisConnection = RedisModulesUtils.connection(client, codec);
+		ResultSetCache resultSetCache = new RedisResultSetCache(redisConnection, meterRegistry, cacheKeyBuilder,
+				ruleSession, queryWriter);
 		return new SmartConnection(backendConnection, resultSetCache);
+	}
+
+	private void checkConfigManager(Config conf) throws SQLException {
+		if (configManagers.containsKey(conf)) {
+			return;
+		}
+		try {
+			String key = keyBuilder(conf).create(KEY_CONFIG);
+			AbstractRedisClient redisClient = redisClient(conf);
+			Duration period = duration(conf.getRuleset().getRefresh());
+			log.log(Level.FINE, "Creating config manager on key {0} with refresh interval {1}",
+					new Object[] { key, period });
+			configManagers.put(conf, new ConfigManager<>(redisClient, JSON_MAPPER, key, conf.getRuleset(), period));
+		} catch (JsonProcessingException e) {
+			throw new SQLException("Could not create config manager", e);
+		}
 	}
 
 	private RedisCodec<String, ResultSet> resultSetCodec(Config conf) {
@@ -168,30 +191,22 @@ public class Driver implements java.sql.Driver {
 	private QueryWriter createQueryWriter(Config conf) {
 		String index = conf.getRedis().getKey().getPrefix() + "-" + KEYSPACE_QUERIES + "-idx";
 		KeyBuilder keyBuilder = keyBuilder(conf, KEYSPACE_QUERIES);
+		log.log(Level.FINE, "Creating query writer on index {0} and keyspace {1}",
+				new Object[] { index, keyBuilder.getKeyspace() });
 		return new QueryWriter(redisClient(conf), conf.getAnalyzer(), index, keyBuilder);
 	}
 
-	public static KeyBuilder keyBuilder(Config config) {
-		return new KeyBuilder(config.getRedis().getKey().getPrefix(), config.getRedis().getKey().getSeparator());
+	public static KeyBuilder keyBuilder(Config config, String prefix) {
+		log.log(Level.FINE, "Creating KeyBuilder for prefix {0}", prefix);
+		return keyBuilder(config).builder(prefix);
 	}
 
-	public static KeyBuilder keyBuilder(Config config, String prefix) {
-		return keyBuilder(config).builder(prefix);
+	private static KeyBuilder keyBuilder(Config config) {
+		return new KeyBuilder(config.getRedis().getKey().getPrefix(), config.getRedis().getKey().getSeparator());
 	}
 
 	private AbstractRedisClient redisClient(Config conf) {
 		return clients.computeIfAbsent(conf.getRedis(), this::createRedisClient);
-	}
-
-	private ConfigManager<RulesetConfig> configManager(Config conf) {
-		String key = keyBuilder(conf).create(KEY_CONFIG);
-		AbstractRedisClient redisClient = redisClient(conf);
-		Duration period = duration(conf.getRuleset().getRefresh());
-		try {
-			return new ConfigManager<>(redisClient, JSON_MAPPER, key, conf.getRuleset(), period);
-		} catch (JsonProcessingException e) {
-			throw new RuntimeException("Could not initialize config manager", e);
-		}
 	}
 
 	private Duration duration(io.airlift.units.Duration duration) {
@@ -230,6 +245,7 @@ public class Driver implements java.sql.Driver {
 				return conf.getMetrics().isEnabled();
 			}
 		};
+		log.fine("Creating meter registry");
 		return new RedisTimeSeriesMeterRegistry(registryConfig, Clock.SYSTEM, redisClient(conf));
 	}
 
@@ -246,7 +262,7 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("No backend URL specified");
 		}
 		java.sql.Driver driver = backendDriver(config.getClassName());
-		logger.log(Level.FINE, "Connecting to backend database with URL: {0}", url);
+		log.log(Level.FINE, "Connecting to backend database with URL: {0}", url);
 		return driver.connect(url, backendInfo);
 	}
 
@@ -301,7 +317,7 @@ public class Driver implements java.sql.Driver {
 
 	@Override
 	public Logger getParentLogger() {
-		return parentLogger;
+		return parentLog;
 	}
 
 	public static void register() throws SQLException {
@@ -352,19 +368,26 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private QueryRuleSession ruleSession(Config config) {
+		log.fine("Creating rule session");
 		QueryRuleSession ruleSession = QueryRuleSession.of(config.getRuleset());
 		config.getRuleset().addPropertyChangeListener(ruleSession);
 		return ruleSession;
 	}
 
+	private RedisURI redisURI(RedisConfig conf) {
+		RedisURIBuilder builder = RedisURIBuilder.create();
+		builder.uri(conf.getUri());
+		builder.username(conf.getUsername());
+		builder.password(conf.getPassword());
+		builder.ssl(conf.isTls());
+		builder.sslVerifyMode(conf.getTlsVerify());
+		return builder.build();
+	}
+
 	private AbstractRedisClient createRedisClient(RedisConfig conf) {
-		RedisURIBuilder redisURI = RedisURIBuilder.create();
-		redisURI.uri(conf.getUri());
-		redisURI.username(conf.getUsername());
-		redisURI.password(conf.getPassword());
-		redisURI.ssl(conf.isTls());
-		redisURI.sslVerifyMode(conf.getTlsVerify());
-		return ClientBuilder.create(redisURI.build()).cluster(conf.isCluster()).build();
+		RedisURI redisURI = redisURI(conf);
+		log.log(Level.FINE, "Creating Redis client with URI {0}", redisURI);
+		return ClientBuilder.create(redisURI).cluster(conf.isCluster()).build();
 	}
 
 }

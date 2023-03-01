@@ -36,7 +36,7 @@ public class ConfigManager<T> implements AutoCloseable {
 		this.key = key;
 		this.config = config;
 		this.connection = RedisModulesUtils.connection(client);
-		log.log(Level.INFO, "Registering config under {0}", key);
+		log.log(Level.FINE, "Registering config under {0}", key);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		this.reader = mapper.readerForUpdating(config);
 		String reply = connection.sync().jsonSet(key, JSON_ROOT, json, SetMode.NX);

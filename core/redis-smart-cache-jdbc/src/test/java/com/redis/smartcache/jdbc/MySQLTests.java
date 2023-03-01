@@ -83,18 +83,18 @@ class MySQLTests extends AbstractIntegrationTests {
 		Properties p = new Properties();
 		p.setProperty("smartcache.driver.class-name", MYSQL.getDriverClassName());
 		p.setProperty("smartcache.driver.url", MYSQL.getJdbcUrl());
+		p.setProperty("smartcache.metrics.enabled", "false");
 		p.setProperty("user", MYSQL.getUsername());
 		p.setProperty("password", MYSQL.getPassword());
-		// step2 create the connection object
 		Connection connection = DriverManager.getConnection("jdbc:" + redis.getRedisURI(), p);
-
-		// step3 create the statement object
 		Statement stmt = connection.createStatement();
-
-		// step4 execute query
-		ResultSet rs = stmt.executeQuery("select * from Employee");
-		while (rs.next()) {
-			System.out.println(rs.getString(1) + "  " + rs.getString(2) + "  " + rs.getString(3));
+		boolean result = stmt.execute("select * from Employee");
+		Assertions.assertTrue(result);
+		ResultSet resultSet = stmt.getResultSet();
+		while (resultSet.next()) {
+			Assertions.assertNotNull(resultSet.getString(1));
+			Assertions.assertNotNull(resultSet.getString(2));
+			Assertions.assertNotNull(resultSet.getString(3));
 		}
 		connection.close();
 	}

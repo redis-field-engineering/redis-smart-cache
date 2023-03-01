@@ -18,10 +18,13 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.logging.Logger;
 
 import com.redis.smartcache.core.ResultSetCache;
 
 public class SmartConnection implements Connection {
+
+	private static final Logger log = Logger.getLogger(SmartConnection.class.getName());
 
 	private final Connection connection;
 	private final ResultSetCache resultSetCache;
@@ -37,12 +40,15 @@ public class SmartConnection implements Connection {
 
 	@Override
 	public void close() throws SQLException {
+		log.fine("Closing backend connection");
 		connection.close();
+		log.fine("Closing ResultSet cache");
 		try {
 			resultSetCache.close();
 		} catch (Exception e) {
 			throw new SQLException("Could not close ResultSet cache", e);
 		}
+		log.fine("Closed connection");
 	}
 
 	@Override
