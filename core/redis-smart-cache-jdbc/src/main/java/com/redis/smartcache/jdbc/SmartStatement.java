@@ -4,17 +4,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.concurrent.Callable;
 
-import javax.sql.rowset.CachedRowSet;
-
-import com.redis.smartcache.core.Query;
+import com.redis.smartcache.core.CachedResultSet;
+import com.redis.smartcache.core.Executable;
 
 public class SmartStatement implements Statement {
 
 	protected final SmartConnection connection;
 	protected final Statement statement;
-	private QueryExecution queryExecution;
+	private CachedResultSet cachedResultSet;
 
 	public SmartStatement(SmartConnection connection, Statement statement) {
 		this.connection = connection;
@@ -38,41 +36,7 @@ public class SmartStatement implements Statement {
 
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
-		return executeQuery(sql, () -> statement.executeQuery(sql));
-	}
-
-	protected boolean execute(String sql, Callable<Boolean> executable) throws SQLException {
-		Query query = connection.fireRules(sql);
-		try {
-			return connection.getQueryTimer(query).recordCallable(() -> {
-				queryExecution = getCachedExecution(query);
-				if (queryExecution.hasResultSet()) {
-					return true;
-				}
-				return connection.getBackendTimer(query).recordCallable(executable);
-			});
-		} catch (SQLException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new SQLException(e);
-		}
-	}
-
-	protected ResultSet executeQuery(String sql, Callable<ResultSet> callable) throws SQLException {
-		Query query = connection.fireRules(sql);
-		try {
-			return connection.getQueryTimer(query).recordCallable(() -> {
-				QueryExecution execution = getCachedExecution(query);
-				if (execution.hasResultSet()) {
-					return execution.getResultSet();
-				}
-				return cacheResultSet(execution.getQuery(), connection.getBackendTimer(query).recordCallable(callable));
-			});
-		} catch (SQLException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new SQLException(e);
-		}
+		return connection.getResultSetCache().computeIfAbsent(sql, () -> statement.executeQuery(sql)).getResultSet();
 	}
 
 	private void checkClosed() throws SQLException {
@@ -81,63 +45,16 @@ public class SmartStatement implements Statement {
 		}
 	}
 
-	private ResultSet cacheResultSet(Query query, ResultSet resultSet) throws SQLException {
-		if (query.isCaching()) {
-			CachedRowSet cachedRowSet = connection.createCachedRowSet();
-			cachedRowSet.populate(resultSet);
-			cachedRowSet.beforeFirst();
-			connection.getCachePutTimer(query)
-					.record(() -> connection.getResultSetCache().put(key(query), query.getTtl(), cachedRowSet));
-			cachedRowSet.beforeFirst();
-			return cachedRowSet;
+	protected boolean execute(CachedResultSet cachedResultSet, Executable<Boolean> executable) throws SQLException {
+		this.cachedResultSet = cachedResultSet;
+		if (cachedResultSet.hasResultSet()) {
+			return true;
 		}
-		return resultSet;
+		return executable.call();
 	}
 
-	protected String key(Query query) {
-		return query.getId();
-	}
-
-	private static class QueryExecution {
-
-		private final Query query;
-		private final ResultSet resultSet;
-
-		public QueryExecution(Query query) {
-			this(query, null);
-		}
-
-		public QueryExecution(Query query, ResultSet resultSet) {
-			this.query = query;
-			this.resultSet = resultSet;
-		}
-
-		public boolean hasResultSet() {
-			return resultSet != null;
-		}
-
-		public Query getQuery() {
-			return query;
-		}
-
-		public ResultSet getResultSet() {
-			return resultSet;
-		}
-
-	}
-
-	private QueryExecution getCachedExecution(Query query) throws Exception {
-		if (query.isCaching()) {
-			ResultSet resultSet = connection.getCacheGetTimer(query)
-					.recordCallable(() -> connection.getResultSetCache().get(key(query)));
-			if (resultSet == null) {
-				connection.getCacheMissCounter(query).increment();
-			} else {
-				connection.getCacheHitCounter(query).increment();
-			}
-			return new QueryExecution(query, resultSet);
-		}
-		return new QueryExecution(query);
+	private boolean execute(String sql, Executable<Boolean> executable) throws SQLException {
+		return execute(connection.getResultSetCache().get(sql), executable);
 	}
 
 	@Override
@@ -162,13 +79,7 @@ public class SmartStatement implements Statement {
 
 	@Override
 	public ResultSet getResultSet() throws SQLException {
-		if (queryExecution == null) {
-			throw new SQLException("No execute method was called previously");
-		}
-		if (queryExecution.hasResultSet()) {
-			return queryExecution.getResultSet();
-		}
-		return cacheResultSet(queryExecution.getQuery(), statement.getResultSet());
+		return connection.getResultSetCache().get(cachedResultSet, statement::getResultSet).getResultSet();
 	}
 
 	@Override
@@ -294,7 +205,7 @@ public class SmartStatement implements Statement {
 	@Override
 	public void close() throws SQLException {
 		statement.close();
-		queryExecution = null;
+		cachedResultSet = null;
 	}
 
 	@Override

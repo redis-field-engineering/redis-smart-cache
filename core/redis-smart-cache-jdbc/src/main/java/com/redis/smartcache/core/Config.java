@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
@@ -14,103 +16,11 @@ import io.lettuce.core.SslVerifyMode;
 
 public class Config {
 
-	public static final String DEFAULT_KEYSPACE = "smartcache";
-	public static final String DEFAULT_KEY_SEPARATOR = ":";
-	public static final Duration DEFAULT_CONFIG_STEP = new Duration(10, TimeUnit.SECONDS);
-	public static final Duration DEFAULT_METRICS_STEP = new Duration(60, TimeUnit.SECONDS);
-	public static final int DEFAULT_POOL_SIZE = 8;
-	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
-	private static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
-
-	private String keyspace = DEFAULT_KEYSPACE;
-	private String keySeparator = DEFAULT_KEY_SEPARATOR;
-	private DataSize codecBufferSize = DEFAULT_BYTE_BUFFER_CAPACITY;
-	private Duration configStep = DEFAULT_CONFIG_STEP;
-	private Duration metricsStep = DEFAULT_METRICS_STEP;
-	private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
 	private DriverConfig driver = new DriverConfig();
-	private RulesetConfig ruleset = new RulesetConfig();
 	private RedisConfig redis = new RedisConfig();
-
-	public String key(String... ids) {
-		StringBuilder builder = new StringBuilder(keyspace);
-		for (String id : ids) {
-			builder.append(keySeparator).append(id);
-		}
-		return builder.toString();
-	}
-
-	public int getQueryCacheCapacity() {
-		return queryCacheCapacity;
-	}
-
-	public void setQueryCacheCapacity(int queryCacheCapacity) {
-		this.queryCacheCapacity = queryCacheCapacity;
-	}
-
-	public String getKeyspace() {
-		return keyspace;
-	}
-
-	public void setKeyspace(String keyspace) {
-		this.keyspace = keyspace;
-	}
-
-	public String getKeySeparator() {
-		return keySeparator;
-	}
-
-	public void setKeySeparator(String keySeparator) {
-		this.keySeparator = keySeparator;
-	}
-
-	public RedisConfig getRedis() {
-		return redis;
-	}
-
-	public void setRedis(RedisConfig redis) {
-		this.redis = redis;
-	}
-
-	/**
-	 * 
-	 * @return max byte buffer capacity in bytes
-	 */
-	public DataSize getCodecBufferSize() {
-		return codecBufferSize;
-	}
-
-	public void setCodecBufferSize(DataSize size) {
-		this.codecBufferSize = size;
-	}
-
-	public void setCodecBufferSizeInBytes(long size) {
-		this.codecBufferSize = DataSize.ofBytes(size);
-	}
-
-	/**
-	 * 
-	 * @return metrics step duration in seconds
-	 */
-	public Duration getMetricsStep() {
-		return metricsStep;
-	}
-
-	public void setMetricsStep(Duration seconds) {
-		this.metricsStep = seconds;
-	}
-
-	/**
-	 * 
-	 * @return config refresh step duration in seconds
-	 */
-	public Duration getConfigStep() {
-		return configStep;
-	}
-
-	public void setConfigStep(Duration seconds) {
-		this.configStep = seconds;
-	}
+	private RulesetConfig ruleset = new RulesetConfig();
+	private MetricsConfig metrics = new MetricsConfig();
+	private AnalyzerConfig analyzer = new AnalyzerConfig();
 
 	public DriverConfig getDriver() {
 		return driver;
@@ -128,13 +38,153 @@ public class Config {
 		this.ruleset = ruleset;
 	}
 
+	public RedisConfig getRedis() {
+		return redis;
+	}
+
+	public void setRedis(RedisConfig redis) {
+		this.redis = redis;
+	}
+
+	public MetricsConfig getMetrics() {
+		return metrics;
+	}
+
+	public void setMetrics(MetricsConfig metrics) {
+		this.metrics = metrics;
+	}
+
+	public AnalyzerConfig getAnalyzer() {
+		return analyzer;
+	}
+
+	public void setAnalyzer(AnalyzerConfig analyzer) {
+		this.analyzer = analyzer;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(redis.getUri(), redis.getKey().getPrefix());
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Config other = (Config) obj;
+		return Objects.equals(redis.getUri(), other.redis.getUri())
+				&& Objects.equals(redis.key.getPrefix(), other.redis.key.prefix);
+	}
+
+	public static class KeyConfig {
+
+		public static final String DEFAULT_PREFIX = "smartcache";
+
+		private String prefix = DEFAULT_PREFIX;
+		private String separator = KeyBuilder.DEFAULT_SEPARATOR;
+
+		public String getPrefix() {
+			return prefix;
+		}
+
+		public void setPrefix(String prefix) {
+			this.prefix = prefix;
+		}
+
+		public String getSeparator() {
+			return separator;
+		}
+
+		public void setSeparator(String separator) {
+			this.separator = separator;
+		}
+
+	}
+
+	public static class MetricsConfig {
+
+		public static final Duration DEFAULT_STEP = new Duration(60, TimeUnit.SECONDS);
+
+		private boolean enabled = true;
+		private Duration step = DEFAULT_STEP;
+
+		/**
+		 * 
+		 * @return metrics publishing interval
+		 */
+		public Duration getStep() {
+			return step;
+		}
+
+		public void setStep(Duration seconds) {
+			this.step = seconds;
+		}
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+	}
+
 	public static class RedisConfig {
+
+		public static final DataSize DEFAULT_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
 		private String uri;
 		private boolean cluster;
+		private boolean tls;
+		private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
 		private String username;
 		private char[] password;
-		private TLS tls = new TLS();
+		private KeyConfig key = new KeyConfig();
+		private DataSize codecBufferCapacity = DEFAULT_BUFFER_CAPACITY;
+
+		/**
+		 * 
+		 * @return max byte buffer capacity in bytes
+		 */
+		public DataSize getCodecBufferCapacity() {
+			return codecBufferCapacity;
+		}
+
+		public void setCodecBufferCapacity(DataSize size) {
+			this.codecBufferCapacity = size;
+		}
+
+		public void setCodecBufferSizeInBytes(long size) {
+			this.codecBufferCapacity = DataSize.ofBytes(size);
+		}
+
+		public KeyConfig getKey() {
+			return key;
+		}
+
+		public void setKey(KeyConfig key) {
+			this.key = key;
+		}
+
+		public boolean isTls() {
+			return tls;
+		}
+
+		public void setTls(boolean tls) {
+			this.tls = tls;
+		}
+
+		public SslVerifyMode getTlsVerify() {
+			return tlsVerify;
+		}
+
+		public void setTlsVerify(SslVerifyMode tlsVerify) {
+			this.tlsVerify = tlsVerify;
+		}
 
 		public String getUri() {
 			return uri;
@@ -168,14 +218,6 @@ public class Config {
 			this.password = password;
 		}
 
-		public TLS getTls() {
-			return tls;
-		}
-
-		public void setTls(TLS tls) {
-			this.tls = tls;
-		}
-
 		@Override
 		public int hashCode() {
 			return Objects.hash(uri);
@@ -195,42 +237,68 @@ public class Config {
 
 	}
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(redis.getUri(), keyspace);
-	}
+	public static class AnalyzerConfig {
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Config other = (Config) obj;
-		return Objects.equals(redis.getUri(), other.redis.getUri()) && Objects.equals(keyspace, other.keyspace);
-	}
+		public static final int DEFAULT_QUEUE_CAPACITY = 10000;
+		public static final int DEFAULT_THREAD_COUNT = 1;
+		public static final Duration DEFAULT_FLUSH_INTERVAL = new Duration(50, TimeUnit.MILLISECONDS);
+		public static final int DEFAULT_POOL_SIZE = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
+		public static final int DEFAULT_BATCH_SIZE = 50;
+		public static final int DEFAULT_CACHE_CAPACITY = 10000;
 
-	public static class TLS {
+		private int cacheCapacity = DEFAULT_CACHE_CAPACITY;
+		private int queueCapacity = DEFAULT_QUEUE_CAPACITY;
+		private int poolSize = DEFAULT_POOL_SIZE;
+		private int batchSize = DEFAULT_BATCH_SIZE;
+		private int threads = DEFAULT_THREAD_COUNT;
+		private Duration flushInterval = DEFAULT_FLUSH_INTERVAL;
 
-		private boolean enabled;
-		private SslVerifyMode verify = SslVerifyMode.NONE;
-
-		public boolean isEnabled() {
-			return enabled;
+		public Duration getFlushInterval() {
+			return flushInterval;
 		}
 
-		public void setEnabled(boolean tls) {
-			this.enabled = tls;
+		public void setFlushInterval(Duration interval) {
+			this.flushInterval = interval;
 		}
 
-		public SslVerifyMode getVerify() {
-			return verify;
+		public int getCacheCapacity() {
+			return cacheCapacity;
 		}
 
-		public void setVerify(SslVerifyMode mode) {
-			this.verify = mode;
+		public void setCacheCapacity(int capacity) {
+			this.cacheCapacity = capacity;
+		}
+
+		public int getQueueCapacity() {
+			return queueCapacity;
+		}
+
+		public void setQueueCapacity(int queueCapacity) {
+			this.queueCapacity = queueCapacity;
+		}
+
+		public int getPoolSize() {
+			return poolSize;
+		}
+
+		public void setPoolSize(int poolSize) {
+			this.poolSize = poolSize;
+		}
+
+		public int getBatchSize() {
+			return batchSize;
+		}
+
+		public void setBatchSize(int batchSize) {
+			this.batchSize = batchSize;
+		}
+
+		public int getThreads() {
+			return threads;
+		}
+
+		public void setThreads(int threads) {
+			this.threads = threads;
 		}
 
 	}
@@ -261,6 +329,21 @@ public class Config {
 	public static class RulesetConfig {
 
 		public static final String PROPERTY_RULES = "rules";
+		public static final Duration DEFAULT_REFRESH_STEP = new Duration(10, TimeUnit.SECONDS);
+
+		private Duration refresh = DEFAULT_REFRESH_STEP;
+
+		/**
+		 * 
+		 * @return config refresh step duration in seconds
+		 */
+		public Duration getRefresh() {
+			return refresh;
+		}
+
+		public void setRefresh(Duration seconds) {
+			this.refresh = seconds;
+		}
 
 		private List<RuleConfig> rules;
 
@@ -297,11 +380,123 @@ public class Config {
 			return new RulesetConfig(rules);
 		}
 
-		public static class RuleConfig {
+	}
 
-			public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
+	public static class RuleConfig {
 
-			private final PropertyChangeSupport support = new PropertyChangeSupport(this);
+		public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
+
+		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
+
+		private String[] tables;
+		private String[] tablesAny;
+		private String[] tablesAll;
+		private String regex;
+		private Duration ttl = DEFAULT_TTL;
+
+		public RuleConfig() {
+		}
+
+		private RuleConfig(Builder builder) {
+			this.tables = builder.tables;
+			this.tablesAny = builder.tablesAny;
+			this.tablesAll = builder.tablesAll;
+			this.regex = builder.regex;
+			this.ttl = builder.ttl;
+		}
+
+		public void addPropertyChangeListener(PropertyChangeListener listener) {
+			support.addPropertyChangeListener(listener);
+		}
+
+		public void removePropertyChangeListener(PropertyChangeListener listener) {
+			support.removePropertyChangeListener(listener);
+		}
+
+		public String getRegex() {
+			return regex;
+		}
+
+		public void setRegex(String regex) {
+			support.firePropertyChange("regex", this.regex, regex);
+			this.regex = regex;
+		}
+
+		public String[] getTables() {
+			return tables;
+		}
+
+		public void setTables(String... tables) {
+			support.firePropertyChange("tables", this.tables, tables);
+			this.tables = tables;
+		}
+
+		public String[] getTablesAny() {
+			return tablesAny;
+		}
+
+		public void setTablesAny(String... tablesAny) {
+			support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
+			this.tablesAny = tablesAny;
+		}
+
+		public String[] getTablesAll() {
+			return tablesAll;
+		}
+
+		public void setTablesAll(String... tablesAll) {
+			support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
+			this.tablesAll = tablesAll;
+		}
+
+		/**
+		 * 
+		 * @return Key expiration duration. Use a duration of zero for no caching
+		 */
+		public Duration getTtl() {
+			return ttl;
+		}
+
+		public void setTtl(Duration ttl) {
+			support.firePropertyChange("ttl", this.ttl, ttl);
+			this.ttl = ttl;
+		}
+
+		@Override
+		public String toString() {
+			return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll + ", regex="
+					+ regex + ", ttl=" + ttl + "]";
+		}
+
+		public static Builder tables(String... tables) {
+			Builder builder = new Builder();
+			builder.tables = tables;
+			return builder;
+		}
+
+		public static Builder tablesAny(String... tables) {
+			Builder builder = new Builder();
+			builder.tablesAny = tables;
+			return builder;
+		}
+
+		public static Builder tablesAll(String... tables) {
+			Builder builder = new Builder();
+			builder.tablesAll = tables;
+			return builder;
+		}
+
+		public static Builder regex(String regex) {
+			Builder builder = new Builder();
+			builder.regex = regex;
+			return builder;
+		}
+
+		public static Builder passthrough() {
+			return new Builder();
+		}
+
+		public static final class Builder {
 
 			private String[] tables;
 			private String[] tablesAny;
@@ -309,129 +504,17 @@ public class Config {
 			private String regex;
 			private Duration ttl = DEFAULT_TTL;
 
-			public RuleConfig() {
+			private Builder() {
 			}
 
-			private RuleConfig(Builder builder) {
-				this.tables = builder.tables;
-				this.tablesAny = builder.tablesAny;
-				this.tablesAll = builder.tablesAll;
-				this.regex = builder.regex;
-				this.ttl = builder.ttl;
-			}
-
-			public void addPropertyChangeListener(PropertyChangeListener listener) {
-				support.addPropertyChangeListener(listener);
-			}
-
-			public void removePropertyChangeListener(PropertyChangeListener listener) {
-				support.removePropertyChangeListener(listener);
-			}
-
-			public String getRegex() {
-				return regex;
-			}
-
-			public void setRegex(String regex) {
-				support.firePropertyChange("regex", this.regex, regex);
-				this.regex = regex;
-			}
-
-			public String[] getTables() {
-				return tables;
-			}
-
-			public void setTables(String... tables) {
-				support.firePropertyChange("tables", this.tables, tables);
-				this.tables = tables;
-			}
-
-			public String[] getTablesAny() {
-				return tablesAny;
-			}
-
-			public void setTablesAny(String... tablesAny) {
-				support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
-				this.tablesAny = tablesAny;
-			}
-
-			public String[] getTablesAll() {
-				return tablesAll;
-			}
-
-			public void setTablesAll(String... tablesAll) {
-				support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
-				this.tablesAll = tablesAll;
-			}
-
-			/**
-			 * 
-			 * @return Key expiration duration. Use a duration of zero for no caching
-			 */
-			public Duration getTtl() {
-				return ttl;
-			}
-
-			public void setTtl(Duration ttl) {
-				support.firePropertyChange("ttl", this.ttl, ttl);
+			public Builder ttl(Duration ttl) {
 				this.ttl = ttl;
+				return this;
 			}
 
-			@Override
-			public String toString() {
-				return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll
-						+ ", regex=" + regex + ", ttl=" + ttl + "]";
+			public RuleConfig build() {
+				return new RuleConfig(this);
 			}
-
-			public static Builder tables(String... tables) {
-				Builder builder = new Builder();
-				builder.tables = tables;
-				return builder;
-			}
-
-			public static Builder tablesAny(String... tables) {
-				Builder builder = new Builder();
-				builder.tablesAny = tables;
-				return builder;
-			}
-
-			public static Builder tablesAll(String... tables) {
-				Builder builder = new Builder();
-				builder.tablesAll = tables;
-				return builder;
-			}
-
-			public static Builder regex(String regex) {
-				Builder builder = new Builder();
-				builder.regex = regex;
-				return builder;
-			}
-
-			public static Builder passthrough() {
-				return new Builder();
-			}
-
-			public static final class Builder {
-
-				private String[] tables;
-				private String[] tablesAny;
-				private String[] tablesAll;
-				private String regex;
-				private Duration ttl = DEFAULT_TTL;
-
-				private Builder() {
-				}
-
-				public Builder ttl(Duration ttl) {
-					this.ttl = ttl;
-					return this;
-				}
-
-				public RuleConfig build() {
-					return new RuleConfig(this);
-				}
-			}
-
 		}
 
 	}

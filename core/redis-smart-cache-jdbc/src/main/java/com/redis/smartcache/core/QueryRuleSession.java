@@ -9,21 +9,21 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Predicates;
+import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
-import com.redis.smartcache.core.Config.RulesetConfig.RuleConfig;
 import com.redis.smartcache.core.rules.CollectionRule;
 import com.redis.smartcache.core.rules.PredicateRule;
 import com.redis.smartcache.core.rules.RegexRule;
 import com.redis.smartcache.core.rules.Rule;
 import com.redis.smartcache.core.rules.RuleSession;
 
-public class QueryRuleSession extends RuleSession<Query, Query> implements PropertyChangeListener {
+public class QueryRuleSession extends RuleSession<Query, Action> implements PropertyChangeListener {
 
 	public QueryRuleSession() {
 		super();
 	}
 
-	public QueryRuleSession(List<Rule<Query, Query>> rules) {
+	public QueryRuleSession(List<Rule<Query, Action>> rules) {
 		super(rules);
 	}
 
@@ -31,7 +31,7 @@ public class QueryRuleSession extends RuleSession<Query, Query> implements Prope
 		return new QueryRuleSession(rules(ruleset));
 	}
 
-	private static List<Rule<Query, Query>> rules(RulesetConfig ruleset) {
+	private static List<Rule<Query, Action>> rules(RulesetConfig ruleset) {
 		return ruleset.getRules().stream().map(QueryRuleSession::rule).collect(Collectors.toList());
 	}
 
@@ -47,12 +47,14 @@ public class QueryRuleSession extends RuleSession<Query, Query> implements Prope
 		setRules(ruleConfigs.stream().map(QueryRuleSession::rule).collect(Collectors.toList()));
 	}
 
-	public void fire(Query query) {
-		super.fire(query, query);
+	public Action fire(Query query) {
+		Action action = new Action(query);
+		super.fire(query, action);
+		return action;
 	}
 
-	private static Rule<Query, Query> rule(RuleConfig rule) {
-		Consumer<Query> action = action(rule);
+	private static Rule<Query, Action> rule(RuleConfig rule) {
+		Consumer<Action> action = action(rule);
 		if (rule.getTables() != null) {
 			return CollectionRule.builder(Query::getTables, action).exact(rule.getTables());
 		}
@@ -68,9 +70,8 @@ public class QueryRuleSession extends RuleSession<Query, Query> implements Prope
 		return new PredicateRule<>(Predicates.alwaysTrue(), action);
 	}
 
-	private static Consumer<Query> action(RuleConfig rule) {
-		Duration ttl = Duration.ofMillis(rule.getTtl().toMillis());
-		return s -> s.setTtl(ttl);
+	private static Consumer<Action> action(RuleConfig rule) {
+		return a -> a.setTtl(Duration.ofMillis(rule.getTtl().toMillis()));
 	}
 
 }

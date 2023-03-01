@@ -17,61 +17,18 @@ import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.Executor;
 
-import javax.sql.rowset.CachedRowSet;
-import javax.sql.rowset.RowSetFactory;
-
-import com.redis.smartcache.core.Config;
-import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.ResultSetCache;
-import com.redis.smartcache.core.util.CRC32HashingFunction;
-import com.redis.smartcache.core.util.EvictingLinkedHashMap;
-import com.redis.smartcache.core.util.HashingFunction;
-import com.redis.smartcache.core.util.SQLParser;
-
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tags;
-import io.micrometer.core.instrument.Timer;
 
 public class SmartConnection implements Connection {
 
-	private static final String METER_PREFIX_CACHE = "cache";
-	private static final String METER_QUERY = "query";
-	private static final String METER_BACKEND = "backend";
-	private static final String METER_CACHE_GET = METER_PREFIX_CACHE + ".get";
-	private static final String METER_CACHE_PUT = METER_PREFIX_CACHE + ".put";
-	private static final String TAG_RESULT = "result";
-	private static final String TAG_MISS = "miss";
-	private static final String TAG_HIT = "hit";
-	private static final String TAG_QUERY = "query";
-	private final Map<String, Query> queryCache;
-
-	private final HashingFunction hashFunction = new CRC32HashingFunction();
-	private final SQLParser sqlParser = new SQLParser();
 	private final Connection connection;
-	private final QueryRuleSession ruleSession;
-	private final RowSetFactory rowSetFactory;
 	private final ResultSetCache resultSetCache;
-	private final MeterRegistry meterRegistry;
-	private final Config config;
 
-	public SmartConnection(Connection connection, QueryRuleSession ruleSession, RowSetFactory rowSetFactory,
-			ResultSetCache resultSetCache, MeterRegistry meterRegistry, Config config) {
+	public SmartConnection(Connection connection, ResultSetCache resultSetCache) {
 		this.connection = connection;
-		this.ruleSession = ruleSession;
-		this.rowSetFactory = rowSetFactory;
 		this.resultSetCache = resultSetCache;
-		this.meterRegistry = meterRegistry;
-		this.config = config;
-		this.queryCache = new EvictingLinkedHashMap<>(config.getQueryCacheCapacity());
-	}
-
-	public Config getConfig() {
-		return config;
 	}
 
 	public ResultSetCache getResultSetCache() {
@@ -81,6 +38,11 @@ public class SmartConnection implements Connection {
 	@Override
 	public void close() throws SQLException {
 		connection.close();
+		try {
+			resultSetCache.close();
+		} catch (Exception e) {
+			throw new SQLException("Could not close ResultSet cache", e);
+		}
 	}
 
 	@Override
@@ -360,80 +322,6 @@ public class SmartConnection implements Connection {
 	@Override
 	public int getNetworkTimeout() throws SQLException {
 		return connection.getNetworkTimeout();
-	}
-
-	public String hash(String string) {
-		return hashFunction.hash(string);
-	}
-
-	public Query getQuery(String sql) {
-		String id = hash(sql);
-		if (queryCache.containsKey(id)) {
-			return queryCache.get(id);
-		}
-		Set<String> tables = sqlParser.extractTableNames(sql);
-		Query query = new Query(id, sql, tables);
-		createTimer(METER_QUERY, query);
-		createTimer(METER_BACKEND, query);
-		createTimer(METER_CACHE_GET, query);
-		createTimer(METER_CACHE_PUT, query);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
-		return query;
-	}
-
-	public Timer getQueryTimer(Query query) {
-		return getTimer(METER_QUERY, query);
-	}
-
-	public Timer getBackendTimer(Query query) {
-		return getTimer(METER_BACKEND, query);
-	}
-
-	public Timer getCacheGetTimer(Query query) {
-		return getTimer(METER_CACHE_GET, query);
-	}
-
-	public Timer getCachePutTimer(Query query) {
-		return getTimer(METER_CACHE_PUT, query);
-	}
-
-	public Counter getCacheHitCounter(Query query) {
-		return getCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
-	}
-
-	public Counter getCacheMissCounter(Query query) {
-		return getCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
-	}
-
-	private Counter getCounter(String name, Query query, String... tags) {
-		return meterRegistry.get(name).tags(tags(query)).tags(tags).counter();
-	}
-
-	private Timer getTimer(String name, Query query) {
-		return meterRegistry.get(name).tags(tags(query)).timer();
-	}
-
-	private Timer createTimer(String name, Query query) {
-		return Timer.builder(name).tags(tags(query)).publishPercentiles(0.9, 0.99).register(meterRegistry);
-	}
-
-	private Tags tags(Query query) {
-		return Tags.of(TAG_QUERY, query.getId());
-	}
-
-	private Counter createCounter(String name, Query query, String... tags) {
-		return Counter.builder(name).tags(tags(query)).tags(tags).register(meterRegistry);
-	}
-
-	public Query fireRules(String sql) {
-		Query query = getQuery(sql);
-		ruleSession.fire(query);
-		return query;
-	}
-
-	public CachedRowSet createCachedRowSet() throws SQLException {
-		return rowSetFactory.createCachedRowSet();
 	}
 
 }

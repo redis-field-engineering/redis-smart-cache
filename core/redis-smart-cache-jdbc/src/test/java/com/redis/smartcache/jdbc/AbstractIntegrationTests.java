@@ -17,10 +17,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -46,33 +44,25 @@ abstract class AbstractIntegrationTests {
 	protected static final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
 
-	private static Driver driver;
-
+	private Driver driver;
 	private RedisModulesClient client;
 	protected StatefulRedisModulesConnection<String, String> redisConnection;
 
-	@BeforeAll
-	public static void setupSmartCache() {
-		driver = new Driver();
-	}
-
-	@AfterAll
-	public static void teardownSmartCache() throws SQLException {
-		driver = null;
-	}
-
 	@BeforeEach
 	void setupRedisClient() {
-		this.client = RedisModulesClient.create(redis.getRedisURI());
-		this.redisConnection = client.connect();
+		driver = new Driver();
+		client = RedisModulesClient.create(redis.getRedisURI());
+		redisConnection = client.connect();
 		redisConnection.sync().flushall();
+		Awaitility.await().until(() -> redisConnection.sync().dbsize() == 0);
 	}
 
 	@AfterEach
 	void teardownRedisClient() {
-		this.redisConnection.close();
-		this.client.shutdown();
-		this.client.getResources().shutdown();
+		redisConnection.close();
+		client.shutdown();
+		client.getResources().shutdown();
+		Driver.clear();
 	}
 
 	protected static void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -95,11 +85,12 @@ abstract class AbstractIntegrationTests {
 		return DriverManager.getConnection(backend.getJdbcUrl(), backend.getUsername(), backend.getPassword());
 	}
 
-	protected static SmartConnection connection(JdbcDatabaseContainer<?> database) throws SQLException, IOException {
+	protected SmartConnection connection(JdbcDatabaseContainer<?> database) throws SQLException, IOException {
 		Config config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
-		config.setConfigStep(new Duration(1, TimeUnit.HOURS));
+		config.getMetrics().setEnabled(false);
+		config.getRuleset().setRefresh(new Duration(1, TimeUnit.HOURS));
 		Properties info = Driver.properties(config);
 		info.put("user", database.getUsername());
 		info.put("password", database.getPassword());
@@ -108,8 +99,8 @@ abstract class AbstractIntegrationTests {
 
 	protected static Config bootstrapConfig() {
 		Config config = new Config();
-		config.setCodecBufferSizeInBytes(BUFFER_SIZE);
-		config.setConfigStep(new Duration(1, TimeUnit.HOURS));
+		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
+		config.getRuleset().setRefresh(new Duration(1, TimeUnit.HOURS));
 		return config;
 	}
 
@@ -173,7 +164,7 @@ abstract class AbstractIntegrationTests {
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
-				String keyPattern = new Config().key(Driver.CACHE_KEY_PREFIX, "*");
+				String keyPattern = Driver.keyBuilder(new Config(), Driver.KEYSPACE_CACHE).create("*");
 				return !redisConnection.sync().keys(keyPattern).isEmpty();
 			});
 			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));

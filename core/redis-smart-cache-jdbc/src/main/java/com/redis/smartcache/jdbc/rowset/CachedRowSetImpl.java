@@ -5637,7 +5637,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @throws SQLException if invalid meta data is supplied to the rowset
 	 */
 	public void setMetaData(RowSetMetaData md) throws SQLException {
-		rowSetMetaData = (RowSetMetaDataImpl) md;
+		rowSetMetaData = md;
 	}
 
 	/**

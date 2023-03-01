@@ -10,3 +10,4 @@ bin
 hs_err_pid*.log
 *.iml
 .vscode
+/README.html

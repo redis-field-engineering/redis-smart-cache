@@ -17,14 +17,14 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.Config.KeyConfig;
+import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
-import com.redis.smartcache.core.Config.RulesetConfig.RuleConfig;
-import com.redis.smartcache.core.config.ConfigManager;
-import com.redis.smartcache.core.config.ObjectMappers;
+import com.redis.smartcache.core.ConfigManager;
+import com.redis.smartcache.core.KeyBuilder;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.DataSize;
@@ -40,15 +40,10 @@ class ConfigTests {
 	@Test
 	void keyBuilder() {
 		Config config = new Config();
-		Assertions.assertEquals(Config.DEFAULT_KEYSPACE + Config.DEFAULT_KEY_SEPARATOR + Driver.CACHE_KEY_PREFIX
-				+ Config.DEFAULT_KEY_SEPARATOR, config.key(Driver.CACHE_KEY_PREFIX, ""));
-	}
-
-	@Test
-	void jsonMapper() throws JsonProcessingException {
-		Config config = new Config();
-		String json = ObjectMappers.json().writeValueAsString(config);
-		System.out.println(json);
+		KeyBuilder keyBuilder = Driver.keyBuilder(config, Driver.KEYSPACE_CACHE);
+		String id = "123";
+		Assertions.assertEquals(KeyConfig.DEFAULT_PREFIX + KeyBuilder.DEFAULT_SEPARATOR + Driver.KEYSPACE_CACHE
+				+ KeyBuilder.DEFAULT_SEPARATOR + id, keyBuilder.create(id));
 	}
 
 	@Test
@@ -58,9 +53,8 @@ class ConfigTests {
 		Duration interval = Duration.ofMillis(100);
 		RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 		StatefulRedisModulesConnection<String, String> connection = client.connect();
-		try (ConfigManager<RulesetConfig> manager = new ConfigManager<>(ObjectMappers.json(), connection, key, config,
+		try (ConfigManager<RulesetConfig> manager = new ConfigManager<>(client, Driver.jsonMapper(), key, config,
 				interval)) {
-			manager.start();
 			Assertions.assertNotNull(connection.sync().jsonGet(key));
 			long ttl = 123;
 			connection.sync().jsonSet(key, ".rules[0].ttl", MessageFormat.format("\"{0}s\"", ttl));
@@ -71,16 +65,17 @@ class ConfigTests {
 
 	@Test
 	void configProperties() throws IOException {
-		String propertyName = Driver.PROPERTY_PREFIX + ".codec-buffer-size";
+		String propertyName = Driver.PROPERTY_PREFIX_REDIS + ".codec-buffer-capacity";
 		Config config = new Config();
 		DataSize bufferSize = DataSize.of(123, Unit.KILOBYTE);
-		config.setCodecBufferSize(bufferSize);
+		config.getRedis().setCodecBufferCapacity(bufferSize);
 		Properties properties = Driver.properties(config);
 		Assertions.assertEquals(bufferSize, DataSize.valueOf(properties.getProperty(propertyName)));
 		Config actual = Driver.config(properties);
 		Assertions.assertEquals(config, actual);
 		properties.setProperty(propertyName, "10MB");
-		Assertions.assertEquals(DataSize.of(10, Unit.MEGABYTE), Driver.config(properties).getCodecBufferSize());
+		Assertions.assertEquals(DataSize.of(10, Unit.MEGABYTE),
+				Driver.config(properties).getRedis().getCodecBufferCapacity());
 	}
 
 	@Test

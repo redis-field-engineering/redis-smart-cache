@@ -13,9 +13,12 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
+import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
+
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.codec.StringCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -26,22 +29,21 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 	public static final String EMPTY_STRING = "";
 	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
-	private final RowSetFactory rowSetFactory;
+	private final RowSetFactory rowSetFactory = new CachedRowSetFactory();
 	private final int maxByteBufferCapacity;
 
-	public ResultSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
-		this.rowSetFactory = rowSetFactory;
+	public ResultSetCodec(int maxByteBufferCapacity) {
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
 	@Override
 	public String decodeKey(ByteBuffer bytes) {
-		return io.lettuce.core.codec.StringCodec.UTF8.decodeKey(bytes);
+		return StringCodec.UTF8.decodeKey(bytes);
 	}
 
 	@Override
 	public ByteBuffer encodeKey(String key) {
-		return io.lettuce.core.codec.StringCodec.UTF8.encodeKey(key);
+		return StringCodec.UTF8.encodeKey(key);
 	}
 
 	@Override

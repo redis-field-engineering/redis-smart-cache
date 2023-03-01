@@ -144,83 +144,24 @@ See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-det
 
 Next step is providing bootstrap configuration.
 
-=== Bootstrap Configuration
+=== Configuration
 
-Bootstrap configuration contains the information necessary to connect to Redis and the backend database and is specified using JDBC properties.
+{product-name} configuration is done through JDBC properties.
 
-==== Property value types
-
-{product-name} JDBC properties support different value types.
-
-===== `boolean`
-
-The properties of type boolean support two values, `true` or `false`.
-
-===== `data size`
-
-The properties of type data size support values that describe an amount of data, measured in byte-based units.
-These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
-For example, the value `6MB` describes six megabytes.
-
-The data size type supports the following units:
-
-* B: Bytes
-* kB: Kilobytes
-* MB: Megabytes
-* GB: Gigabytes
-
-===== `double`
-
-The properties of type double support numerical values including decimals, such as `1.6`.
-Double type values can be negative, if supported by the specific property.
-
-===== `duration`
-
-The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
-For example, the value `7m` describes seven minutes.
-
-The duration type supports the following units:
-
-* ns: Nanoseconds
-* us: Microseconds
-* ms: Milliseconds
-* s: Seconds
-* m: Minutes
-* h: Hours
-* d: Days
-
-A duration of 0 is treated as zero regardless of the unit that follows.
-For example, 0s and 0m both mean the same thing.
-
-Properties of type duration also support decimal values, such as `2.25d`.
-These are handled as a fractional value of the specified unit.
-For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
-
-===== `integer`
-
-The properties of type integer support whole numeric values, such as `5` and `1000`.
-Negative values are supported as well, for example `-7`.
-Integer type values must be whole numbers, decimal values such as 2.5 are not supported.
-
-Some integer type properties enforce their own minimum and maximum values.
-
-===== `string`
-
-The properties of type string support a set of values that consist of a sequence of characters.
-Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
+Refer to the <<property_types>> section for details on different property types.
 
 ==== Backend database
 
 ===== `{property-prefix}.driver.class-name`
 
-* Type: `string`
+* Type: <<property_type_string>>
 * *Required*
 
 Class name of the backend database JDBC driver, for example `oracle.jdbc.OracleDriver`.
 
 ===== `{property-prefix}.driver.url`
 
-* Type: `string`
+* Type: <<property_type_string>>
 * *Required*
 
 JDBC URL for the backend database, for example `jdbc:oracle:thin:@myhost:1521:orcl`.
@@ -232,25 +173,39 @@ These will be passed to the backend JDBC driver as is.
 
 ==== Redis
 
-To further configure how {product-name} connects to Redis, set the following properties:
+To further configure how {product-name} interacts with Redis, set the following properties:
+
+===== `{property-prefix}.redis.key.prefix`
+
+* Type: <<property_type_string>>
+* Default value: `{property-prefix}`
+
+Prefix for all Redis keys used by {product-name}, such as cache entries, configuration, and metrics.
+
+===== `{property-prefix}.redis.key.separator`
+
+* Type: <<property_type_string>>
+* Default value: `:`
+
+Delimiter to use between key elements.
 
 ===== `{property-prefix}.redis.cluster`
 
-* Type: `boolean`
+* Type: <<property_type_boolean>>
 * Default value: `false`
 
 Connect to a Redis Cluster.
 
 ===== `{property-prefix}.redis.tls`
 
-* Type: `boolean`
+* Type: <<property_type_boolean>>
 * Default value: `false`
 
 Establish a secure TLS connection.
 
 ===== `{property-prefix}.redis.tls-verify`
 
-* Type: `string`
+* Type: <<property_type_string>>
 * Allowed values: `NONE`, `CA`, `FULL`
 * Default value: `NONE`
 
@@ -261,7 +216,7 @@ Use `FULL` mode for full certificate verification.
 
 ===== `{property-prefix}.redis.username`
 
-* Type: `string`
+* Type: <<property_type_string>>
 
 Authenticate using the provided username.
 Overrides username in Redis URI.
@@ -269,53 +224,85 @@ Requires password.
 
 ===== `{property-prefix}.redis.password`
 
-* Type: `string`
+* Type: <<property_type_string>>
 
 Authenticate using the provided password.
 Overrides password in Redis URI.
 
-===== `{property-prefix}.redis.keyspace`
+===== `{property-prefix}.redis.codec-buffer-capacity`
 
-* Type: `string`
-* Default value: `{property-prefix}`
+* Type: <<property_type_data_size>>
+* Default value: `10MB`
 
-Prefix for all Redis keys used by {product-name}, such as cache entries, configuration, and metrics.
+Maximum capacity of the buffer used to encode a result set.
 
-===== `{property-prefix}.redis.key-separator`
+==== Query Analyzer
 
-* Type: `string`
-* Default value: `:`
+The following properties are used to configure the query analyzer component.
 
-Delimiter to use between key elements.
+===== `{property-prefix}.analyzer.pool-size`
 
-===== `{property-prefix}.redis.pool.size`
-
-* Type: `integer`
+* Type: <<property_type_integer>>
 * Default value: `8`
 
 Maximum number of connections that can be allocated by the pool at a given time.
 Use a negative value for no limit.
 
-===== `{property-prefix}.redis.codec-buffer-size`
+===== `{property-prefix}.analyzer.cache-capacity`
 
-* Type: `data size`
-* Default value: `10MB`
+* Type: <<property_type_integer>>
+* Default value: `10000`
 
-Maximum capacity of the buffer used to encode a result set.
- 
-==== Additional components
+Capacity of the parsed query cache.
 
-===== `{property-prefix}.metrics-step`
+===== `{property-prefix}.analyzer.queue-capacity`
 
-* Type: `duration`
+* Type: <<property_type_integer>>
+* Default value: `10000`
+
+Capacity of the query writer queue.
+
+===== `{property-prefix}.analyzer.threads`
+
+* Type: <<property_type_integer>>
+* Default value: `1`
+
+Number of writer threads.
+
+===== `{property-prefix}.analyzer.batch-size`
+
+* Type: <<property_type_integer>>
+* Default value: `50`
+
+Number of query items to write at a time (i.e. pipeline size).
+
+===== `{property-prefix}.analyzer.flush-interval`
+
+* Type: <<property_type_duration>>
+* Default value: `50ms`
+
+Max duration between writes.
+
+==== Metrics
+
+===== `{property-prefix}.metrics.enabled`
+
+* Type: <<property_type_boolean>>
+* Default value: `true`
+
+Enable publishing of metrics.
+
+===== `{property-prefix}.metrics.step`
+
+* Type: <<property_type_duration>>
 * Default value: `60s`
 
 Metrics publishing interval.
 
 [[config_step]]
-===== `{property-prefix}.config-step`
+===== `{property-prefix}.ruleset.refresh`
 
-* Type: `duration`
+* Type: <<property_type_duration>>
 * Default value: `10s`
 
 Rule config refresh interval.
@@ -348,17 +335,46 @@ Only the first rule with matching criteria will be considered, and its action ap
 
 ==== Criteria
 
-`tables`:: Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
+===== `tables`
 
-`tablesAny`:: Triggers if any of the given tables shows up in the SQL query.
+* Type: <<property_type_list>>
+* Example: `products,customers,orders`
 
-`tablesAll`:: Triggers if all the given tables show up in the SQL query.
+Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
 
-`regex`:: Triggers if regular expression matches the SQL query.
+===== `tablesAny`
+
+* Type: <<property_type_list>>
+* Example: `products,customers,orders`
+
+Triggers if any of the given tables shows up in the SQL query.
+
+===== `tablesAll`
+
+* Type: <<property_type_list>>
+* Example: `products,customers,orders`
+
+Triggers if all the given tables show up in the SQL query.
+
+===== `regex`
+
+* Type: <<property_type_string>>
+* Example: `SELECT \* FROM test\.\w*`
+
+Triggers if given regular expression matches the SQL query.
+
+TIP: It is a good idea to test regexes at https://regex101.com[regex101.com].
 
 ==== Action
 
-`ttl`:: Sets the time-to-live for the corresponding cache entry (default: `1h`). Use `0s` to disable caching.
+===== `ttl`
+
+* Type: <<property_type_duration>>
+* Default value: `1h`
+
+Sets the time-to-live for the corresponding cache entry.
+
+Use `0s` to disable caching.
 
 ==== Examples
 
@@ -415,6 +431,73 @@ Only the first rule with matching criteria will be considered, and its action ap
 ----
 |image:check.svg[Check,20]
 |==========================
+
+[[property_types]]
+=== Property value types
+
+{product-name} configuration properties support different value types.
+
+[[property_type_boolean]]
+===== `boolean`
+
+The properties of type boolean support two values, `true` or `false`.
+
+[[property_type_data_size]]
+===== `data size`
+
+The properties of type data size support values that describe an amount of data, measured in byte-based units.
+These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
+For example, the value `6MB` describes six megabytes.
+
+The data size type supports the following units:
+
+* B: Bytes
+* kB: Kilobytes
+* MB: Megabytes
+* GB: Gigabytes
+
+[[property_type_duration]]
+===== `duration`
+
+The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
+For example, the value `7m` describes seven minutes.
+
+The duration type supports the following units:
+
+* ns: Nanoseconds
+* us: Microseconds
+* ms: Milliseconds
+* s: Seconds
+* m: Minutes
+* h: Hours
+* d: Days
+
+A duration of 0 is treated as zero regardless of the unit that follows.
+For example, 0s and 0m both mean the same thing.
+
+Properties of type duration also support decimal values, such as `2.25d`.
+These are handled as a fractional value of the specified unit.
+For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
+
+[[property_type_integer]]
+===== `integer`
+
+The properties of type integer support whole numeric values, such as `5` and `1000`.
+Negative values are supported as well, for example `-7`.
+Integer type values must be whole numbers, decimal values such as 2.5 are not supported.
+
+Some integer type properties enforce their own minimum and maximum values.
+
+[[property_type_string]]
+===== `string`
+
+The properties of type string support a set of values that consist of a sequence of characters.
+Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
+
+[[property_type_list]]
+===== `list`
+
+The properties of type list support a set of values that consist of a comma-separated list of <<property_type_string>>s, such as `a,b,c` and `customers,products`.
 
 == Support
 

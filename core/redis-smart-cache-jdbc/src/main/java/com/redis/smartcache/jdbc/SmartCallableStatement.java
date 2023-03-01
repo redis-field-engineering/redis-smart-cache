@@ -17,26 +17,22 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 public class SmartCallableStatement extends SmartPreparedStatement implements CallableStatement {
 
-	private final SortedMap<String, String> parameters = new TreeMap<>();
+	private final Map<String, String> parameters = new HashMap<>();
 
 	public SmartCallableStatement(SmartConnection connection, CallableStatement statement, String sql) {
 		super(connection, statement, sql);
 	}
 
 	@Override
-	protected String paramString() {
-		StringBuilder builder = new StringBuilder();
-		for (Entry<String, String> entry : parameters.entrySet()) {
-			builder.append(PARAMETER_SEPARATOR).append(entry.getKey() + "=" + entry.getValue());
-		}
-		return builder.toString();
+	protected Collection<String> getParameters() {
+		return parameters.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.toList());
 	}
 
 	@Override

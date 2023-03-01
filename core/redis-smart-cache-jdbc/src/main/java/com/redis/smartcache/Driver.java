@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -14,9 +15,10 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.sql.rowset.RowSetFactory;
-
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
@@ -29,16 +31,17 @@ import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.DriverConfig;
 import com.redis.smartcache.core.Config.RedisConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.ConfigManager;
+import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.QueryRuleSession;
+import com.redis.smartcache.core.QueryWriter;
 import com.redis.smartcache.core.RedisResultSetCache;
 import com.redis.smartcache.core.ResultSetCache;
 import com.redis.smartcache.core.codec.ResultSetCodec;
-import com.redis.smartcache.core.config.ConfigManager;
-import com.redis.smartcache.core.config.ObjectMappers;
 import com.redis.smartcache.jdbc.SmartConnection;
-import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.codec.RedisCodec;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -67,19 +70,32 @@ public class Driver implements java.sql.Driver {
 	public static final String PROPERTY_PREFIX = "smartcache";
 	public static final String PROPERTY_PREFIX_DRIVER = PROPERTY_PREFIX + ".driver";
 	public static final String PROPERTY_PREFIX_REDIS = PROPERTY_PREFIX + ".redis";
-	public static final String CACHE_KEY_PREFIX = "cache";
+	public static final String KEYSPACE_QUERIES = "queries";
+	public static final String KEYSPACE_METRICS = "metrics";
+	public static final String KEYSPACE_CACHE = "cache";
+	public static final String KEY_CONFIG = "config";
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 	private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
-	private static final JavaPropsMapper PROPS_MAPPER = ObjectMappers.javaProps();
-	private static final JsonMapper JSON_MAPPER = ObjectMappers.json();
+	private static final JavaPropsMapper PROPS_MAPPER = propsMapper();
+	private static final JsonMapper JSON_MAPPER = jsonMapper();
 
-	private static final RowSetFactory rowSetFactory = new CachedRowSetFactory();
 	private static final Map<String, java.sql.Driver> drivers = new HashMap<>();
+	private static final Map<RedisConfig, AbstractRedisClient> clients = new HashMap<>();
 	private static final Map<Config, MeterRegistry> registries = new HashMap<>();
 	private static final Map<Config, QueryRuleSession> sessions = new HashMap<>();
 	private static final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
-	private static final Map<RedisConfig, AbstractRedisClient> clients = new HashMap<>();
+	private static final Map<Config, QueryWriter> queryWriters = new HashMap<>();
+
+	public static JavaPropsMapper propsMapper() {
+		return JavaPropsMapper.builder().serializationInclusion(Include.NON_NULL)
+				.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
+				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+	}
+
+	public static JsonMapper jsonMapper() {
+		return JsonMapper.builder().build();
+	}
 
 	static {
 		try {
@@ -127,40 +143,111 @@ public class Driver implements java.sql.Driver {
 			throw new SQLException("Could not load config", e);
 		}
 		config.getRedis().setUri(redisUri);
-		return makeConnection(config, info);
+		Connection backendConnection = backendConnection(config.getDriver(), info);
+		return makeConnection(config, backendConnection);
 	}
 
-	private SmartConnection makeConnection(Config conf, Properties info) throws SQLException {
-		Connection backend = backendConnection(conf.getDriver(), info);
-		AbstractRedisClient client = clients.computeIfAbsent(conf.getRedis(), Driver::redisClient);
-		QueryRuleSession session = sessions.computeIfAbsent(conf, this::ruleSession);
-		ConfigManager<RulesetConfig> configManager = configManagers.computeIfAbsent(conf,
-				config -> new ConfigManager<>(JSON_MAPPER, RedisModulesUtils.connection(client), config.key("config"),
-						config.getRuleset(), Duration.ofMillis(config.getConfigStep().toMillis())));
+	private SmartConnection makeConnection(Config conf, Connection backendConnection) {
+		QueryRuleSession ruleSession = sessions.computeIfAbsent(conf, this::ruleSession);
+		configManagers.computeIfAbsent(conf, this::configManager);
+		KeyBuilder cacheKeyBuilder = keyBuilder(conf, KEYSPACE_CACHE);
+		MeterRegistry meterRegistry = registries.computeIfAbsent(conf, this::createMeterRegistry);
+		QueryWriter queryWriter = queryWriters.computeIfAbsent(conf, this::createQueryWriter);
+		AbstractRedisClient client = redisClient(conf);
+		RedisCodec<String, ResultSet> codec = resultSetCodec(conf);
+		ResultSetCache resultSetCache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec),
+				meterRegistry, cacheKeyBuilder, ruleSession, queryWriter);
+		return new SmartConnection(backendConnection, resultSetCache);
+	}
+
+	private RedisCodec<String, ResultSet> resultSetCodec(Config conf) {
+		int bufferSize = Math.toIntExact(conf.getRedis().getCodecBufferCapacity().toBytes());
+		return new ResultSetCodec(bufferSize);
+	}
+
+	private QueryWriter createQueryWriter(Config conf) {
+		String index = conf.getRedis().getKey().getPrefix() + "-" + KEYSPACE_QUERIES + "-idx";
+		KeyBuilder keyBuilder = keyBuilder(conf, KEYSPACE_QUERIES);
+		return new QueryWriter(redisClient(conf), conf.getAnalyzer(), index, keyBuilder);
+	}
+
+	public static KeyBuilder keyBuilder(Config config) {
+		return new KeyBuilder(config.getRedis().getKey().getPrefix(), config.getRedis().getKey().getSeparator());
+	}
+
+	public static KeyBuilder keyBuilder(Config config, String prefix) {
+		return keyBuilder(config).builder(prefix);
+	}
+
+	private AbstractRedisClient redisClient(Config conf) {
+		return clients.computeIfAbsent(conf.getRedis(), this::createRedisClient);
+	}
+
+	private ConfigManager<RulesetConfig> configManager(Config conf) {
+		String key = keyBuilder(conf).create(KEY_CONFIG);
+		AbstractRedisClient redisClient = redisClient(conf);
+		Duration period = duration(conf.getRuleset().getRefresh());
 		try {
-			configManager.start();
+			return new ConfigManager<>(redisClient, JSON_MAPPER, key, conf.getRuleset(), period);
 		} catch (JsonProcessingException e) {
-			logger.log(Level.WARNING, "Could not initialize config manager", e);
+			throw new RuntimeException("Could not initialize config manager", e);
 		}
-		ResultSetCodec codec = new ResultSetCodec(rowSetFactory, Math.toIntExact(conf.getCodecBufferSize().toBytes()));
-		String prefix = conf.key(CACHE_KEY_PREFIX) + conf.getKeySeparator();
-		ResultSetCache cache = new RedisResultSetCache(RedisModulesUtils.connection(client, codec), prefix);
-		MeterRegistry registry = registries.computeIfAbsent(conf, c -> registry(c, client));
-		return new SmartConnection(backend, session, rowSetFactory, cache, registry, conf);
 	}
 
-	private static RedisTimeSeriesMeterRegistry registry(Config conf, AbstractRedisClient client) {
-		return new RedisTimeSeriesMeterRegistry(new MeterRegistryConfig(conf), Clock.SYSTEM, client);
+	private Duration duration(io.airlift.units.Duration duration) {
+		return Duration.ofMillis(duration.toMillis());
+	}
+
+	private RedisTimeSeriesMeterRegistry createMeterRegistry(Config conf) {
+		KeyBuilder keyBuilder = keyBuilder(conf).builder(KEYSPACE_METRICS);
+		String keyPrefix = keyBuilder.create(""); // Registry expects prefix that includes trailing separator
+		String keySeparator = keyBuilder.getSeparator();
+		Duration step = duration(conf.getMetrics().getStep());
+		RedisTimeSeriesConfig registryConfig = new RedisTimeSeriesConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public String keyPrefix() {
+				return keyPrefix;
+			}
+
+			@Override
+			public String keySeparator() {
+				return keySeparator;
+			}
+
+			@Override
+			public Duration step() {
+				return step;
+			}
+
+			@Override
+			public boolean enabled() {
+				return conf.getMetrics().isEnabled();
+			}
+		};
+		return new RedisTimeSeriesMeterRegistry(registryConfig, Clock.SYSTEM, redisClient(conf));
 	}
 
 	private static Connection backendConnection(DriverConfig config, Properties info) throws SQLException {
+		Properties backendInfo = new Properties();
+		for (String name : info.stringPropertyNames()) {
+			if (name.startsWith(PROPS_SCHEMA.prefix())) {
+				continue;
+			}
+			backendInfo.setProperty(name, info.getProperty(name));
+		}
 		String url = config.getUrl();
 		if (url == null || url.isEmpty()) {
 			throw new SQLException("No backend URL specified");
 		}
 		java.sql.Driver driver = backendDriver(config.getClassName());
 		logger.log(Level.FINE, "Connecting to backend database with URL: {0}", url);
-		return driver.connect(url, info);
+		return driver.connect(url, backendInfo);
 	}
 
 	public static synchronized java.sql.Driver backendDriver(String className) throws SQLException {
@@ -239,19 +326,25 @@ public class Driver implements java.sql.Driver {
 			throw new IllegalStateException(
 					"Driver is not registered (or it has not been registered using Driver.register() method)");
 		}
+		clear();
+		DriverManager.deregisterDriver(registeredDriver);
+		registeredDriver = null;
+	}
+
+	public static void clear() {
 		drivers.clear();
 		configManagers.values().forEach(ConfigManager::close);
 		configManagers.clear();
 		registries.values().forEach(MeterRegistry::close);
 		registries.clear();
+		queryWriters.values().forEach(QueryWriter::close);
+		queryWriters.clear();
 		sessions.clear();
 		clients.values().forEach(c -> {
 			c.shutdown();
 			c.getResources().shutdown();
 		});
 		clients.clear();
-		DriverManager.deregisterDriver(registeredDriver);
-		registeredDriver = null;
 	}
 
 	public static boolean isRegistered() {
@@ -264,49 +357,14 @@ public class Driver implements java.sql.Driver {
 		return ruleSession;
 	}
 
-	private static AbstractRedisClient redisClient(RedisConfig config) {
+	private AbstractRedisClient createRedisClient(RedisConfig conf) {
 		RedisURIBuilder redisURI = RedisURIBuilder.create();
-		redisURI.uri(config.getUri());
-		redisURI.username(config.getUsername());
-		redisURI.password(config.getPassword());
-		redisURI.sslVerifyMode(config.getTls().getVerify());
-		redisURI.ssl(config.getTls().isEnabled());
-		return ClientBuilder.create(redisURI.build()).cluster(config.isCluster()).build();
-	}
-
-	private static class MeterRegistryConfig implements RedisTimeSeriesConfig {
-
-		private final Config config;
-
-		protected MeterRegistryConfig(Config config) {
-			this.config = config;
-		}
-
-		@Override
-		public String get(String key) {
-			return null;
-		}
-
-		@Override
-		public String uri() {
-			return config.getRedis().getUri();
-		}
-
-		@Override
-		public boolean cluster() {
-			return config.getRedis().isCluster();
-		}
-
-		@Override
-		public String keyspace() {
-			return config.key("metrics");
-		}
-
-		@Override
-		public Duration step() {
-			return Duration.ofMillis(config.getMetricsStep().toMillis());
-		}
-
+		redisURI.uri(conf.getUri());
+		redisURI.username(conf.getUsername());
+		redisURI.password(conf.getPassword());
+		redisURI.ssl(conf.isTls());
+		redisURI.sslVerifyMode(conf.getTlsVerify());
+		return ClientBuilder.create(redisURI.build()).cluster(conf.isCluster()).build();
 	}
 
 }

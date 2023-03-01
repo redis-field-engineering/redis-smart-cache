@@ -20,10 +20,9 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
-import com.redis.smartcache.core.Query;
 
 public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
@@ -39,21 +38,13 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	}
 
 	@Override
-	protected String key(Query query) {
-		return query.getId() + connection.getConfig().getKeySeparator() + connection.hash(paramString());
-	}
-
-	protected String paramString() {
-		StringBuilder builder = new StringBuilder();
-		for (String parameter : parameters.values()) {
-			builder.append(PARAMETER_SEPARATOR).append(parameter);
-		}
-		return builder.toString();
-	}
-
-	@Override
 	public ResultSet executeQuery() throws SQLException {
-		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
+		return connection.getResultSetCache()
+				.computeIfAbsent(sql, getParameters(), ((PreparedStatement) statement)::executeQuery).getResultSet();
+	}
+
+	protected Collection<String> getParameters() {
+		return parameters.values();
 	}
 
 	@Override
@@ -63,7 +54,8 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	public boolean execute() throws SQLException {
-		return execute(sql, ((PreparedStatement) statement)::execute);
+		return execute(connection.getResultSetCache().get(sql, getParameters()),
+				((PreparedStatement) statement)::execute);
 	}
 
 	@Override

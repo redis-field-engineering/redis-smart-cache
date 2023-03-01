@@ -18,7 +18,7 @@ class CodecTests {
 	@Test
 	void resultSetCodec() throws SQLException {
 		RowSet rowSet = rowSetBuilder().build();
-		ResultSetCodec codec = new ResultSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY * 1024 * 1024);
+		ResultSetCodec codec = new ResultSetCodec(BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
 		Utils.assertEquals(rowSet, actual);

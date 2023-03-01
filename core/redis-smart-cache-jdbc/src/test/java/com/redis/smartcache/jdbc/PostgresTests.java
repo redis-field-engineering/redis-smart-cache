@@ -46,7 +46,7 @@ class PostgresTests extends AbstractIntegrationTests {
 	void testSimpleStatement() throws Exception {
 		testSimpleStatement(POSTGRES, "SELECT * FROM orders");
 		Config config = bootstrapConfig();
-		String cacheKeyPattern = config.key(Driver.CACHE_KEY_PREFIX, "*");
+		String cacheKeyPattern = Driver.keyBuilder(config, Driver.KEYSPACE_CACHE).create("*");
 		List<String> keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(1, keys.size());
 		testSimpleStatement(POSTGRES, "SELECT * FROM employees");

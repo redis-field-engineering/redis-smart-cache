@@ -2,25 +2,27 @@ package com.redis.smartcache.core;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
+import java.util.Collection;
 
-public interface ResultSetCache {
+public interface ResultSetCache extends AutoCloseable {
 
 	/**
 	 * 
-	 * @param key key to get the ResultSet for.
-	 * @return ResultSet that was retrieved from cache or null if none found.
+	 * @param sql SQL statement to get the ResultSet for.
+	 * @return CacheHandle that was retrieved from cache.
 	 */
-	ResultSet get(String key);
+	CachedResultSet get(String sql);
 
-	/**
-	 * Adds a ResultSet to the cache.
-	 *
-	 * @param key       key to store the ResultSet under
-	 * @param ttl       the key TTL
-	 * @param resultSet the ResultSet to store under the key
-	 * @throws SQLException if an error occurred while storing the ResultSet
-	 */
-	void put(String key, Duration ttl, ResultSet resultSet);
+	CachedResultSet get(String sql, Collection<String> parameters);
+
+	CachedResultSet get(CachedResultSet cachedResultSet, Executable<ResultSet> executable) throws SQLException;
+
+	CachedResultSet computeIfAbsent(String sql, Executable<ResultSet> executable) throws SQLException;
+
+	CachedResultSet computeIfAbsent(String sql, Collection<String> parameters, Executable<ResultSet> executable)
+			throws SQLException;
+
+	@Override
+	void close();
 
 }

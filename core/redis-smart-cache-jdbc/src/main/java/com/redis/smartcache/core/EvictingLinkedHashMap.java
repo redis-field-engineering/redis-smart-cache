@@ -1,4 +1,4 @@
-package com.redis.smartcache.core.util;
+package com.redis.smartcache.core;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

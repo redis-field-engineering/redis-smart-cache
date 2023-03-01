@@ -5,7 +5,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.redis.smartcache.core.util.EvictingLinkedHashMap;
+import com.redis.smartcache.core.EvictingLinkedHashMap;
 
 class UtilTests {
 

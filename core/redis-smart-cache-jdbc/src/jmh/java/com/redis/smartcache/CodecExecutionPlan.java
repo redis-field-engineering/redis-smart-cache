@@ -34,7 +34,7 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = new ResultSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
+		this.codec = new ResultSetCodec(BYTE_BUFFER_CAPACITY);
 		this.serializedCodec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY);
 	}
 

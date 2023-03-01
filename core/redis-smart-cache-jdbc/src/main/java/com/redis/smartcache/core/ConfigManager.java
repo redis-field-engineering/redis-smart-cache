@@ -1,4 +1,4 @@
-package com.redis.smartcache.core.config;
+package com.redis.smartcache.core;
 
 import java.text.MessageFormat;
 import java.time.Duration;
@@ -14,6 +14,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.json.SetMode;
+import com.redis.lettucemod.util.RedisModulesUtils;
+
+import io.lettuce.core.AbstractRedisClient;
 
 public class ConfigManager<T> implements AutoCloseable {
 
@@ -22,24 +25,17 @@ public class ConfigManager<T> implements AutoCloseable {
 	private static final String JSON_ROOT = "$";
 
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-	private final ObjectMapper mapper;
-	private final StatefulRedisModulesConnection<String, String> connection;
 	private final String key;
 	private final T config;
-	private final Duration period;
+	private final StatefulRedisModulesConnection<String, String> connection;
 	private ObjectReader reader;
 	private ScheduledFuture<?> future;
 
-	public ConfigManager(ObjectMapper mapper, StatefulRedisModulesConnection<String, String> connection, String key,
-			T config, Duration period) {
-		this.mapper = mapper;
-		this.connection = connection;
+	public ConfigManager(AbstractRedisClient client, ObjectMapper mapper, String key, T config, Duration period)
+			throws JsonProcessingException {
 		this.key = key;
 		this.config = config;
-		this.period = period;
-	}
-
-	public void start() throws JsonProcessingException {
+		this.connection = RedisModulesUtils.connection(client);
 		log.log(Level.INFO, "Registering config under {0}", key);
 		String json = mapper.writerFor(config.getClass()).writeValueAsString(config);
 		this.reader = mapper.readerForUpdating(config);
@@ -57,6 +53,7 @@ public class ConfigManager<T> implements AutoCloseable {
 	@Override
 	public void close() {
 		future.cancel(false);
+		connection.close();
 	}
 
 	public T read() throws JsonProcessingException {
