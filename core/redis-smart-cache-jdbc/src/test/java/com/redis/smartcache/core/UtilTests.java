@@ -1,11 +1,9 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import com.redis.smartcache.core.EvictingLinkedHashMap;
 
 class UtilTests {
 

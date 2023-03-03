@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -19,12 +19,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.smartcache.core.Config;
+import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config.KeyConfig;
 import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
-import com.redis.smartcache.core.ConfigManager;
-import com.redis.smartcache.core.KeyBuilder;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.DataSize;

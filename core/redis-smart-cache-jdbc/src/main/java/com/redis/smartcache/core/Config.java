@@ -332,6 +332,8 @@ public class Config {
 		public static final Duration DEFAULT_REFRESH_STEP = new Duration(10, TimeUnit.SECONDS);
 
 		private Duration refresh = DEFAULT_REFRESH_STEP;
+		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
+		private List<RuleConfig> rules;
 
 		/**
 		 * 
@@ -345,8 +347,6 @@ public class Config {
 			this.refresh = seconds;
 		}
 
-		private List<RuleConfig> rules;
-
 		public RulesetConfig() {
 			this(RuleConfig.passthrough().build());
 		}
@@ -354,8 +354,6 @@ public class Config {
 		public RulesetConfig(RuleConfig... rules) {
 			this.rules = Arrays.asList(rules);
 		}
-
-		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
 		public void addPropertyChangeListener(PropertyChangeListener listener) {
 			support.addPropertyChangeListener(listener);
@@ -388,10 +386,11 @@ public class Config {
 
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
-		private String[] tables;
-		private String[] tablesAny;
-		private String[] tablesAll;
+		private List<String> tables;
+		private List<String> tablesAny;
+		private List<String> tablesAll;
 		private String regex;
+		private List<String> queryIds;
 		private Duration ttl = DEFAULT_TTL;
 
 		public RuleConfig() {
@@ -402,6 +401,7 @@ public class Config {
 			this.tablesAny = builder.tablesAny;
 			this.tablesAll = builder.tablesAll;
 			this.regex = builder.regex;
+			this.queryIds = builder.queryIds;
 			this.ttl = builder.ttl;
 		}
 
@@ -413,6 +413,15 @@ public class Config {
 			support.removePropertyChangeListener(listener);
 		}
 
+		public List<String> getQueryIds() {
+			return queryIds;
+		}
+
+		public void setQueryIds(List<String> queryIds) {
+			support.firePropertyChange("queryIds", this.queryIds, queryIds);
+			this.queryIds = queryIds;
+		}
+
 		public String getRegex() {
 			return regex;
 		}
@@ -422,29 +431,29 @@ public class Config {
 			this.regex = regex;
 		}
 
-		public String[] getTables() {
+		public List<String> getTables() {
 			return tables;
 		}
 
-		public void setTables(String... tables) {
+		public void setTables(List<String> tables) {
 			support.firePropertyChange("tables", this.tables, tables);
 			this.tables = tables;
 		}
 
-		public String[] getTablesAny() {
+		public List<String> getTablesAny() {
 			return tablesAny;
 		}
 
-		public void setTablesAny(String... tablesAny) {
+		public void setTablesAny(List<String> tablesAny) {
 			support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
 			this.tablesAny = tablesAny;
 		}
 
-		public String[] getTablesAll() {
+		public List<String> getTablesAll() {
 			return tablesAll;
 		}
 
-		public void setTablesAll(String... tablesAll) {
+		public void setTablesAll(List<String> tablesAll) {
 			support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
 			this.tablesAll = tablesAll;
 		}
@@ -465,24 +474,30 @@ public class Config {
 		@Override
 		public String toString() {
 			return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll + ", regex="
-					+ regex + ", ttl=" + ttl + "]";
+					+ regex + ", queryIds=" + queryIds + ", ttl=" + ttl + "]";
 		}
 
 		public static Builder tables(String... tables) {
 			Builder builder = new Builder();
-			builder.tables = tables;
+			builder.tables = Arrays.asList(tables);
 			return builder;
 		}
 
 		public static Builder tablesAny(String... tables) {
 			Builder builder = new Builder();
-			builder.tablesAny = tables;
+			builder.tablesAny = Arrays.asList(tables);
 			return builder;
 		}
 
 		public static Builder tablesAll(String... tables) {
 			Builder builder = new Builder();
-			builder.tablesAll = tables;
+			builder.tablesAll = Arrays.asList(tables);
+			return builder;
+		}
+
+		public static Builder queryIds(String... ids) {
+			Builder builder = new Builder();
+			builder.queryIds = Arrays.asList(ids);
 			return builder;
 		}
 
@@ -498,13 +513,39 @@ public class Config {
 
 		public static final class Builder {
 
-			private String[] tables;
-			private String[] tablesAny;
-			private String[] tablesAll;
+			private List<String> tables;
+			private List<String> tablesAny;
+			private List<String> tablesAll;
 			private String regex;
+			private List<String> queryIds;
 			private Duration ttl = DEFAULT_TTL;
 
 			private Builder() {
+			}
+
+			public Builder tables(String... tables) {
+				this.tables = Arrays.asList(tables);
+				return this;
+			}
+
+			public Builder tablesAny(String... tables) {
+				this.tablesAny = Arrays.asList(tables);
+				return this;
+			}
+
+			public Builder tablesAll(String... tables) {
+				this.tablesAll = Arrays.asList(tables);
+				return this;
+			}
+
+			public Builder regex(String regex) {
+				this.regex = regex;
+				return this;
+			}
+
+			public Builder queryIds(String... ids) {
+				this.queryIds = Arrays.asList(ids);
+				return this;
 			}
 
 			public Builder ttl(Duration ttl) {

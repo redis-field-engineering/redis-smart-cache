@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.sql.SQLException;
 

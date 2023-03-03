@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.util.concurrent.TimeUnit;
 
@@ -7,9 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
-import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.core.SQLParser;
 
 import io.airlift.units.Duration;
 
@@ -60,8 +57,18 @@ class RulesTests {
 		Assertions.assertFalse(ruleSession.fire(query("SELECT COUNT(*) FROM blah")).isCaching());
 	}
 
+	@Test
+	void testQueryIds() {
+		String sql = "SELECT * FROM blah";
+		RuleConfig rule = RuleConfig.queryIds(String.valueOf(HashingFunctions.crc32(sql))).ttl(ttl).build();
+		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
+		Assertions.assertEquals(ttl.toMillis(), ruleSession.fire(query(sql)).getTtl().toMillis());
+		Assertions.assertFalse(ruleSession.fire(query("SELECT COUNT(*) FROM blah")).isCaching());
+	}
+
 	private Query query(String sql) {
 		Query query = new Query();
+		query.setId(String.valueOf(HashingFunctions.crc32(sql)));
 		query.setSql(sql);
 		query.setTables(PARSER.extractTableNames(sql));
 		return query;

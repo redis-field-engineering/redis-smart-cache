@@ -324,6 +324,7 @@ Here is the default rule configuration:
       "tablesAny": null,
       "tablesAll": null,
       "regex": null,
+      "queryIds": null,
       "ttl": "1h"
     }
   ]
@@ -358,6 +359,16 @@ Triggers if any of the given tables shows up in the SQL query.
 
 Triggers if all the given tables show up in the SQL query.
 
+===== `queryIds`
+
+* Type: <<property_type_list>>
+* Example: `a3bb9911,ffff0000`
+
+Triggers if the SQL query ID matches any of the given IDs.
+
+TIP: An ID is the CRC32 hash of the SQL query. You can use an online CRC32 calculator like https://randommer.io/Hash/CRC32[this one] to compute the ID.
+
+
 ===== `regex`
 
 * Type: <<property_type_string>>
@@ -384,48 +395,70 @@ Use `0s` to disable caching.
 [cols="6a,^1",options="header"]
 |==========================
 |Criteria|Match
+
 |
 [source,json]
 ----
 { "tables": ["orders", "products"] }
 ----
 |image:cross.svg[Check,20]
+
 |
 [source,json]
 ----
 { "tables": ["orders", "products", "customers"] }
 ----
 |image:check.svg[Check,20]
+
 |
 [source,json]
 ----
 { "tablesAny": ["transactions"] }
 ----
 |image:cross.svg[Check,20]
+
 |
 [source,json]
 ----
 { "tablesAny": ["transactions", "orders"] }
 ----
 |image:check.svg[Check,20]
+
 |
 [source,json]
 ----
 { "tablesAll": ["transactions", "orders", "products"] }
 ----
 |image:cross.svg[Check,20]
+
 |
 [source,json]
 ----
 { "tablesAll": ["orders", "products"] }
 ----
 |image:check.svg[Check,20]
+
+|
+[source,json]
+----
+{ "queryIds": ["aaff2b5c", "56789"] }
+----
+|image:cross.svg[Check,20]
+
+|
+[source,json]
+----
+{ "queryIds": ["a3bb9911", "abcd1233"] }
+----
+|image:check.svg[Check,20]
+
 |
 [source,json]
 ----
 { "regex": "SELECT .+ FROM trans.*" }
 ----
 |image:cross.svg[Check,20]
+
 |
 [source,json]
 ----

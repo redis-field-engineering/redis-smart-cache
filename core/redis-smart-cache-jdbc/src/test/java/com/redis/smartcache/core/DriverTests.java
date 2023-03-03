@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.io.IOException;
 import java.sql.DriverManager;
@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.redis.smartcache.core.Config;
+import com.redis.smartcache.Driver;
 import com.redis.testcontainers.RedisStackContainer;
 
 @Testcontainers

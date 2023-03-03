@@ -1,4 +1,4 @@
-package com.redis.smartcache;
+package com.redis.smartcache.core;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -12,9 +12,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.core.Config.AnalyzerConfig;
-import com.redis.smartcache.core.KeyBuilder;
-import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.QueryWriter;
 import com.redis.testcontainers.RedisStackContainer;
 
 @Testcontainers

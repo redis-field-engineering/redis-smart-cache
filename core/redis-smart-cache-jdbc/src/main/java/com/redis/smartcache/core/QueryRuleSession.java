@@ -67,6 +67,9 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 		if (rule.getRegex() != null) {
 			return new RegexRule<>(Pattern.compile(rule.getRegex()), Query::getSql, action);
 		}
+		if (rule.getQueryIds() != null) {
+			return new PredicateRule<>(q -> rule.getQueryIds().contains(q.getId()), action);
+		}
 		return new PredicateRule<>(Predicates.alwaysTrue(), action);
 	}
 

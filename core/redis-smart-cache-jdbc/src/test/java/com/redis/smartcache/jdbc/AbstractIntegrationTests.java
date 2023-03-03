@@ -27,8 +27,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
-import com.redis.smartcache.Utils;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.Utils;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.Duration;

@@ -53,18 +53,15 @@ public class CollectionRule<T, L, R> extends AbstractRule<L, R> {
 			return control(f -> control);
 		}
 
-		@SuppressWarnings("unchecked")
-		public CollectionRule<T, L, R> any(T... tableNames) {
+		public CollectionRule<T, L, R> any(List<T> tableNames) {
 			return new CollectionRule<>(extractor, new ContainsAnyPredicate<>(tableNames), action, control);
 		}
 
-		@SuppressWarnings("unchecked")
-		public CollectionRule<T, L, R> all(T... tableNames) {
+		public CollectionRule<T, L, R> all(List<T> tableNames) {
 			return new CollectionRule<>(extractor, new ContainsAllPredicate<>(tableNames), action, control);
 		}
 
-		@SuppressWarnings("unchecked")
-		public CollectionRule<T, L, R> exact(T... tableNames) {
+		public CollectionRule<T, L, R> exact(List<T> tableNames) {
 			return new CollectionRule<>(extractor, new EqualsPredicate<>(tableNames), action, control);
 		}
 	}
