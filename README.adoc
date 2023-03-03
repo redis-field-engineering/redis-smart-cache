@@ -56,6 +56,8 @@ You need to think about a number of issues, including:
 This is why we built {product-name}.
 After adding a single dependency and setting some basic configuration, your JDBC application can take advantage of Redis as a cache without any changes to your code.
 
+image:redis-smart-cache-flow.png[]
+
 == Quick start
 
 To understand how {product-name} works, it's best to try it for yourself.
