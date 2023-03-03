@@ -85,9 +85,9 @@ public class RedisResultSetCache implements ResultSetCache {
 		if (cachedResultSet.getAction().isCaching()) {
 			Timer timer = getTimer(METER_CACHE_GET, cachedResultSet.getQuery());
 			ResultSet resultSet = timer.record(() -> connection.sync().get(cachedResultSet.getKey()));
-			meterRegistry.get(METER_CACHE_GET).tags(tags(cachedResultSet.getQuery()))
-					.tags(TAG_RESULT, cachedResultSet.hasResultSet() ? TAG_MISS : TAG_HIT).counter().increment();
 			cachedResultSet.setResultSet(resultSet);
+			meterRegistry.get(METER_CACHE_GET).tags(tags(cachedResultSet.getQuery()))
+					.tags(TAG_RESULT, cachedResultSet.hasResultSet() ? TAG_HIT : TAG_MISS).counter().increment();
 		}
 	}
 
@@ -146,14 +146,14 @@ public class RedisResultSetCache implements ResultSetCache {
 		return computeIfAbsent(sql, q -> key(q, parameters), executable);
 	}
 
-	private CachedResultSet computeIfAbsent(String sql, Function<Query, String> keyMappingFunction,
-			Executable<ResultSet> executable) throws SQLException {
-		CachedResultSet cachedResultSet = cachedResultSet(sql, keyMappingFunction);
+	private CachedResultSet computeIfAbsent(String sql, Function<Query, String> mapper, Executable<ResultSet> backend)
+			throws SQLException {
+		CachedResultSet cachedResultSet = cachedResultSet(sql, mapper);
 		try {
 			return queryTimer(cachedResultSet).recordCallable(() -> {
 				populateFromCache(cachedResultSet);
 				if (!cachedResultSet.hasResultSet()) {
-					put(cachedResultSet, executable);
+					put(cachedResultSet, backend);
 				}
 				return cachedResultSet;
 			});
