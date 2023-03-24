@@ -11,6 +11,7 @@ buildscript {
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
         classpath "gradle.plugin.com.github.johnrengelman:shadow:$shadowPluginVersion"
         classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
+        classpath "org.asciidoctor:asciidoctor-gradle-jvm:$asciidoctorVersion"
     }
 }
 
@@ -32,6 +33,7 @@ projects {
             id 'java-library'
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
+            id 'org.asciidoctor.jvm.convert'
         }
         path(':redis-smart-cache-jdbc') {
             id 'com.github.johnrengelman.shadow'

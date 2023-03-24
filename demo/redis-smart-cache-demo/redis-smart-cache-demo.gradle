@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':redis-smart-cache-jdbc')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation group: 'com.redis', name: 'spring-lettucemod', version: lettucemodVersion
 	implementation group: 'com.github.javafaker', name: 'javafaker', version: fakerVersion
@@ -23,3 +24,23 @@ publishing {
 }
 
 tasks.bootJar.dependsOn ':redis-smart-cache-jdbc:shadowJar'
+
+bootJar {
+    dependsOn asciidoctor
+    from ("${asciidoctor.outputDir}") { 
+        into 'static'
+    }
+}
+
+asciidoctor {
+    resources {
+    	from("$rootDir/src/media") {
+     		include '**/*'
+   		}
+    }
+    attributes \
+    'icons': 'font',
+    'docinfo1': '',
+    'project-name': project.name,
+    'project-title': config.info.description
+}

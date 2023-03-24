@@ -1,0 +1,4 @@
+= {project-title}
+
+include::../../README.adoc[tags=demoSteps]
+

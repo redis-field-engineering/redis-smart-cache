@@ -74,14 +74,17 @@ cd {project-name}
 Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and {product-name} example app instance:
 [source,console]
 ----
-docker-compose up
+docker compose up
 ----
 
-Once all of these containers have started, log in to Grafana by pointing your browser to http://localhost:3000.
+// tag::demoSteps[]
+Log into Grafana by pointing your browser to http://localhost:3000.
+
 Use the following credentials:
 
-Username: `admin`
-Password: `admin`
+* Username: `admin`
+
+* Password: `admin`
 
 In the Grafana UI, click http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
 
@@ -106,6 +109,8 @@ You should see the following dashboard:
 image:grafana-dashboard.png[Dashboard,width=1486]
 
 After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
+
+// end::demoSteps[]
 
 == Installation
 
@@ -473,12 +478,12 @@ Use `0s` to disable caching.
 {product-name} configuration properties support different value types.
 
 [[property_type_boolean]]
-===== `boolean`
+==== `boolean`
 
 The properties of type boolean support two values, `true` or `false`.
 
 [[property_type_data_size]]
-===== `data size`
+==== `data size`
 
 The properties of type data size support values that describe an amount of data, measured in byte-based units.
 These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
@@ -492,7 +497,7 @@ The data size type supports the following units:
 * GB: Gigabytes
 
 [[property_type_duration]]
-===== `duration`
+==== `duration`
 
 The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
 For example, the value `7m` describes seven minutes.
@@ -515,7 +520,7 @@ These are handled as a fractional value of the specified unit.
 For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
 
 [[property_type_integer]]
-===== `integer`
+==== `integer`
 
 The properties of type integer support whole numeric values, such as `5` and `1000`.
 Negative values are supported as well, for example `-7`.
@@ -524,13 +529,13 @@ Integer type values must be whole numbers, decimal values such as 2.5 are not su
 Some integer type properties enforce their own minimum and maximum values.
 
 [[property_type_string]]
-===== `string`
+==== `string`
 
 The properties of type string support a set of values that consist of a sequence of characters.
 Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
 
 [[property_type_list]]
-===== `list`
+==== `list`
 
 The properties of type list support a set of values that consist of a comma-separated list of <<property_type_string>>s, such as `a,b,c` and `customers,products`.
 
