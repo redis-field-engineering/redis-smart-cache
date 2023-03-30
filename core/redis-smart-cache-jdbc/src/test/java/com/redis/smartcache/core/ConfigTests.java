@@ -20,7 +20,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
-import com.redis.smartcache.core.Config.KeyConfig;
 import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
 import com.redis.testcontainers.RedisStackContainer;
@@ -40,7 +39,7 @@ class ConfigTests {
 		Config config = new Config();
 		KeyBuilder keyBuilder = Driver.keyBuilder(config, Driver.KEYSPACE_CACHE);
 		String id = "123";
-		Assertions.assertEquals(KeyConfig.DEFAULT_PREFIX + KeyBuilder.DEFAULT_SEPARATOR + Driver.KEYSPACE_CACHE
+		Assertions.assertEquals(Config.DEFAULT_NAME + KeyBuilder.DEFAULT_SEPARATOR + Driver.KEYSPACE_CACHE
 				+ KeyBuilder.DEFAULT_SEPARATOR + id, keyBuilder.create(id));
 	}
 

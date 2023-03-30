@@ -214,7 +214,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private static KeyBuilder keyBuilder(Config config) {
-		return new KeyBuilder(config.getRedis().getKey().getPrefix(), config.getRedis().getKey().getSeparator());
+		return new KeyBuilder(config.getName(), config.getRedis().getKeySeparator());
 	}
 
 	private AbstractRedisClient client(Config config) {

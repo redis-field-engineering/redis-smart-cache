@@ -16,11 +16,22 @@ import io.lettuce.core.SslVerifyMode;
 
 public class Config {
 
+	public static final String DEFAULT_NAME = "smartcache";
+
+	private String name = DEFAULT_NAME;
 	private DriverConfig driver = new DriverConfig();
 	private RedisConfig redis = new RedisConfig();
 	private RulesetConfig ruleset = new RulesetConfig();
 	private MetricsConfig metrics = new MetricsConfig();
 	private AnalyzerConfig analyzer = new AnalyzerConfig();
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
 
 	public DriverConfig getDriver() {
 		return driver;
@@ -64,7 +75,7 @@ public class Config {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(redis.getUri(), redis.getKey().getPrefix());
+		return Objects.hash(redis.getUri(), name);
 	}
 
 	@Override
@@ -76,33 +87,7 @@ public class Config {
 		if (getClass() != obj.getClass())
 			return false;
 		Config other = (Config) obj;
-		return Objects.equals(redis.getUri(), other.redis.getUri())
-				&& Objects.equals(redis.key.getPrefix(), other.redis.key.prefix);
-	}
-
-	public static class KeyConfig {
-
-		public static final String DEFAULT_PREFIX = "smartcache";
-
-		private String prefix = DEFAULT_PREFIX;
-		private String separator = KeyBuilder.DEFAULT_SEPARATOR;
-
-		public String getPrefix() {
-			return prefix;
-		}
-
-		public void setPrefix(String prefix) {
-			this.prefix = prefix;
-		}
-
-		public String getSeparator() {
-			return separator;
-		}
-
-		public void setSeparator(String separator) {
-			this.separator = separator;
-		}
-
+		return Objects.equals(redis.getUri(), other.redis.getUri()) && Objects.equals(name, other.name);
 	}
 
 	public static class MetricsConfig {
@@ -143,8 +128,8 @@ public class Config {
 		private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
 		private String username;
 		private char[] password;
-		private KeyConfig key = new KeyConfig();
 		private DataSize codecBufferCapacity = DEFAULT_BUFFER_CAPACITY;
+		private String keySeparator = KeyBuilder.DEFAULT_SEPARATOR;
 
 		/**
 		 * 
@@ -162,12 +147,12 @@ public class Config {
 			this.codecBufferCapacity = DataSize.ofBytes(size);
 		}
 
-		public KeyConfig getKey() {
-			return key;
+		public String getKeySeparator() {
+			return keySeparator;
 		}
 
-		public void setKey(KeyConfig key) {
-			this.key = key;
+		public void setKeySeparator(String keySeparator) {
+			this.keySeparator = keySeparator;
 		}
 
 		public boolean isTls() {
