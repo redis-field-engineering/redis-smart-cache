@@ -30,6 +30,8 @@ release:
     changelog:
       formatted: ALWAYS
       preset: conventional-commits
+      contributors:
+        enabled: false
       labelers:
         - label: 'dependencies'
           title: 'regex:^(?:deps(?:\(.*\))?!?):\s.*'
@@ -74,7 +76,7 @@ announce:
   slack:
     active: RELEASE
     channel: '#field-engineering-announcements'
-    message: '📈 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    message: '🚀 Redis Smart Cache {{projectVersion}} has been released! {{releaseNotesUrl}}'
 
 distributions:
   redis-smart-cache-jdbc:

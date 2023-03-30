@@ -3,7 +3,7 @@ dependencies {
     implementation 'org.apache.commons:commons-pool2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
-    implementation group: 'com.redis', name: 'micrometer-registry-redistimeseries', version: micrometerRedisVersion
+    implementation group: 'com.redis', name: 'micrometer-registry-redis', version: micrometerRedisVersion
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
     testImplementation project(':redis-smart-cache-test')
