@@ -120,8 +120,8 @@ public class Config {
 			return step;
 		}
 
-		public void setStep(Duration seconds) {
-			this.step = seconds;
+		public void setStep(Duration duration) {
+			this.step = duration;
 		}
 
 		public boolean isEnabled() {

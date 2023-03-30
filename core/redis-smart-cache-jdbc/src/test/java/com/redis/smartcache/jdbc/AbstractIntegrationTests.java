@@ -62,7 +62,7 @@ abstract class AbstractIntegrationTests {
 		redisConnection.close();
 		client.shutdown();
 		client.getResources().shutdown();
-		Driver.clear();
+		driver.clear();
 	}
 
 	protected static void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -99,6 +99,7 @@ abstract class AbstractIntegrationTests {
 
 	protected static Config bootstrapConfig() {
 		Config config = new Config();
+		config.getMetrics().setStep(new Duration(100, TimeUnit.MILLISECONDS));
 		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
 		config.getRuleset().setRefresh(new Duration(1, TimeUnit.HOURS));
 		return config;

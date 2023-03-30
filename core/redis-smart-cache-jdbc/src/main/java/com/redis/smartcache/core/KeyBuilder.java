@@ -46,7 +46,7 @@ public class KeyBuilder {
 	 * this KeyBuilder is in keyspace "root" and the given id is "sub" then the
 	 * returned KeyBuilder will create keys under "root:sub:"
 	 * 
-	 * @param id sub-keyspace element
+	 * @param id subkeyspace element
 	 * @return KeyBuilder for sub-keyspace "id"
 	 */
 	public KeyBuilder builder(String id) {

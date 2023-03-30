@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Properties;
 
 import org.awaitility.Awaitility;
@@ -20,7 +21,7 @@ import com.redis.lettucemod.api.sync.RedisModulesCommands;
 import com.redis.lettucemod.search.Document;
 import com.redis.lettucemod.search.SearchResults;
 import com.redis.lettucemod.util.RedisModulesUtils;
-import com.redis.smartcache.core.QueryWriter;
+import com.redis.smartcache.core.RedisResultSetCache;
 
 class MySQLTests extends AbstractIntegrationTests {
 
@@ -46,15 +47,16 @@ class MySQLTests extends AbstractIntegrationTests {
 		testSimpleStatement(MYSQL, "SELECT * FROM SalesOrder");
 		testSimpleStatement(MYSQL, "SELECT * FROM OrderDetail");
 		RedisModulesCommands<String, String> commands = redisConnection.sync();
-		Awaitility.await().until(() -> commands.keys("smartcache:queries:*").size() == 5);
-		String index = "smartcache-queries-idx";
+		Awaitility.await().timeout(Duration.ofSeconds(1)).until(() -> commands.keys("smartcache:query:*").size() == 5);
+		String index = "smartcache-query-idx";
 		Awaitility.await().until(() -> !RedisModulesUtils.indexInfo(() -> commands.ftInfo(index)).isEmpty());
 		SearchResults<String, String> results = commands.ftSearch(index, "*");
 		Assertions.assertEquals(5, results.size());
 		for (Document<String, String> doc : results) {
-			Assertions.assertTrue(doc.get(QueryWriter.FIELD_SQL)
-					.equalsIgnoreCase("select * from " + doc.get(QueryWriter.FIELD_TABLE)));
+			Assertions.assertTrue(doc.get(RedisResultSetCache.TAG_SQL)
+					.equalsIgnoreCase("select * from " + doc.get(RedisResultSetCache.TAG_TABLE)));
 		}
+		Assertions.assertEquals("459d4345", redisConnection.sync().hget("smartcache:query:459d4345", "id"));
 	}
 
 	@Test
