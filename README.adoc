@@ -93,7 +93,7 @@ Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
 image:grafana-import-dashboard.png[Import Dashboard,width=380]
 
-Next, click `Upload JSON file` and upload `{project-name}/demo/redis-smart-cache-demo/grafana/dashboard.json`.
+Next, click `Upload JSON file` and in the `Import via grafana.com` field enter this id: `18441`.
 
 At the bottom of the page, select the Redis datasource that you just created and click `Import`.
 
