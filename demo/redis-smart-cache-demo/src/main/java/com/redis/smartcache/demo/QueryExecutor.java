@@ -109,7 +109,7 @@ public class QueryExecutor implements AutoCloseable {
 			int count = 0;
 			while (!stopped) {
 				try (Connection connection = dataSource.getConnection();
-					 PreparedStatement statement = connection.prepareStatement(QUERIES.get(random.nextInt(QUERIES.size())))) {
+						PreparedStatement statement = connection.prepareStatement(QUERIES.get(random.nextInt(QUERIES.size())))) {
 					int orderNumber = random.nextInt(totalRows) + 1;
 					statement.setInt(1, random.nextInt(5));
 					statement.setInt(2, orderNumber);
