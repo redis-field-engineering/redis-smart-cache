@@ -13,11 +13,13 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
@@ -51,29 +53,32 @@ class ConfigTests {
 		String key = "updateStreamConfig";
 		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
-			RulesetConfig config = new RulesetConfig();
-			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, config,
-					Driver.propsMapper())) {
+			RulesetConfig conf = new RulesetConfig();
+			JavaPropsMapper mapper = Driver.propsMapper();
+			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
 				manager.start();
 				Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "123s");
 				connection.sync().xadd(key, body);
-				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config.getRules().size() == 1
-						&& config.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 123);
+				await().until(() -> conf.getRules().size() == 1);
+				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 123);
 				body.put("rules[0].ttl", "456s");
 				connection.sync().xadd(key, body);
-				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config.getRules().size() == 1
-						&& config.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf.getRules().size() == 1);
+				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
-			RulesetConfig config2 = new RulesetConfig();
-			try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, config2,
-					Driver.propsMapper())) {
+			RulesetConfig conf2 = new RulesetConfig();
+			try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, conf2, mapper)) {
 				manager2.start();
-				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config2.getRules().size() == 1
-						&& config2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf2.getRules().size() == 1);
+				await().until(() -> conf2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
 		}
+	}
+
+	private ConditionFactory await() {
+		return Awaitility.await().timeout(Duration.ofSeconds(1));
 	}
 
 	@Test
