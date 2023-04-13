@@ -21,6 +21,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.KeyBuilder;
 
 class PostgresTests extends AbstractIntegrationTests {
 
@@ -44,15 +45,14 @@ class PostgresTests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		testSimpleStatement(POSTGRES, "SELECT * FROM orders");
-		Config config = bootstrapConfig();
-		String cacheKeyPattern = Driver.keyBuilder(config, Driver.KEYSPACE_CACHE).create("*");
+		testSimpleStatement("SELECT * FROM orders", POSTGRES);
+		String cacheKeyPattern = KeyBuilder.of(Config.DEFAULT_NAME).sub(Driver.KEYSPACE_CACHE).build("*");
 		List<String> keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(1, keys.size());
-		testSimpleStatement(POSTGRES, "SELECT * FROM employees");
+		testSimpleStatement("SELECT * FROM employees", POSTGRES);
 		keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(2, keys.size());
-		testSimpleStatement(POSTGRES, "SELECT * FROM products");
+		testSimpleStatement("SELECT * FROM products", POSTGRES);
 		keys = redisConnection.sync().keys(cacheKeyPattern);
 		Assertions.assertEquals(3, keys.size());
 	}
@@ -75,7 +75,7 @@ class PostgresTests extends AbstractIntegrationTests {
 	@Test
 	void testCallableStatementParams() throws Exception {
 		String runFunction = "{ ? = call hello( ? ) }";
-		try (Connection connection = connection(POSTGRES);
+		try (Connection connection = smartConnection(POSTGRES);
 				Statement statement = connection.createStatement();
 				CallableStatement callableStatement = connection.prepareCall(runFunction)) {
 			callableStatement.registerOutParameter(1, Types.VARCHAR);
@@ -88,7 +88,7 @@ class PostgresTests extends AbstractIntegrationTests {
 	@Test
 	void testCallableStatementRefCursor() throws Exception {
 		String runFunction = "{? = call getUsers()}";
-		try (Connection connection = connection(POSTGRES);
+		try (Connection connection = smartConnection(POSTGRES);
 				Statement statement = connection.createStatement();
 				CallableStatement cs = connection.prepareCall(runFunction)) {
 			// We must be inside a transaction for cursors to work.
@@ -114,20 +114,22 @@ class PostgresTests extends AbstractIntegrationTests {
 
 	@Test
 	void testResultSetMetadata() throws Exception {
-		testResultSetMetaData(POSTGRES, "SELECT * FROM orders");
+		testResultSetMetaData("SELECT * FROM orders", POSTGRES);
 	}
 
 	@Test
-	void testConnect() throws SQLException, IOException {
+	void testConnect() throws Exception {
 		Config config = new Config();
 		config.getDriver().setClassName(POSTGRES.getDriverClassName());
 		config.getDriver().setUrl(POSTGRES.getJdbcUrl());
+		config.getMetrics().setEnabled(false);
 		Properties info = Driver.properties(config);
 		info.setProperty("user", POSTGRES.getUsername());
 		info.setProperty("password", POSTGRES.getPassword());
 		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());
-		Connection connection = driver.connect("jdbc:" + redis.getRedisURI(), info);
-		Assertions.assertInstanceOf(SmartConnection.class, connection);
+		try (Connection connection = driver.connect("jdbc:" + redis.getRedisURI(), info)) {
+			Assertions.assertInstanceOf(SmartConnection.class, connection);
+		}
 	}
 
 }

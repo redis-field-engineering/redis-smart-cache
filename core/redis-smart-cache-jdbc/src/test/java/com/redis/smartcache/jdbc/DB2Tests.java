@@ -33,7 +33,7 @@ class DB2Tests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		testSimpleStatement(DB2, "SELECT * FROM books");
+		testSimpleStatement("SELECT * FROM books", DB2);
 	}
 
 	@Test
@@ -53,6 +53,6 @@ class DB2Tests extends AbstractIntegrationTests {
 
 	@Test
 	void testResultSetMetadata() throws Exception {
-		testResultSetMetaData(DB2, "SELECT * FROM books");
+		testResultSetMetaData("SELECT * FROM books", DB2);
 	}
 }

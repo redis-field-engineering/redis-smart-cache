@@ -3,11 +3,12 @@ package com.redis.smartcache.core;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -26,6 +27,7 @@ import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
+import io.lettuce.core.XReadArgs.StreamOffset;
 
 @Testcontainers
 class ConfigTests {
@@ -40,23 +42,37 @@ class ConfigTests {
 		KeyBuilder keyBuilder = Driver.keyBuilder(config, Driver.KEYSPACE_CACHE);
 		String id = "123";
 		Assertions.assertEquals(Config.DEFAULT_NAME + KeyBuilder.DEFAULT_SEPARATOR + Driver.KEYSPACE_CACHE
-				+ KeyBuilder.DEFAULT_SEPARATOR + id, keyBuilder.create(id));
+				+ KeyBuilder.DEFAULT_SEPARATOR + id, keyBuilder.build(id));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
-	void updateConfig() throws Exception {
-		String key = "testUpdate";
-		RulesetConfig config = new RulesetConfig();
-		Duration interval = Duration.ofMillis(100);
-		RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
-		StatefulRedisModulesConnection<String, String> connection = client.connect();
-		try (ConfigManager<RulesetConfig> manager = new ConfigManager<>(client, Driver.jsonMapper(), key, config,
-				interval)) {
-			Assertions.assertNotNull(connection.sync().jsonGet(key));
-			long ttl = 123;
-			connection.sync().jsonSet(key, ".rules[0].ttl", MessageFormat.format("\"{0}s\"", ttl));
-			Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config.getRules().size() == 1
-					&& config.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == ttl);
+	void updateStreamConfig() throws Exception {
+		String key = "updateStreamConfig";
+		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+			RulesetConfig config = new RulesetConfig();
+			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, config,
+					Driver.propsMapper())) {
+				manager.start();
+				Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
+				Map<String, String> body = new HashMap<>();
+				body.put("rules[0].ttl", "123s");
+				connection.sync().xadd(key, body);
+				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config.getRules().size() == 1
+						&& config.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 123);
+				body.put("rules[0].ttl", "456s");
+				connection.sync().xadd(key, body);
+				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config.getRules().size() == 1
+						&& config.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+			}
+			RulesetConfig config2 = new RulesetConfig();
+			try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, config2,
+					Driver.propsMapper())) {
+				manager2.start();
+				Awaitility.await().timeout(Duration.ofMillis(300)).until(() -> config2.getRules().size() == 1
+						&& config2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+			}
 		}
 	}
 

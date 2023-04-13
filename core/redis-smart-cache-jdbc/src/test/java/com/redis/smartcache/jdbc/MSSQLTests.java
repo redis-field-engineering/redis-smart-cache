@@ -33,10 +33,10 @@ class MSSQLTests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		testSimpleStatement(MSSQL, "SELECT * FROM LOCATIONS");
-		testSimpleStatement(MSSQL, "SELECT * FROM DEPARTMENTS");
-		testSimpleStatement(MSSQL, "SELECT * FROM JOB_HISTORY");
-		testSimpleStatement(MSSQL, "SELECT * FROM EMPLOYEES");
+		testSimpleStatement("SELECT * FROM LOCATIONS", MSSQL);
+		testSimpleStatement("SELECT * FROM DEPARTMENTS", MSSQL);
+		testSimpleStatement("SELECT * FROM JOB_HISTORY", MSSQL);
+		testSimpleStatement("SELECT * FROM EMPLOYEES", MSSQL);
 	}
 
 	@Test
@@ -56,6 +56,6 @@ class MSSQLTests extends AbstractIntegrationTests {
 
 	@Test
 	void testResultSetMetadata() throws Exception {
-		testResultSetMetaData(MSSQL, "SELECT * FROM LOCATIONS");
+		testResultSetMetaData("SELECT * FROM LOCATIONS", MSSQL);
 	}
 }

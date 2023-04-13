@@ -10,10 +10,13 @@ import java.util.stream.Collectors;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
+import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
+import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.RedisCodec;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -39,15 +42,17 @@ public class RedisResultSetCache implements ResultSetCache {
 	private final MeterRegistry registry;
 	private final QueryRuleSession session;
 	private final KeyBuilder keyBuilder;
+	private final KeyBuilder paramKeyBuilder;
 	private final Map<String, Query> queryCache;
 
-	public RedisResultSetCache(StatefulRedisConnection<String, ResultSet> connection, MeterRegistry registry,
+	public RedisResultSetCache(AbstractRedisClient client, RedisCodec<String, ResultSet> codec, MeterRegistry registry,
 			KeyBuilder keyBuilder, QueryRuleSession session, Map<String, Query> queryCache) {
-		this.connection = connection;
+		this.connection = RedisModulesUtils.connection(client, codec);
 		this.registry = registry;
 		this.keyBuilder = keyBuilder;
 		this.session = session;
 		this.queryCache = queryCache;
+		this.paramKeyBuilder = new KeyBuilder().withSeparator(keyBuilder.separator());
 	}
 
 	private Query getQuery(String sql) {
@@ -96,11 +101,11 @@ public class RedisResultSetCache implements ResultSetCache {
 	}
 
 	private String key(Query query) {
-		return keyBuilder.create(query.getId());
+		return keyBuilder.build(query.getId());
 	}
 
 	private String key(Query query, Collection<String> parameters) {
-		return keyBuilder.create(query.getId(), hash(String.join(keyBuilder.getSeparator(), parameters)));
+		return keyBuilder.build(query.getId(), hash(paramKeyBuilder.build(parameters)));
 	}
 
 	private CachedResultSet cachedResultSet(String sql, Function<Query, String> keyMappingFunction) {

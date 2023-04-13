@@ -32,6 +32,7 @@ import com.redis.smartcache.core.Utils;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.Duration;
+import io.lettuce.core.internal.LettuceAssert;
 
 @Testcontainers
 abstract class AbstractIntegrationTests {
@@ -58,11 +59,11 @@ abstract class AbstractIntegrationTests {
 	}
 
 	@AfterEach
-	void teardownRedisClient() {
+	void teardownRedisClient() throws Exception {
+		Driver.clear();
 		redisConnection.close();
 		client.shutdown();
 		client.getResources().shutdown();
-		driver.clear();
 	}
 
 	protected static void runScript(Connection backendConnection, String script) throws SQLException, IOException {
@@ -85,15 +86,27 @@ abstract class AbstractIntegrationTests {
 		return DriverManager.getConnection(backend.getJdbcUrl(), backend.getUsername(), backend.getPassword());
 	}
 
-	protected SmartConnection connection(JdbcDatabaseContainer<?> database) throws SQLException, IOException {
+	/**
+	 * 
+	 * @param database
+	 * @param properties the properties tuples (key,value,key,value,...).
+	 * @return
+	 * @throws SQLException
+	 * @throws IOException
+	 */
+	protected SmartConnection smartConnection(JdbcDatabaseContainer<?> database, String... properties)
+			throws SQLException, IOException {
 		Config config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
-		config.getMetrics().setEnabled(false);
-		config.getRuleset().setRefresh(new Duration(1, TimeUnit.HOURS));
 		Properties info = Driver.properties(config);
-		info.put("user", database.getUsername());
-		info.put("password", database.getPassword());
+		LettuceAssert.isTrue(properties.length % 2 == 0,
+				"properties.length must be a multiple of 2 and contain a sequence of name1, value1, name2, value2, nameN, valueN");
+		for (int i = 0; i < properties.length; i += 2) {
+			info.setProperty(properties[i], properties[i + 1]);
+		}
+		info.setProperty("user", database.getUsername());
+		info.setProperty("password", database.getPassword());
 		return driver.connect("jdbc:" + redis.getRedisURI(), info);
 	}
 
@@ -101,7 +114,7 @@ abstract class AbstractIntegrationTests {
 		Config config = new Config();
 		config.getMetrics().setStep(new Duration(100, TimeUnit.MILLISECONDS));
 		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
-		config.getRuleset().setRefresh(new Duration(1, TimeUnit.HOURS));
+		config.getMetrics().setEnabled(false);
 		return config;
 	}
 
@@ -111,33 +124,33 @@ abstract class AbstractIntegrationTests {
 
 	}
 
-	protected void testSimpleStatement(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
-		test(databaseContainer, c -> c.createStatement().executeQuery(sql));
+	protected void testSimpleStatement(String sql, JdbcDatabaseContainer<?> databaseContainer, String... properties)
+			throws Exception {
+		test(databaseContainer, c -> c.createStatement().executeQuery(sql), properties);
 	}
 
 	protected void testUpdateAndGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
 		test(databaseContainer, c -> {
-			try (Statement statement = c.createStatement()) {
-				statement.execute(sql);
-				return statement.getResultSet();
-			}
+			Statement statement = c.createStatement();
+			statement.execute(sql);
+			return statement.getResultSet();
 		});
 	}
 
 	protected void testPreparedStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
 			throws Exception {
 		test(databaseContainer, c -> {
-			try (PreparedStatement statement = c.prepareStatement(sql)) {
-				for (int index = 0; index < parameters.length; index++) {
-					statement.setObject(index + 1, parameters[index]);
-				}
-				return statement.executeQuery();
+			PreparedStatement statement = c.prepareStatement(sql);
+			for (int index = 0; index < parameters.length; index++) {
+				statement.setObject(index + 1, parameters[index]);
 			}
+			return statement.executeQuery();
 		});
 	}
 
-	protected boolean execute(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
-		try (SmartConnection connection = connection(databaseContainer);
+	protected boolean execute(String sql, JdbcDatabaseContainer<?> databaseContainer, String... properties)
+			throws Exception {
+		try (SmartConnection connection = smartConnection(databaseContainer, properties);
 				Statement statement = connection.createStatement()) {
 			return statement.execute(sql);
 		}
@@ -146,45 +159,44 @@ abstract class AbstractIntegrationTests {
 	protected void testCallableStatement(JdbcDatabaseContainer<?> databaseContainer, String sql, Object... parameters)
 			throws Exception {
 		test(databaseContainer, c -> {
-			try (CallableStatement statement = c.prepareCall(sql)) {
-				for (int index = 0; index < parameters.length; index++) {
-					statement.setObject(index + 1, parameters[index]);
-				}
-				return statement.executeQuery();
+			CallableStatement statement = c.prepareCall(sql);
+			for (int index = 0; index < parameters.length; index++) {
+				statement.setObject(index + 1, parameters[index]);
 			}
+			return statement.executeQuery();
 		});
 	}
 
 	protected void testCallableStatementGetResultSet(JdbcDatabaseContainer<?> databaseContainer, String sql,
 			Object... parameters) throws Exception {
 		test(databaseContainer, c -> {
-			try (CallableStatement statement = c.prepareCall(sql)) {
-				statement.execute();
-				return statement.getResultSet();
-			}
+			CallableStatement statement = c.prepareCall(sql);
+			statement.execute();
+			return statement.getResultSet();
 		});
 	}
 
-	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, StatementExecutor executor)
-			throws Exception {
-		try (Connection databaseConnection = connection(databaseContainer);
-				SmartConnection connection = connection(databaseContainer)) {
-			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(connection));
+	private <T extends Statement> void test(JdbcDatabaseContainer<?> databaseContainer, StatementExecutor executor,
+			String... properties) throws Exception {
+		try (Connection backendConnection = backendConnection(databaseContainer);
+				SmartConnection smartConnection = smartConnection(databaseContainer, properties)) {
+			Utils.assertEquals(executor.execute(backendConnection), executor.execute(smartConnection));
 			Awaitility.await().until(() -> {
 				try {
-					executor.execute(connection);
+					executor.execute(smartConnection);
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
-				String keyPattern = Driver.keyBuilder(new Config(), Driver.KEYSPACE_CACHE).create("*");
+				String keyPattern = Driver.keyBuilder(new Config(), Driver.KEYSPACE_CACHE).build("*");
 				return !redisConnection.sync().keys(keyPattern).isEmpty();
 			});
-			Utils.assertEquals(executor.execute(databaseConnection), executor.execute(databaseConnection));
+			Utils.assertEquals(executor.execute(backendConnection), executor.execute(smartConnection));
 		}
 	}
 
-	protected void testResultSetMetaData(JdbcDatabaseContainer<?> databaseContainer, String sql) throws Exception {
-		try (Connection connection = connection(databaseContainer);
+	protected void testResultSetMetaData(String sql, JdbcDatabaseContainer<?> databaseContainer, String... properties)
+			throws Exception {
+		try (SmartConnection connection = smartConnection(databaseContainer, properties);
 				Statement statement = connection.createStatement()) {
 			statement.execute(sql);
 			ResultSet resultSet = statement.getResultSet();

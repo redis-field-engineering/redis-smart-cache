@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
@@ -227,13 +225,11 @@ public class Config {
 		public static final int DEFAULT_QUEUE_CAPACITY = 10000;
 		public static final int DEFAULT_THREAD_COUNT = 1;
 		public static final Duration DEFAULT_FLUSH_INTERVAL = new Duration(50, TimeUnit.MILLISECONDS);
-		public static final int DEFAULT_POOL_SIZE = GenericObjectPoolConfig.DEFAULT_MAX_TOTAL;
 		public static final int DEFAULT_BATCH_SIZE = 50;
 		public static final int DEFAULT_CACHE_CAPACITY = 10000;
 
 		private int cacheCapacity = DEFAULT_CACHE_CAPACITY;
 		private int queueCapacity = DEFAULT_QUEUE_CAPACITY;
-		private int poolSize = DEFAULT_POOL_SIZE;
 		private int batchSize = DEFAULT_BATCH_SIZE;
 		private int threads = DEFAULT_THREAD_COUNT;
 		private Duration flushInterval = DEFAULT_FLUSH_INTERVAL;
@@ -260,14 +256,6 @@ public class Config {
 
 		public void setQueueCapacity(int queueCapacity) {
 			this.queueCapacity = queueCapacity;
-		}
-
-		public int getPoolSize() {
-			return poolSize;
-		}
-
-		public void setPoolSize(int poolSize) {
-			this.poolSize = poolSize;
 		}
 
 		public int getBatchSize() {
@@ -314,23 +302,9 @@ public class Config {
 	public static class RulesetConfig {
 
 		public static final String PROPERTY_RULES = "rules";
-		public static final Duration DEFAULT_REFRESH_STEP = new Duration(10, TimeUnit.SECONDS);
 
-		private Duration refresh = DEFAULT_REFRESH_STEP;
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 		private List<RuleConfig> rules;
-
-		/**
-		 * 
-		 * @return config refresh step duration in seconds
-		 */
-		public Duration getRefresh() {
-			return refresh;
-		}
-
-		public void setRefresh(Duration seconds) {
-			this.refresh = seconds;
-		}
 
 		public RulesetConfig() {
 			this(RuleConfig.passthrough().build());
@@ -460,6 +434,25 @@ public class Config {
 		public String toString() {
 			return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll + ", regex="
 					+ regex + ", queryIds=" + queryIds + ", ttl=" + ttl + "]";
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(queryIds, regex, tables, tablesAll, tablesAny, ttl);
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			RuleConfig other = (RuleConfig) obj;
+			return Objects.equals(queryIds, other.queryIds) && Objects.equals(regex, other.regex)
+					&& Objects.equals(tables, other.tables) && Objects.equals(tablesAll, other.tablesAll)
+					&& Objects.equals(tablesAny, other.tablesAny) && Objects.equals(ttl, other.ttl);
 		}
 
 		public static Builder tables(String... tables) {

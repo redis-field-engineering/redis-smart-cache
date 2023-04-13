@@ -41,9 +41,9 @@ class OracleTests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		testSimpleStatement(ORACLE, "SELECT * FROM employees");
-		testSimpleStatement(ORACLE, "SELECT * FROM emp_details_view");
-		testSimpleStatement(ORACLE, "SELECT * FROM locations");
+		testSimpleStatement("SELECT * FROM employees", ORACLE );
+		testSimpleStatement("SELECT * FROM emp_details_view", ORACLE);
+		testSimpleStatement("SELECT * FROM locations", ORACLE);
 	}
 
 	@Test
@@ -58,7 +58,7 @@ class OracleTests extends AbstractIntegrationTests {
 
 	@Test
 	void testCallableStatement() throws Exception {
-		try (Connection connection = connection(ORACLE)) {
+		try (Connection connection = smartConnection(ORACLE)) {
 			CallableStatement callableStatement = connection.prepareCall("{ call insert_employee(?,?,?) }");
 			callableStatement.setString(1, "julien");
 			callableStatement.setBigDecimal(2, new BigDecimal("99.99"));
@@ -74,7 +74,7 @@ class OracleTests extends AbstractIntegrationTests {
 
 	@Test
 	void testResultSetMetadata() throws Exception {
-		testResultSetMetaData(ORACLE, "SELECT * FROM employees");
+		testResultSetMetaData("SELECT * FROM employees", ORACLE);
 	}
 
 }

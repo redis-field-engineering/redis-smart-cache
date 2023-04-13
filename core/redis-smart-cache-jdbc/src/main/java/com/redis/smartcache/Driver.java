@@ -20,15 +20,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.util.ClientBuilder;
-import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.lettucemod.util.RedisURIBuilder;
 import com.redis.micrometer.RediSearchMeterRegistry;
 import com.redis.micrometer.RediSearchRegistryConfig;
@@ -45,7 +41,7 @@ import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RedisResultSetCache;
 import com.redis.smartcache.core.ResultSetCache;
-import com.redis.smartcache.core.RuntimeSQLException;
+import com.redis.smartcache.core.StreamConfigManager;
 import com.redis.smartcache.core.codec.ResultSetCodec;
 import com.redis.smartcache.jdbc.SmartConnection;
 
@@ -90,22 +86,16 @@ public class Driver implements java.sql.Driver {
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 	private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
 	private static final JavaPropsMapper PROPS_MAPPER = propsMapper();
-	private static final JsonMapper JSON_MAPPER = jsonMapper();
 
-	private final Map<RedisConfig, AbstractRedisClient> clients = new HashMap<>();
-	private final Map<Config, MeterRegistry> registries = new HashMap<>();
-	private final Map<Config, QueryRuleSession> sessions = new HashMap<>();
-	private final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
-	private final Map<Config, Map<String, Query>> queryCaches = new HashMap<>();
+	private static final Map<Config, AbstractRedisClient> clients = new HashMap<>();
+	private static final Map<Config, MeterRegistry> registries = new HashMap<>();
+	private static final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
+	private static final Map<Config, Map<String, Query>> queryCaches = new HashMap<>();
 
 	public static JavaPropsMapper propsMapper() {
 		return JavaPropsMapper.builder().serializationInclusion(Include.NON_NULL)
 				.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
 				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
-	}
-
-	public static JsonMapper jsonMapper() {
-		return JsonMapper.builder().build();
 	}
 
 	static {
@@ -157,7 +147,6 @@ public class Driver implements java.sql.Driver {
 		}
 		config.getRedis().setUri(redisUri);
 		log.fine("Creating backend connection");
-		configManager(config);
 		Connection backendConnection = backendConnection(config.getDriver(), info);
 		log.fine("Creating SmartCache connection");
 		return makeConnection(config, backendConnection);
@@ -168,14 +157,15 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private ResultSetCache resultSetCache(Config config) {
-		QueryRuleSession session = sessions.computeIfAbsent(config, this::ruleSession);
+		RulesetConfig ruleset = configManager(config).get();
+		QueryRuleSession session = QueryRuleSession.of(ruleset);
+		ruleset.addPropertyChangeListener(session);
 		KeyBuilder keyBuilder = keyBuilder(config, KEYSPACE_CACHE);
 		MeterRegistry registry = registries.computeIfAbsent(config, this::createMeterRegistry);
 		AbstractRedisClient client = client(config);
 		RedisCodec<String, ResultSet> codec = resultSetCodec(config);
-		StatefulRedisModulesConnection<String, ResultSet> connection = RedisModulesUtils.connection(client, codec);
 		Map<String, Query> queryCache = queryCache(config);
-		return new RedisResultSetCache(connection, registry, keyBuilder, session, queryCache);
+		return new RedisResultSetCache(client, codec, registry, keyBuilder, session, queryCache);
 	}
 
 	private ConfigManager<RulesetConfig> configManager(Config config) {
@@ -183,16 +173,17 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private ConfigManager<RulesetConfig> createConfigManager(Config config) {
-		String key = keyBuilder(config).create(KEY_CONFIG);
-		AbstractRedisClient redisClient = client(config);
-		Duration period = duration(config.getRuleset().getRefresh());
-		log.log(Level.FINE, "Creating config manager on key {0} with refresh interval {1}",
-				new Object[] { key, period });
+		AbstractRedisClient client = client(config);
+		String key = keyBuilder(config).build(KEY_CONFIG);
+		RulesetConfig ruleset = config.getRuleset();
+		StreamConfigManager<RulesetConfig> configManager = new StreamConfigManager<>(client, key, ruleset,
+				PROPS_MAPPER);
 		try {
-			return new ConfigManager<>(redisClient, JSON_MAPPER, key, config.getRuleset(), period);
-		} catch (JsonProcessingException e) {
-			throw new RuntimeSQLException("Could not create config manager", e);
+			configManager.start();
+		} catch (IOException e) {
+			throw new RuntimeException("Could not start config manager", e);
 		}
+		return configManager;
 	}
 
 	private Map<String, Query> queryCache(Config config) {
@@ -210,15 +201,15 @@ public class Driver implements java.sql.Driver {
 
 	public static KeyBuilder keyBuilder(Config config, String prefix) {
 		log.log(Level.FINE, "Creating KeyBuilder for prefix {0}", prefix);
-		return keyBuilder(config).builder(prefix);
+		return keyBuilder(config).sub(prefix);
 	}
 
 	private static KeyBuilder keyBuilder(Config config) {
-		return new KeyBuilder(config.getName(), config.getRedis().getKeySeparator());
+		return KeyBuilder.of(config.getName()).withSeparator(config.getRedis().getKeySeparator());
 	}
 
 	private AbstractRedisClient client(Config config) {
-		return clients.computeIfAbsent(config.getRedis(), this::createRedisClient);
+		return clients.computeIfAbsent(config, this::createRedisClient);
 	}
 
 	private Duration duration(io.airlift.units.Duration duration) {
@@ -230,7 +221,7 @@ public class Driver implements java.sql.Driver {
 		log.fine("Creating meter registry");
 		KeyBuilder keyBuilder = keyBuilder(config);
 		Duration step = duration(config.getMetrics().getStep());
-		String tsKeyspace = keyBuilder.create(KEYSPACE_METRICS);
+		String tsKeyspace = keyBuilder.build(KEYSPACE_METRICS);
 		RedisTimeSeriesMeterRegistry tsRegistry = new RedisTimeSeriesMeterRegistry(new RedisRegistryConfig() {
 
 			@Override
@@ -245,16 +236,22 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String keySeparator() {
-				return keyBuilder.getSeparator();
+				return keyBuilder.separator();
 			}
 
 			@Override
 			public Duration step() {
 				return step;
 			}
+
+			@Override
+			public boolean enabled() {
+				return config.getMetrics().isEnabled();
+			}
+
 		}, Clock.SYSTEM, client);
 		tsRegistry.config().meterFilter(MeterFilter.ignoreTags(TAG_SQL, TAG_TABLE));
-		String searchKeyspace = keyBuilder.getKeyspace();
+		String searchKeyspace = keyBuilder.keyspace();
 		RediSearchMeterRegistry searchRegistry = new RediSearchMeterRegistry(new RediSearchRegistryConfig() {
 
 			@Override
@@ -269,7 +266,7 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String keySeparator() {
-				return keyBuilder.getSeparator();
+				return keyBuilder.separator();
 			}
 
 			@Override
@@ -284,12 +281,17 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String indexPrefix() {
-				return keyBuilder.getKeyspace();
+				return keyBuilder.keyspace();
 			}
 
 			@Override
 			public String indexSuffix() {
 				return "idx";
+			}
+
+			@Override
+			public boolean enabled() {
+				return config.getMetrics().isEnabled();
 			}
 
 		}, Clock.SYSTEM, client);
@@ -387,18 +389,23 @@ public class Driver implements java.sql.Driver {
 			throw new IllegalStateException(
 					"Driver is not registered (or it has not been registered using Driver.register() method)");
 		}
-		registeredDriver.clear();
+		try {
+			clear();
+		} catch (Exception e) {
+			throw new SQLException("Could not clear", e);
+		}
 		DriverManager.deregisterDriver(registeredDriver);
 		registeredDriver = null;
 	}
 
-	public void clear() {
-		configManagers.values().forEach(ConfigManager::close);
+	public static void clear() throws Exception {
+		for (ConfigManager<RulesetConfig> configManager : configManagers.values()) {
+			configManager.close();
+		}
 		configManagers.clear();
 		registries.values().forEach(MeterRegistry::close);
 		registries.clear();
 		queryCaches.clear();
-		sessions.clear();
 		clients.values().forEach(c -> {
 			c.shutdown();
 			c.getResources().shutdown();
@@ -408,13 +415,6 @@ public class Driver implements java.sql.Driver {
 
 	public static boolean isRegistered() {
 		return registeredDriver != null;
-	}
-
-	private QueryRuleSession ruleSession(Config config) {
-		log.fine("Creating rule session");
-		QueryRuleSession ruleSession = QueryRuleSession.of(config.getRuleset());
-		config.getRuleset().addPropertyChangeListener(ruleSession);
-		return ruleSession;
 	}
 
 	private RedisURI redisURI(RedisConfig config) {
@@ -427,10 +427,10 @@ public class Driver implements java.sql.Driver {
 		return builder.build();
 	}
 
-	private AbstractRedisClient createRedisClient(RedisConfig config) {
-		RedisURI redisURI = redisURI(config);
+	private AbstractRedisClient createRedisClient(Config config) {
+		RedisURI redisURI = redisURI(config.getRedis());
 		log.log(Level.FINE, "Creating Redis client with URI {0}", redisURI);
-		return ClientBuilder.create(redisURI).cluster(config.isCluster()).build();
+		return ClientBuilder.create(redisURI).cluster(config.getRedis().isCluster()).build();
 	}
 
 }

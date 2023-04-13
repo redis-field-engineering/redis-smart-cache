@@ -41,11 +41,12 @@ class MySQLTests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		testSimpleStatement(MYSQL, "SELECT * FROM Product");
-		testSimpleStatement(MYSQL, "SELECT * FROM Category");
-		testSimpleStatement(MYSQL, "SELECT * FROM Supplier");
-		testSimpleStatement(MYSQL, "SELECT * FROM SalesOrder");
-		testSimpleStatement(MYSQL, "SELECT * FROM OrderDetail");
+		String[] properties = { "smartcache.metrics.enabled", "true" };
+		testSimpleStatement("SELECT * FROM Product", MYSQL, properties);
+		testSimpleStatement("SELECT * FROM Category", MYSQL, properties);
+		testSimpleStatement("SELECT * FROM Supplier", MYSQL, properties);
+		testSimpleStatement("SELECT * FROM SalesOrder", MYSQL, properties);
+		testSimpleStatement("SELECT * FROM OrderDetail", MYSQL, properties);
 		RedisModulesCommands<String, String> commands = redisConnection.sync();
 		Awaitility.await().timeout(Duration.ofSeconds(1)).until(() -> commands.keys("smartcache:query:*").size() == 5);
 		String index = "smartcache-query-idx";
@@ -76,7 +77,7 @@ class MySQLTests extends AbstractIntegrationTests {
 
 	@Test
 	void testResultSetMetadata() throws Exception {
-		testResultSetMetaData(MYSQL, "SELECT * FROM Employee");
+		testResultSetMetaData("SELECT * FROM Employee", MYSQL);
 	}
 
 	@Test
@@ -88,16 +89,16 @@ class MySQLTests extends AbstractIntegrationTests {
 		p.setProperty("smartcache.metrics.enabled", "false");
 		p.setProperty("user", MYSQL.getUsername());
 		p.setProperty("password", MYSQL.getPassword());
-		Connection connection = DriverManager.getConnection("jdbc:" + redis.getRedisURI(), p);
-		Statement stmt = connection.createStatement();
-		boolean result = stmt.execute("select * from Employee");
-		Assertions.assertTrue(result);
-		ResultSet resultSet = stmt.getResultSet();
-		while (resultSet.next()) {
-			Assertions.assertNotNull(resultSet.getString(1));
-			Assertions.assertNotNull(resultSet.getString(2));
-			Assertions.assertNotNull(resultSet.getString(3));
+		try (Connection connection = DriverManager.getConnection("jdbc:" + redis.getRedisURI(), p)) {
+			Statement stmt = connection.createStatement();
+			boolean result = stmt.execute("select * from Employee");
+			Assertions.assertTrue(result);
+			ResultSet resultSet = stmt.getResultSet();
+			while (resultSet.next()) {
+				Assertions.assertNotNull(resultSet.getString(1));
+				Assertions.assertNotNull(resultSet.getString(2));
+				Assertions.assertNotNull(resultSet.getString(3));
+			}
 		}
-		connection.close();
 	}
 }
