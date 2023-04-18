@@ -4,12 +4,7 @@ import java.util.Set;
 
 public class Query {
 
-	public enum Type {
-		STRING, PARAMETERIZED, STORED_PROCEDURE
-	}
-
 	private String id;
-	private Type type;
 	private String sql;
 	private Set<String> tables;
 
@@ -19,14 +14,6 @@ public class Query {
 
 	public void setId(String id) {
 		this.id = id;
-	}
-
-	public Type getType() {
-		return type;
-	}
-
-	public void setType(Type type) {
-		this.type = type;
 	}
 
 	public String getSql() {

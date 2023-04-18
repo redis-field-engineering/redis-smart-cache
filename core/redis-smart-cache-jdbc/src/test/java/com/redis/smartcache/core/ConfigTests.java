@@ -29,6 +29,8 @@ import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
+import io.lettuce.core.Range;
+import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XReadArgs.StreamOffset;
 
 @Testcontainers
@@ -74,6 +76,32 @@ class ConfigTests {
 				await().until(() -> conf2.getRules().size() == 1);
 				await().until(() -> conf2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
+		}
+	}
+
+	@Test
+	void initialStreamConfig() throws Exception {
+		String key = "config";
+		RulesetConfig conf = new RulesetConfig();
+		conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
+		conf.getRules().add(
+				RuleConfig.regex("SELECT \\* FROM customers").ttl(io.airlift.units.Duration.valueOf("30m")).build());
+		conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
+		JavaPropsMapper mapper = Driver.propsMapper();
+		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+				StatefulRedisModulesConnection<String, String> connection = client.connect();
+				StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+			manager.start();
+			List<StreamMessage<String, String>> messages = connection.sync().xrange(key, Range.unbounded());
+			Assertions.assertEquals(1, messages.size());
+			Map<String, String> body = messages.get(0).getBody();
+			Map<String, String> expectedBody = new HashMap<>();
+			expectedBody.put("rules.1.tables.1", "customer");
+			expectedBody.put("rules.1.ttl", "1.00h");
+			expectedBody.put("rules.2.regex", "SELECT \\* FROM customers");
+			expectedBody.put("rules.2.ttl", "30.00m");
+			expectedBody.put("rules.3.ttl", "10.00s");
+			Assertions.assertEquals(expectedBody, body);
 		}
 	}
 

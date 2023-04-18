@@ -6,7 +6,7 @@ import javax.sql.RowSet;
 
 import org.junit.jupiter.api.Test;
 
-import com.redis.smartcache.core.codec.ResultSetCodec;
+import com.redis.smartcache.core.codec.RowSetCodec;
 import com.redis.smartcache.core.codec.SerializedResultSetCodec;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
@@ -18,7 +18,7 @@ class CodecTests {
 	@Test
 	void resultSetCodec() throws SQLException {
 		RowSet rowSet = rowSetBuilder().build();
-		ResultSetCodec codec = new ResultSetCodec(BYTE_BUFFER_CAPACITY * 1024 * 1024);
+		RowSetCodec codec = new RowSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY * 1024 * 1024);
 		RowSet actual = codec.decodeValue(codec.encodeValue(rowSet));
 		rowSet.beforeFirst();
 		Utils.assertEquals(rowSet, actual);

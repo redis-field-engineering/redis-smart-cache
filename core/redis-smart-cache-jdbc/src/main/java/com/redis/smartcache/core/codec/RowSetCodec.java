@@ -13,8 +13,6 @@ import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
-import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
-
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.lettuce.core.codec.RedisCodec;
@@ -23,16 +21,17 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
-public class ResultSetCodec implements RedisCodec<String, ResultSet> {
+public class RowSetCodec implements RedisCodec<String, RowSet> {
 
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 	public static final String EMPTY_STRING = "";
 	public static final DataSize DEFAULT_BYTE_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
-	private final RowSetFactory rowSetFactory = new CachedRowSetFactory();
+	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public ResultSetCodec(int maxByteBufferCapacity) {
+	public RowSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
+		this.rowSetFactory = rowSetFactory;
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
@@ -55,7 +54,7 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	public RowSet decodeRowSet(ByteBuf byteBuf) throws SQLException {
+	public CachedRowSet decodeRowSet(ByteBuf byteBuf) throws SQLException {
 		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
 		RowSetMetaData metaData = decodeMetaData(byteBuf);
 		rowSet.setMetaData(metaData);
@@ -151,7 +150,7 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 	}
 
 	@Override
-	public ByteBuffer encodeValue(ResultSet rowSet) {
+	public ByteBuffer encodeValue(RowSet rowSet) {
 		try {
 			if (rowSet == null) {
 				return ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
@@ -167,19 +166,19 @@ public class ResultSetCodec implements RedisCodec<String, ResultSet> {
 		}
 	}
 
-	public void encode(ResultSet rowSet, ByteBuf byteBuf) throws SQLException {
-		ResultSetMetaData metaData = rowSet.getMetaData();
+	public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {
+		ResultSetMetaData metaData = resultSet.getMetaData();
 		encode(metaData, byteBuf);
 		int columnCount = metaData.getColumnCount();
 		ColumnCodec[] codecs = new ColumnCodec[columnCount];
 		for (int index = 0; index < columnCount; index++) {
 			int columnIndex = index + 1;
-			int columnType = rowSet.getMetaData().getColumnType(columnIndex);
+			int columnType = resultSet.getMetaData().getColumnType(columnIndex);
 			codecs[index] = columnCodec(columnIndex, columnType);
 		}
-		while (rowSet.next()) {
+		while (resultSet.next()) {
 			for (int index = 0; index < codecs.length; index++) {
-				codecs[index].encode(rowSet, byteBuf);
+				codecs[index].encode(resultSet, byteBuf);
 			}
 		}
 	}

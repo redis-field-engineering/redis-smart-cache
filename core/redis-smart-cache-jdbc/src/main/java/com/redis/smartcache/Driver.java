@@ -1,14 +1,9 @@
 package com.redis.smartcache;
 
-import static com.redis.smartcache.core.RedisResultSetCache.METER_QUERY;
-import static com.redis.smartcache.core.RedisResultSetCache.TAG_SQL;
-import static com.redis.smartcache.core.RedisResultSetCache.TAG_TABLE;
-
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -18,6 +13,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.sql.RowSet;
+import javax.sql.rowset.RowSetFactory;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -36,14 +34,17 @@ import com.redis.smartcache.core.Config.RedisConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
 import com.redis.smartcache.core.ConfigManager;
 import com.redis.smartcache.core.EvictingLinkedHashMap;
+import com.redis.smartcache.core.HashingFunctions;
 import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RedisResultSetCache;
-import com.redis.smartcache.core.ResultSetCache;
+import com.redis.smartcache.core.RowSetCache;
 import com.redis.smartcache.core.StreamConfigManager;
-import com.redis.smartcache.core.codec.ResultSetCodec;
+import com.redis.smartcache.core.codec.RowSetCodec;
 import com.redis.smartcache.jdbc.SmartConnection;
+import com.redis.smartcache.jdbc.SmartStatement;
+import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisURI;
@@ -86,6 +87,7 @@ public class Driver implements java.sql.Driver {
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
 	private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
 	private static final JavaPropsMapper PROPS_MAPPER = propsMapper();
+	private static final RowSetFactory ROW_SET_FACTORY = new CachedRowSetFactory();
 
 	private static final Map<Config, AbstractRedisClient> clients = new HashMap<>();
 	private static final Map<Config, MeterRegistry> registries = new HashMap<>();
@@ -153,19 +155,20 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private SmartConnection makeConnection(Config config, Connection backendConnection) {
-		return new SmartConnection(backendConnection, resultSetCache(config));
-	}
-
-	private ResultSetCache resultSetCache(Config config) {
 		RulesetConfig ruleset = configManager(config).get();
 		QueryRuleSession session = QueryRuleSession.of(ruleset);
 		ruleset.addPropertyChangeListener(session);
 		KeyBuilder keyBuilder = keyBuilder(config, KEYSPACE_CACHE);
 		MeterRegistry registry = registries.computeIfAbsent(config, this::createMeterRegistry);
-		AbstractRedisClient client = client(config);
-		RedisCodec<String, ResultSet> codec = resultSetCodec(config);
 		Map<String, Query> queryCache = queryCache(config);
-		return new RedisResultSetCache(client, codec, registry, keyBuilder, session, queryCache);
+		return new SmartConnection(backendConnection, session, registry, ROW_SET_FACTORY, rowSetCache(config),
+				queryCache, keyBuilder);
+	}
+
+	private RowSetCache rowSetCache(Config config) {
+		AbstractRedisClient client = client(config);
+		RedisCodec<String, RowSet> codec = resultSetCodec(config);
+		return new RedisResultSetCache(ROW_SET_FACTORY, client, codec);
 	}
 
 	private ConfigManager<RulesetConfig> configManager(Config config) {
@@ -194,9 +197,9 @@ public class Driver implements java.sql.Driver {
 		return new EvictingLinkedHashMap<>(config.getAnalyzer().getCacheCapacity());
 	}
 
-	private static RedisCodec<String, ResultSet> resultSetCodec(Config config) {
+	private static RedisCodec<String, RowSet> resultSetCodec(Config config) {
 		int bufferSize = Math.toIntExact(config.getRedis().getCodecBufferCapacity().toBytes());
-		return new ResultSetCodec(bufferSize);
+		return new RowSetCodec(ROW_SET_FACTORY, bufferSize);
 	}
 
 	public static KeyBuilder keyBuilder(Config config, String prefix) {
@@ -250,8 +253,7 @@ public class Driver implements java.sql.Driver {
 			}
 
 		}, Clock.SYSTEM, client);
-		tsRegistry.config().meterFilter(MeterFilter.ignoreTags(TAG_SQL, TAG_TABLE));
-		String searchKeyspace = keyBuilder.keyspace();
+		tsRegistry.config().meterFilter(MeterFilter.ignoreTags(SmartStatement.TAG_SQL, SmartStatement.TAG_TABLE));
 		RediSearchMeterRegistry searchRegistry = new RediSearchMeterRegistry(new RediSearchRegistryConfig() {
 
 			@Override
@@ -261,7 +263,7 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String keyspace() {
-				return searchKeyspace;
+				return keyBuilder.keyspace().orElse(null);
 			}
 
 			@Override
@@ -276,12 +278,12 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String[] nonKeyTags() {
-				return new String[] { TAG_SQL, TAG_TABLE };
+				return new String[] { SmartStatement.TAG_SQL, SmartStatement.TAG_TABLE };
 			}
 
 			@Override
 			public String indexPrefix() {
-				return keyBuilder.keyspace();
+				return keyBuilder.keyspace().orElse(null);
 			}
 
 			@Override
@@ -295,7 +297,7 @@ public class Driver implements java.sql.Driver {
 			}
 
 		}, Clock.SYSTEM, client);
-		searchRegistry.config().meterFilter(MeterFilter.acceptNameStartsWith(METER_QUERY))
+		searchRegistry.config().meterFilter(MeterFilter.acceptNameStartsWith(SmartStatement.METER_QUERY))
 				.meterFilter(MeterFilter.deny());
 		return new CompositeMeterRegistry().add(tsRegistry).add(searchRegistry);
 	}
@@ -431,6 +433,10 @@ public class Driver implements java.sql.Driver {
 		RedisURI redisURI = redisURI(config.getRedis());
 		log.log(Level.FINE, "Creating Redis client with URI {0}", redisURI);
 		return ClientBuilder.create(redisURI).cluster(config.getRedis().isCluster()).build();
+	}
+
+	public static String crc32(String string) {
+		return Long.toHexString(HashingFunctions.crc32(string));
 	}
 
 }

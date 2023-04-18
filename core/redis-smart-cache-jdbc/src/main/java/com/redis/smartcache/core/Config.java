@@ -2,6 +2,7 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -304,15 +305,7 @@ public class Config {
 		public static final String PROPERTY_RULES = "rules";
 
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
-		private List<RuleConfig> rules;
-
-		public RulesetConfig() {
-			this(RuleConfig.passthrough().build());
-		}
-
-		public RulesetConfig(RuleConfig... rules) {
-			this.rules = Arrays.asList(rules);
-		}
+		private List<RuleConfig> rules = new ArrayList<>();
 
 		public void addPropertyChangeListener(PropertyChangeListener listener) {
 			support.addPropertyChangeListener(listener);
@@ -334,7 +327,11 @@ public class Config {
 		}
 
 		public static RulesetConfig of(RuleConfig... rules) {
-			return new RulesetConfig(rules);
+			RulesetConfig ruleset = new RulesetConfig();
+			for (RuleConfig rule : rules) {
+				ruleset.getRules().add(rule);
+			}
+			return ruleset;
 		}
 
 	}

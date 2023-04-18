@@ -8,10 +8,10 @@ public class HashingFunctions {
 
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 
-	public static String crc32(String string) {
+	public static long crc32(String string) {
 		CRC32 crc = new CRC32();
 		crc.update(string.getBytes(CHARSET));
-		return Long.toHexString(crc.getValue());
+		return crc.getValue();
 	}
 
 }

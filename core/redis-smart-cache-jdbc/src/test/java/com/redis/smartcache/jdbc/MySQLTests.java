@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
@@ -21,8 +22,9 @@ import com.redis.lettucemod.api.sync.RedisModulesCommands;
 import com.redis.lettucemod.search.Document;
 import com.redis.lettucemod.search.SearchResults;
 import com.redis.lettucemod.util.RedisModulesUtils;
-import com.redis.smartcache.core.RedisResultSetCache;
+import com.redis.smartcache.core.Config;
 
+@SuppressWarnings("unchecked")
 class MySQLTests extends AbstractIntegrationTests {
 
 	@Container
@@ -41,21 +43,24 @@ class MySQLTests extends AbstractIntegrationTests {
 
 	@Test
 	void testSimpleStatement() throws Exception {
-		String[] properties = { "smartcache.metrics.enabled", "true" };
-		testSimpleStatement("SELECT * FROM Product", MYSQL, properties);
-		testSimpleStatement("SELECT * FROM Category", MYSQL, properties);
-		testSimpleStatement("SELECT * FROM Supplier", MYSQL, properties);
-		testSimpleStatement("SELECT * FROM SalesOrder", MYSQL, properties);
-		testSimpleStatement("SELECT * FROM OrderDetail", MYSQL, properties);
+		Consumer<Config> configurer = c -> {
+			c.getMetrics().setEnabled(true);
+			c.getMetrics().setStep(io.airlift.units.Duration.valueOf("100ms"));
+		};
+		testSimpleStatement("SELECT * FROM Product", MYSQL, configurer);
+		testSimpleStatement("SELECT * FROM Category", MYSQL, configurer);
+		testSimpleStatement("SELECT * FROM Supplier", MYSQL, configurer);
+		testSimpleStatement("SELECT * FROM SalesOrder", MYSQL, configurer);
+		testSimpleStatement("SELECT * FROM OrderDetail", MYSQL, configurer);
 		RedisModulesCommands<String, String> commands = redisConnection.sync();
 		Awaitility.await().timeout(Duration.ofSeconds(1)).until(() -> commands.keys("smartcache:query:*").size() == 5);
 		String index = "smartcache-query-idx";
-		Awaitility.await().until(() -> !RedisModulesUtils.indexInfo(() -> commands.ftInfo(index)).isEmpty());
+		awaitUntil(() -> !RedisModulesUtils.indexInfo(() -> commands.ftInfo(index)).isEmpty());
 		SearchResults<String, String> results = commands.ftSearch(index, "*");
 		Assertions.assertEquals(5, results.size());
 		for (Document<String, String> doc : results) {
-			Assertions.assertTrue(doc.get(RedisResultSetCache.TAG_SQL)
-					.equalsIgnoreCase("select * from " + doc.get(RedisResultSetCache.TAG_TABLE)));
+			Assertions.assertTrue(doc.get(SmartStatement.TAG_SQL)
+					.equalsIgnoreCase("select * from " + doc.get(SmartStatement.TAG_TABLE)));
 		}
 		Assertions.assertEquals("459d4345", redisConnection.sync().hget("smartcache:query:459d4345", "id"));
 	}
@@ -86,7 +91,6 @@ class MySQLTests extends AbstractIntegrationTests {
 		Properties p = new Properties();
 		p.setProperty("smartcache.driver.class-name", MYSQL.getDriverClassName());
 		p.setProperty("smartcache.driver.url", MYSQL.getJdbcUrl());
-		p.setProperty("smartcache.metrics.enabled", "false");
 		p.setProperty("user", MYSQL.getUsername());
 		p.setProperty("password", MYSQL.getPassword());
 		try (Connection connection = DriverManager.getConnection("jdbc:" + redis.getRedisURI(), p)) {

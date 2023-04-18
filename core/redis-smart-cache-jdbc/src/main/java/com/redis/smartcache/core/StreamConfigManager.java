@@ -3,6 +3,7 @@ package com.redis.smartcache.core;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -65,7 +66,10 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		List<StreamMessage<String, String>> messages = connection.sync().xrevrange(key, Range.create("-", "+"),
 				Limit.create(0, 1));
 		if (messages.isEmpty()) {
-			connection.sync().xadd(key, mapper.writeValueAsMap(config));
+			Map<String, String> map = mapper.writeValueAsMap(config);
+			if (!map.isEmpty()) {
+				connection.sync().xadd(key, map);
+			}
 		} else {
 			update(messages.get(0));
 		}

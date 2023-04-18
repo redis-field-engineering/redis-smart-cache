@@ -23,6 +23,7 @@ import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.KeyBuilder;
 
+@SuppressWarnings("unchecked")
 class PostgresTests extends AbstractIntegrationTests {
 
 	private static final DockerImageName POSTGRE_DOCKER_IMAGE_NAME = DockerImageName.parse(PostgreSQLContainer.IMAGE)

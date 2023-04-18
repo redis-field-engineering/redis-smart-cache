@@ -20,9 +20,13 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
+import javax.sql.RowSet;
+
+import com.redis.smartcache.core.KeyBuilder;
+import com.redis.smartcache.core.Query;
 
 public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
@@ -30,7 +34,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	protected static final String PARAMETER_SEPARATOR = ",";
 
 	private final String sql;
-	private final SortedMap<Integer, String> parameters = new TreeMap<>();
+	private final SortedMap<Integer, Object> parameters = new TreeMap<>();
 
 	public SmartPreparedStatement(SmartConnection connection, PreparedStatement statement, String sql) {
 		super(connection, statement);
@@ -38,13 +42,19 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	}
 
 	@Override
-	public ResultSet executeQuery() throws SQLException {
-		return connection.getResultSetCache()
-				.computeIfAbsent(sql, getParameters(), ((PreparedStatement) statement)::executeQuery).getResultSet();
+	protected String key(Query query) {
+		KeyBuilder keyBuilder = connection.getKeyBuilder();
+		String paramsId = connection.hash(keyBuilder.join(parameters.values()));
+		return keyBuilder.build(query.getId(), paramsId);
 	}
 
-	protected Collection<String> getParameters() {
-		return parameters.values();
+	@Override
+	public ResultSet executeQuery() throws SQLException {
+		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
+	}
+
+	protected Object[] parameters() {
+		return parameters.values().toArray();
 	}
 
 	@Override
@@ -54,12 +64,11 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	public boolean execute() throws SQLException {
-		return execute(connection.getResultSetCache().get(sql, getParameters()),
-				((PreparedStatement) statement)::execute);
+		return execute(sql, ((PreparedStatement) statement)::execute);
 	}
 
 	@Override
-	public ResultSet executeQuery(String sql) throws SQLException {
+	public RowSet executeQuery(String sql) throws SQLException {
 		throw new SQLException(METHOD_CANNOT_BE_USED);
 	}
 
@@ -87,49 +96,49 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
 		((PreparedStatement) statement).setBoolean(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
 		((PreparedStatement) statement).setByte(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
 		((PreparedStatement) statement).setShort(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
 		((PreparedStatement) statement).setInt(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
 		((PreparedStatement) statement).setLong(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
 		((PreparedStatement) statement).setFloat(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
 		((PreparedStatement) statement).setDouble(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
 		((PreparedStatement) statement).setBigDecimal(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
@@ -147,19 +156,19 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setDate(int parameterIndex, Date x) throws SQLException {
 		((PreparedStatement) statement).setDate(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setTime(int parameterIndex, Time x) throws SQLException {
 		((PreparedStatement) statement).setTime(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
 		((PreparedStatement) statement).setTimestamp(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 
 	}
 
@@ -188,13 +197,13 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
 		((PreparedStatement) statement).setObject(parameterIndex, x, targetSqlType);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setObject(int parameterIndex, Object x) throws SQLException {
 		((PreparedStatement) statement).setObject(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
@@ -235,19 +244,19 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
 		((PreparedStatement) statement).setDate(parameterIndex, x, cal);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
 		((PreparedStatement) statement).setTime(parameterIndex, x, cal);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
 		((PreparedStatement) statement).setTimestamp(parameterIndex, x, cal);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
@@ -259,7 +268,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setURL(int parameterIndex, URL x) throws SQLException {
 		((PreparedStatement) statement).setURL(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override
@@ -270,7 +279,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	public void setRowId(int parameterIndex, RowId x) throws SQLException {
 		((PreparedStatement) statement).setRowId(parameterIndex, x);
-		parameters.put(parameterIndex, String.valueOf(x));
+		parameters.put(parameterIndex, x);
 	}
 
 	@Override

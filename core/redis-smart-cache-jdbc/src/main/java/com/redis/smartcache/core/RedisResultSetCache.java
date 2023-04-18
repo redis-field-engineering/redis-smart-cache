@@ -2,216 +2,47 @@ package com.redis.smartcache.core;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.time.Duration;
 
+import javax.sql.RowSet;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 
 import com.redis.lettucemod.util.RedisModulesUtils;
-import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.RedisCodec;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tags;
-import io.micrometer.core.instrument.Timer;
 
-public class RedisResultSetCache implements ResultSetCache {
+public class RedisResultSetCache implements RowSetCache {
 
-	public static final String METER_PREFIX_CACHE = "cache";
-	public static final String METER_QUERY = "query";
-	public static final String METER_BACKEND = "backend";
-	public static final String METER_CACHE_GET = METER_PREFIX_CACHE + ".get";
-	public static final String METER_CACHE_PUT = METER_PREFIX_CACHE + ".put";
-	public static final String TAG_RESULT = "result";
-	public static final String TAG_MISS = "miss";
-	public static final String TAG_HIT = "hit";
-	public static final String TAG_ID = "id";
-	public static final String TAG_TABLE = "table";
-	public static final String TAG_SQL = "sql";
+	private final RowSetFactory rowSetFactory;
+	private final StatefulRedisConnection<String, RowSet> connection;
 
-	private final SQLParser parser = new SQLParser();
-	private final RowSetFactory rowSetFactory = new CachedRowSetFactory();
-	private final StatefulRedisConnection<String, ResultSet> connection;
-	private final MeterRegistry registry;
-	private final QueryRuleSession session;
-	private final KeyBuilder keyBuilder;
-	private final KeyBuilder paramKeyBuilder;
-	private final Map<String, Query> queryCache;
-
-	public RedisResultSetCache(AbstractRedisClient client, RedisCodec<String, ResultSet> codec, MeterRegistry registry,
-			KeyBuilder keyBuilder, QueryRuleSession session, Map<String, Query> queryCache) {
+	public RedisResultSetCache(RowSetFactory rowSetFactory, AbstractRedisClient client,
+			RedisCodec<String, RowSet> codec) {
+		this.rowSetFactory = rowSetFactory;
 		this.connection = RedisModulesUtils.connection(client, codec);
-		this.registry = registry;
-		this.keyBuilder = keyBuilder;
-		this.session = session;
-		this.queryCache = queryCache;
-		this.paramKeyBuilder = new KeyBuilder().withSeparator(keyBuilder.separator());
-	}
-
-	private Query getQuery(String sql) {
-		synchronized (queryCache) {
-			return queryCache.computeIfAbsent(sql, this::newQuery);
-		}
-	}
-
-	private Query newQuery(String sql) {
-		Query query = new Query();
-		query.setId(hash(sql));
-		query.setSql(sql);
-		query.setTables(parser.extractTableNames(sql));
-		createMeters(query);
-		return query;
-	}
-
-	private String hash(String sql) {
-		return String.valueOf(HashingFunctions.crc32(sql));
 	}
 
 	@Override
-	public CachedResultSet get(String sql) {
-		return get(sql, this::key);
+	public RowSet get(String key) {
+		return connection.sync().get(key);
 	}
 
 	@Override
-	public CachedResultSet get(String sql, Collection<String> parameters) {
-		return get(sql, q -> key(q, parameters));
-	}
-
-	private CachedResultSet get(String sql, Function<Query, String> keyMappingFunction) {
-		CachedResultSet cachedResultSet = cachedResultSet(sql, keyMappingFunction);
-		populateFromCache(cachedResultSet);
-		return cachedResultSet;
-	}
-
-	private void populateFromCache(CachedResultSet cachedResultSet) {
-		if (cachedResultSet.getAction().isCaching()) {
-			Timer timer = getTimer(METER_CACHE_GET, cachedResultSet.getQuery());
-			ResultSet resultSet = timer.record(() -> connection.sync().get(cachedResultSet.getKey()));
-			cachedResultSet.setResultSet(resultSet);
-			registry.get(METER_CACHE_GET).tags(tags(cachedResultSet.getQuery()))
-					.tags(TAG_RESULT, cachedResultSet.hasResultSet() ? TAG_HIT : TAG_MISS).counter().increment();
-		}
-	}
-
-	private String key(Query query) {
-		return keyBuilder.build(query.getId());
-	}
-
-	private String key(Query query, Collection<String> parameters) {
-		return keyBuilder.build(query.getId(), hash(paramKeyBuilder.build(parameters)));
-	}
-
-	private CachedResultSet cachedResultSet(String sql, Function<Query, String> keyMappingFunction) {
-		Query query = getQuery(sql);
-		String key = keyMappingFunction.apply(query);
-		Action action = session.fire(query);
-		return new CachedResultSet(key, query, action);
-	}
-
-	private CachedResultSet put(CachedResultSet cachedResultSet, Executable<ResultSet> executable) throws SQLException {
-		Timer backendTimer = getTimer(METER_BACKEND, cachedResultSet.getQuery());
-		Timer cachePutTimer = getTimer(METER_CACHE_PUT, cachedResultSet.getQuery());
-		try {
-			ResultSet resultSet = backendTimer.recordCallable(executable);
-			return cachePutTimer.recordCallable(() -> put(cachedResultSet, resultSet));
-		} catch (SQLException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new SQLException(e);
-		}
-	}
-
-	private CachedResultSet put(CachedResultSet cachedResultSet, ResultSet resultSet) throws SQLException {
-		CachedRowSet cachedRowSet = rowSetFactory.createCachedRowSet();
-		cachedRowSet.populate(resultSet);
-		cachedRowSet.beforeFirst();
-		SetArgs args = SetArgs.Builder.ex(cachedResultSet.getAction().getTtl());
-		connection.sync().set(cachedResultSet.getKey(), cachedRowSet, args);
-		cachedRowSet.beforeFirst();
-		cachedResultSet.setResultSet(cachedRowSet);
-		return cachedResultSet;
+	public RowSet put(String key, Duration ttl, ResultSet resultSet) throws SQLException {
+		CachedRowSet cached = rowSetFactory.createCachedRowSet();
+		cached.populate(resultSet);
+		cached.beforeFirst();
+		connection.sync().setex(key, ttl.getSeconds(), cached);
+		cached.beforeFirst();
+		return cached;
 	}
 
 	@Override
 	public void close() {
 		connection.close();
-	}
-
-	@Override
-	public CachedResultSet computeIfAbsent(String sql, Executable<ResultSet> executable) throws SQLException {
-		return computeIfAbsent(sql, this::key, executable);
-	}
-
-	@Override
-	public CachedResultSet computeIfAbsent(String sql, Collection<String> parameters, Executable<ResultSet> executable)
-			throws SQLException {
-		return computeIfAbsent(sql, q -> key(q, parameters), executable);
-	}
-
-	private CachedResultSet computeIfAbsent(String sql, Function<Query, String> mapper, Executable<ResultSet> backend)
-			throws SQLException {
-		CachedResultSet cachedResultSet = cachedResultSet(sql, mapper);
-		try {
-			return queryTimer(cachedResultSet).recordCallable(() -> {
-				populateFromCache(cachedResultSet);
-				if (!cachedResultSet.hasResultSet()) {
-					put(cachedResultSet, backend);
-				}
-				return cachedResultSet;
-			});
-		} catch (SQLException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new SQLException(e);
-		}
-	}
-
-	private Timer queryTimer(CachedResultSet cachedResultSet) {
-		return getTimer(METER_QUERY, cachedResultSet.getQuery());
-	}
-
-	@Override
-	public CachedResultSet get(CachedResultSet cachedResultSet, Executable<ResultSet> executable) throws SQLException {
-		if (!cachedResultSet.hasResultSet()) {
-			put(cachedResultSet, executable);
-		}
-		return cachedResultSet;
-	}
-
-	private Timer getTimer(String name, Query query) {
-		return registry.get(name).tags(tags(query)).timer();
-	}
-
-	private Timer createTimer(String name, Query query) {
-		return Timer.builder(name).tags(tags(query)).publishPercentiles(0.9, 0.99).register(registry);
-	}
-
-	private Tags tags(Query query) {
-		return Tags.of(TAG_ID, query.getId(), TAG_SQL, query.getSql(), TAG_TABLE, csv(query.getTables()));
-	}
-
-	private String csv(Collection<String> tables) {
-		return tables.stream().collect(Collectors.joining(","));
-	}
-
-	private Counter createCounter(String name, Query query, String... tags) {
-		return Counter.builder(name).tags(tags(query)).tags(tags).register(registry);
-	}
-
-	public void createMeters(Query query) {
-		createTimer(METER_QUERY, query);
-		createTimer(METER_BACKEND, query);
-		createTimer(METER_CACHE_GET, query);
-		createTimer(METER_CACHE_PUT, query);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
 	}
 
 }

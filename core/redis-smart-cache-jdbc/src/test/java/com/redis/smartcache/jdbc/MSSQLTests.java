@@ -13,6 +13,7 @@ import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.junit.jupiter.Container;
 
 @EnabledOnOs(OS.LINUX)
+@SuppressWarnings("unchecked")
 class MSSQLTests extends AbstractIntegrationTests {
 
 	@Container

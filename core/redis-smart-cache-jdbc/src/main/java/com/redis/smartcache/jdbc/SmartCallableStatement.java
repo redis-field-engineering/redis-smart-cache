@@ -17,22 +17,20 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class SmartCallableStatement extends SmartPreparedStatement implements CallableStatement {
 
-	private final Map<String, String> parameters = new HashMap<>();
+	private final Map<String, Object> parameters = new HashMap<>();
 
 	public SmartCallableStatement(SmartConnection connection, CallableStatement statement, String sql) {
 		super(connection, statement, sql);
 	}
 
 	@Override
-	protected Collection<String> getParameters() {
-		return parameters.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.toList());
+	protected Object[] parameters() {
+		return parameters.entrySet().toArray();
 	}
 
 	@Override

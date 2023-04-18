@@ -17,36 +17,82 @@ import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 
-import com.redis.smartcache.core.ResultSetCache;
+import javax.sql.rowset.RowSetFactory;
+
+import com.redis.smartcache.Driver;
+import com.redis.smartcache.core.KeyBuilder;
+import com.redis.smartcache.core.Query;
+import com.redis.smartcache.core.QueryRuleSession;
+import com.redis.smartcache.core.RowSetCache;
+import com.redis.smartcache.core.SQLParser;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 public class SmartConnection implements Connection {
 
 	private static final Logger log = Logger.getLogger(SmartConnection.class.getName());
 
+	private final UnaryOperator<String> hashFunction = Driver::crc32;
+	private final SQLParser parser = new SQLParser();
+	private final RowSetFactory rowSetFactory;
 	private final Connection connection;
-	private final ResultSetCache resultSetCache;
+	private final RowSetCache rowSetCache;
+	private final MeterRegistry meterRegistry;
+	private final QueryRuleSession session;
+	private final KeyBuilder keyBuilder;
+	private final Map<String, Query> queryCache;
 
-	public SmartConnection(Connection connection, ResultSetCache resultSetCache) {
+	public SmartConnection(Connection connection, QueryRuleSession session, MeterRegistry meterRegistry,
+			RowSetFactory rowSetFactory, RowSetCache rowSetCache, Map<String, Query> queryCache,
+			KeyBuilder keyBuilder) {
 		this.connection = connection;
-		this.resultSetCache = resultSetCache;
+		this.session = session;
+		this.meterRegistry = meterRegistry;
+		this.rowSetFactory = rowSetFactory;
+		this.rowSetCache = rowSetCache;
+		this.queryCache = queryCache;
+		this.keyBuilder = keyBuilder;
 	}
 
-	public ResultSetCache getResultSetCache() {
-		return resultSetCache;
+	public RowSetFactory getRowSetFactory() {
+		return rowSetFactory;
+	}
+
+	public KeyBuilder getKeyBuilder() {
+		return keyBuilder;
+	}
+
+	public MeterRegistry getMeterRegistry() {
+		return meterRegistry;
+	}
+
+	public QueryRuleSession getRuleSession() {
+		return session;
+	}
+
+	public RowSetCache getRowSetCache() {
+		return rowSetCache;
+	}
+
+	public String hash(String string) {
+		return hashFunction.apply(string);
 	}
 
 	@Override
 	public void close() throws SQLException {
 		log.fine("Closing backend connection");
 		connection.close();
-		log.fine("Closing ResultSet cache");
+		log.fine("Closing RowSet cache");
 		try {
-			resultSetCache.close();
+			rowSetCache.close();
 		} catch (Exception e) {
-			throw new SQLException("Could not close ResultSet cache", e);
+			throw new SQLException("Could not close RowSet cache", e);
 		}
 		log.fine("Closed connection");
 	}
@@ -328,6 +374,16 @@ public class SmartConnection implements Connection {
 	@Override
 	public int getNetworkTimeout() throws SQLException {
 		return connection.getNetworkTimeout();
+	}
+
+	public Set<String> tableNames(String sql) {
+		return parser.extractTableNames(sql);
+	}
+
+	public Query computeQueryIfAbsent(String sql, Function<? super String, ? extends Query> mappingFunction) {
+		synchronized (queryCache) {
+			return queryCache.computeIfAbsent(sql, mappingFunction);
+		}
 	}
 
 }

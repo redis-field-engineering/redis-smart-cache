@@ -19,6 +19,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 @EnabledOnOs(OS.LINUX)
+@SuppressWarnings("unchecked")
 class OracleTests extends AbstractIntegrationTests {
 
 	private static final DockerImageName ORACLE_DOCKER_IMAGE_NAME = DockerImageName.parse("gvenzl/oracle-xe")

@@ -13,6 +13,7 @@ import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.junit.jupiter.Container;
 
 @EnabledOnOs(OS.LINUX)
+@SuppressWarnings("unchecked")
 class DB2Tests extends AbstractIntegrationTests {
 
 	@SuppressWarnings("deprecation")

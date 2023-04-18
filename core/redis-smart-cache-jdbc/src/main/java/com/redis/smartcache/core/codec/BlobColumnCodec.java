@@ -27,7 +27,7 @@ public class BlobColumnCodec extends NullableColumnCodec<Blob> {
 		} catch (ArithmeticException e) {
 			throw new SQLException("BLOB too large", e);
 		}
-		byte[] bytes = length == 0 ? ResultSetCodec.EMPTY_BYTE_ARRAY : value.getBytes(1, length);
+		byte[] bytes = length == 0 ? RowSetCodec.EMPTY_BYTE_ARRAY : value.getBytes(1, length);
 		byteBuf.writeInt(bytes.length);
 		byteBuf.writeBytes(bytes);
 	}

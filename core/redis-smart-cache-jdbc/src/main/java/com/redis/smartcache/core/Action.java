@@ -30,6 +30,7 @@ public class Action {
 	}
 
 	public boolean isCaching() {
-		return !TTL_NO_CACHING.equals(ttl);
+		return !Action.TTL_NO_CACHING.equals(ttl);
 	}
+
 }

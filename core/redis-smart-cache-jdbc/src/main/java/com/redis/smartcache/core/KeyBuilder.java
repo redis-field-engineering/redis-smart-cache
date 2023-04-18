@@ -1,31 +1,30 @@
 package com.redis.smartcache.core;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.springframework.util.StringUtils;
-
 public class KeyBuilder {
 
-	public static final String EMPTY_STRING = "";
 	public static final String DEFAULT_SEPARATOR = ":";
 
-	private String prefix = EMPTY_STRING;
 	private String separator = DEFAULT_SEPARATOR;
-	private String keyspace = EMPTY_STRING;
+	private Optional<String> keyspace = Optional.empty();
 
-	public String keyspace() {
+	public Optional<String> keyspace() {
 		return keyspace;
-	}
-
-	public String prefix() {
-		return prefix;
 	}
 
 	public String separator() {
 		return separator;
+	}
+
+	public static KeyBuilder create() {
+		return new KeyBuilder();
 	}
 
 	public static KeyBuilder of(String keyspace) {
@@ -33,35 +32,49 @@ public class KeyBuilder {
 	}
 
 	public KeyBuilder noKeyspace() {
-		return withKeyspace(null);
+		this.keyspace = Optional.empty();
+		return this;
 	}
 
 	public KeyBuilder withSeparator(String separator) {
 		this.separator = separator;
-		updatePrefix();
 		return this;
 	}
 
 	public KeyBuilder withKeyspace(String keyspace) {
-		this.keyspace = keyspace;
-		updatePrefix();
+		this.keyspace = Optional.of(keyspace);
 		return this;
 	}
 
-	private void updatePrefix() {
-		this.prefix = StringUtils.hasLength(keyspace) ? keyspace + separator : EMPTY_STRING;
-	}
-
 	public String build(Iterable<String> ids) {
-		return prefix + String.join(separator, ids);
+		List<String> items = new ArrayList<>();
+		keyspace.ifPresent(items::add);
+		ids.forEach(items::add);
+		return join(items);
 	}
 
 	public String build(Object... ids) {
-		return build(Stream.of(ids).filter(Objects::nonNull).map(String::valueOf).collect(Collectors.toList()));
+		return build(toString(ids));
+	}
+
+	private Iterable<String> toString(Object... ids) {
+		return Stream.of(ids).filter(Objects::nonNull).map(String::valueOf).collect(Collectors.toList());
 	}
 
 	public String build(String... ids) {
 		return build(Arrays.asList(ids));
+	}
+
+	public String join(Iterable<String> ids) {
+		return String.join(separator, ids);
+	}
+
+	public String join(String... ids) {
+		return join(Arrays.asList(ids));
+	}
+
+	public String join(Object... ids) {
+		return join(toString(ids));
 	}
 
 	/**
