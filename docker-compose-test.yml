@@ -1,0 +1,31 @@
+version: "2.2"
+
+services:
+  mysql:
+    image: mysql:latest
+    hostname: mysql
+    container_name: mysql
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_USER=smartcache
+      - MYSQL_PASSWORD=smartcache
+      - MYSQL_DATABASE=smartcache
+
+  grafana:
+    image: grafana/grafana
+    hostname: grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_INSTALL_PLUGINS=redis-app
+
+  redis:
+    image: redis/redis-stack-server
+    hostname: redis
+    container_name: redis
+    ports:
+      - 6379:6379
