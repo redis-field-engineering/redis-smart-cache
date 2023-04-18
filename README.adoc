@@ -10,6 +10,7 @@
 :grafana-dir:     demo/redis-smart-cache-demo/grafana
 :imagesdir:       src/media
 :toc:
+:toc-title:
 :toc-placement!:
 
 ++++
@@ -34,6 +35,8 @@ Implemented as a wrapper around your backend database's JDBC driver, {product-na
 slow, repeated SQL queries in Redis, bypassing expensive database calls and greatly
 improving response times.
 
+[discrete]
+== Table of Contents
 toc::[]
 
 == Background
