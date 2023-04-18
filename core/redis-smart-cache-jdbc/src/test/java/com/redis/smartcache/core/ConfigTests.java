@@ -60,6 +60,7 @@ class ConfigTests {
 			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
 				manager.start();
 				Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
+				await().until(manager::isRunning);
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "123s");
 				connection.sync().xadd(key, body);

@@ -92,6 +92,14 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 
 	}
 
+	public boolean isRunning() {
+		return reader.state == State.STARTED;
+	}
+
+	private enum State {
+		STARTING, STARTED, STOPPING, STOPPED
+	}
+
 	private static class StreamPollRunnable implements Runnable {
 
 		private final StatefulRedisModulesConnection<String, String> connection;
@@ -100,6 +108,7 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		private final Consumer<StreamMessage<String, String>> consumer;
 
 		private boolean stop;
+		private State state = State.STARTING;
 
 		public StreamPollRunnable(StatefulRedisModulesConnection<String, String> connection, XReadArgs xreadArgs,
 				StreamOffset<String> offset, Consumer<StreamMessage<String, String>> consumer) {
@@ -112,14 +121,17 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		@SuppressWarnings("unchecked")
 		@Override
 		public void run() {
+			this.state = State.STARTED;
 			while (!stop) {
 				connection.sync().xread(xreadArgs, offset).forEach(consumer);
 			}
 			connection.close();
+			this.state = State.STOPPED;
 		}
 
 		public void stop() {
 			stop = true;
+			this.state = State.STOPPING;
 		}
 
 	}

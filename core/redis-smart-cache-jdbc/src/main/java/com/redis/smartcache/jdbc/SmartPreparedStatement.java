@@ -20,6 +20,7 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -44,7 +45,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	@Override
 	protected String key(Query query) {
 		KeyBuilder keyBuilder = connection.getKeyBuilder();
-		String paramsId = connection.hash(keyBuilder.join(parameters.values()));
+		String paramsId = connection.hash(keyBuilder.join(parameters()));
 		return keyBuilder.build(query.getId(), paramsId);
 	}
 
@@ -53,8 +54,8 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
 	}
 
-	protected Object[] parameters() {
-		return parameters.values().toArray();
+	protected Collection<Object> parameters() {
+		return parameters.values();
 	}
 
 	@Override
