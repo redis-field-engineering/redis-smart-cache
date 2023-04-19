@@ -31,6 +31,8 @@ import com.redis.smartcache.core.Query;
 
 public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
+	private static final String TYPE = "prep";
+
 	private static final String METHOD_CANNOT_BE_USED = "Cannot use query methods that take a query string on a PreparedStatement";
 	protected static final String PARAMETER_SEPARATOR = ",";
 
@@ -40,6 +42,11 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	public SmartPreparedStatement(SmartConnection connection, PreparedStatement statement, String sql) {
 		super(connection, statement);
 		this.sql = sql;
+	}
+
+	@Override
+	protected String statementType() {
+		return TYPE;
 	}
 
 	@Override

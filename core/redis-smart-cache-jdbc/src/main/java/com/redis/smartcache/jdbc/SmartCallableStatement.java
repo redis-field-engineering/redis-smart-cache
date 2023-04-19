@@ -25,10 +25,17 @@ import java.util.stream.Collectors;
 
 public class SmartCallableStatement extends SmartPreparedStatement implements CallableStatement {
 
+	private static final String TYPE = "proc";
+
 	private final Map<String, Object> parameters = new HashMap<>();
 
 	public SmartCallableStatement(SmartConnection connection, CallableStatement statement, String sql) {
 		super(connection, statement, sql);
+	}
+
+	@Override
+	protected String statementType() {
+		return TYPE;
 	}
 
 	@Override

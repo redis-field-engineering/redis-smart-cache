@@ -33,6 +33,8 @@ public class SmartStatement implements Statement {
 	public static final String TAG_ID = "id";
 	public static final String TAG_TABLE = "table";
 	public static final String TAG_SQL = "sql";
+	public static final String TAG_TYPE = "type";
+	private static final String TYPE = "static";
 
 	protected final SmartConnection connection;
 	protected final Statement statement;
@@ -58,7 +60,12 @@ public class SmartStatement implements Statement {
 	}
 
 	private Tags tags(Query query) {
-		return Tags.of(TAG_ID, query.getId(), TAG_SQL, query.getSql(), TAG_TABLE, csv(query.getTables()));
+		return Tags.of(TAG_ID, query.getId(), TAG_TYPE, statementType(), TAG_SQL, query.getSql(), TAG_TABLE,
+				csv(query.getTables()));
+	}
+
+	protected String statementType() {
+		return TYPE;
 	}
 
 	private String csv(Collection<String> tables) {
