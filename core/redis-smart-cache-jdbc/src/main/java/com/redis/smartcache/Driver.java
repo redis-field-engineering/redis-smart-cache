@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.util.ClientBuilder;
+import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.lettucemod.util.RedisURIBuilder;
 import com.redis.micrometer.RediSearchMeterRegistry;
 import com.redis.micrometer.RediSearchRegistryConfig;
@@ -53,6 +55,10 @@ import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
+import io.micrometer.core.instrument.simple.SimpleConfig;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.jmx.JmxConfig;
+import io.micrometer.jmx.JmxMeterRegistry;
 
 /**
  * The Java SQL framework allows for multiple database drivers. Each driver
@@ -155,12 +161,12 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private SmartConnection makeConnection(Config config, Connection backendConnection) {
-		RulesetConfig ruleset = configManager(config).get();
+		RulesetConfig ruleset = configManagers.computeIfAbsent(config, this::createConfigManager).get();
 		QueryRuleSession session = QueryRuleSession.of(ruleset);
 		ruleset.addPropertyChangeListener(session);
 		KeyBuilder keyBuilder = keyBuilder(config, KEYSPACE_CACHE);
-		MeterRegistry registry = registries.computeIfAbsent(config, this::createMeterRegistry);
-		Map<String, Query> queryCache = queryCache(config);
+		MeterRegistry registry = registries.computeIfAbsent(config, this::meterRegistry);
+		Map<String, Query> queryCache = queryCaches.computeIfAbsent(config, this::createQueryCache);
 		return new SmartConnection(backendConnection, session, registry, ROW_SET_FACTORY, rowSetCache(config),
 				queryCache, keyBuilder);
 	}
@@ -169,10 +175,6 @@ public class Driver implements java.sql.Driver {
 		AbstractRedisClient client = client(config);
 		RedisCodec<String, RowSet> codec = resultSetCodec(config);
 		return new RedisResultSetCache(ROW_SET_FACTORY, client, codec);
-	}
-
-	private ConfigManager<RulesetConfig> configManager(Config config) {
-		return configManagers.computeIfAbsent(config, this::createConfigManager);
 	}
 
 	private ConfigManager<RulesetConfig> createConfigManager(Config config) {
@@ -187,10 +189,6 @@ public class Driver implements java.sql.Driver {
 			throw new RuntimeException("Could not start config manager", e);
 		}
 		return configManager;
-	}
-
-	private Map<String, Query> queryCache(Config config) {
-		return queryCaches.computeIfAbsent(config, this::createQueryCache);
 	}
 
 	private Map<String, Query> createQueryCache(Config config) {
@@ -219,11 +217,73 @@ public class Driver implements java.sql.Driver {
 		return Duration.ofMillis(duration.toMillis());
 	}
 
-	private MeterRegistry createMeterRegistry(Config config) {
+	private MeterRegistry meterRegistry(Config config) {
+		switch (config.getMetrics().getRegistry()) {
+		case JMX:
+			return jmxMeterRegistry(config);
+		case REDIS:
+			return redisMeterRegistry(config);
+		default:
+			return simpleMeterRegistry(config);
+		}
+	}
+
+	private SimpleMeterRegistry simpleMeterRegistry(Config config) {
+		Duration step = step(config);
+		return new SimpleMeterRegistry(new SimpleConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public Duration step() {
+				return step;
+			}
+
+		}, Clock.SYSTEM);
+	}
+
+	private JmxMeterRegistry jmxMeterRegistry(Config config) {
+		Duration step = step(config);
+		return new JmxMeterRegistry(new JmxConfig() {
+
+			@Override
+			public String get(String key) {
+				return null;
+			}
+
+			@Override
+			public Duration step() {
+				return step;
+			}
+
+			@Override
+			public String domain() {
+				return config.getName();
+			}
+
+		}, Clock.SYSTEM);
+	}
+
+	private Duration step(Config config) {
+		return duration(config.getMetrics().getStep());
+	}
+
+	private MeterRegistry redisMeterRegistry(Config config) {
 		AbstractRedisClient client = client(config);
+		StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
+		try {
+			connection.sync().ftList();
+		} catch (Exception e) {
+			// Looks like we don't have Redis Modules
+			log.info("No RediSearch found, downgrading to simple meter registry");
+			return simpleMeterRegistry(config);
+		}
 		log.fine("Creating meter registry");
+		Duration step = step(config);
 		KeyBuilder keyBuilder = keyBuilder(config);
-		Duration step = duration(config.getMetrics().getStep());
 		String tsKeyspace = keyBuilder.build(KEYSPACE_METRICS);
 		RedisTimeSeriesMeterRegistry tsRegistry = new RedisTimeSeriesMeterRegistry(new RedisRegistryConfig() {
 
@@ -278,7 +338,7 @@ public class Driver implements java.sql.Driver {
 
 			@Override
 			public String[] nonKeyTags() {
-				return new String[] { SmartStatement.TAG_SQL, SmartStatement.TAG_TABLE };
+				return new String[] { SmartStatement.TAG_SQL, SmartStatement.TAG_TABLE, SmartStatement.TAG_TYPE };
 			}
 
 			@Override

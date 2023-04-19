@@ -91,9 +91,16 @@ public class Config {
 
 	public static class MetricsConfig {
 
+		public enum Registry {
+
+			JMX, SIMPLE, REDIS
+
+		}
+
 		public static final Duration DEFAULT_STEP = new Duration(60, TimeUnit.SECONDS);
 
 		private boolean enabled = true;
+		private Registry registry = Registry.REDIS;
 		private Duration step = DEFAULT_STEP;
 
 		/**
@@ -114,6 +121,14 @@ public class Config {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+		public Registry getRegistry() {
+			return registry;
+		}
+
+		public void setRegistry(Registry registry) {
+			this.registry = registry;
 		}
 	}
 
