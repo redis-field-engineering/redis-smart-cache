@@ -302,6 +302,14 @@ Max duration between writes.
 
 Enable publishing of metrics.
 
+===== `{property-prefix}.metrics.registry`
+
+* Type: <<property_type_string>>
+* Allowed values: `REDIS`, `SIMPLE`, `JMX`
+* Default value: `REDIS`
+
+Meter registry type. Use `REDIS` for TimeSeries + RediSearch, `SIMPLE` for in-memory, `JMX` for JMX registry.
+
 ===== `{property-prefix}.metrics.step`
 
 * Type: <<property_type_duration>>
