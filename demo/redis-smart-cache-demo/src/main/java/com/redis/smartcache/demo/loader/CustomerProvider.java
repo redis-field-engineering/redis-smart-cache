@@ -3,13 +3,14 @@ package com.redis.smartcache.demo.loader;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-import com.github.javafaker.Faker;
 import com.redis.smartcache.demo.DemoConfig.DataConfig;
+
+import net.datafaker.Faker;
 
 public class CustomerProvider implements RowProvider {
 
 	private final Faker faker = new Faker();
-
+	
 	@Override
 	public void set(PreparedStatement statement, DataConfig config, int index) throws SQLException {
 		int columnIndex = 1;

@@ -3,7 +3,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation group: 'com.redis', name: 'spring-lettucemod', version: lettucemodVersion
-	implementation group: 'com.github.javafaker', name: 'javafaker', version: fakerVersion
+	implementation group: 'net.datafaker', name: 'datafaker', version: datafakerVersion
 	implementation group: 'me.tongfei', name: 'progressbar', version: progressbarVersion
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	runtimeOnly 'org.postgresql:postgresql'

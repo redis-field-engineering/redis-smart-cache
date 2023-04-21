@@ -3,8 +3,9 @@ package com.redis.smartcache.demo.loader;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-import com.github.javafaker.Faker;
 import com.redis.smartcache.demo.DemoConfig.DataConfig;
+
+import net.datafaker.Faker;
 
 public class ProductProvider implements RowProvider {
 

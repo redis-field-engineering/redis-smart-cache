@@ -7,8 +7,9 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
-import com.github.javafaker.Faker;
 import com.redis.smartcache.demo.DemoConfig.DataConfig;
+
+import net.datafaker.Faker;
 
 public class OrderProvider implements RowProvider {
 
