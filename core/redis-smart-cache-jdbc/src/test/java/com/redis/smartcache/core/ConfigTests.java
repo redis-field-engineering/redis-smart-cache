@@ -106,6 +106,31 @@ class ConfigTests {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	@Test
+	void disableCaching() throws Exception {
+		String key = "disableCaching";
+		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+			RulesetConfig conf = new RulesetConfig();
+			conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
+			conf.getRules().add(RuleConfig.regex("SELECT \\* FROM customers")
+					.ttl(io.airlift.units.Duration.valueOf("30m")).build());
+			conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
+			JavaPropsMapper mapper = Driver.propsMapper();
+			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+				manager.start();
+				Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
+				await().until(manager::isRunning);
+				Map<String, String> body = new HashMap<>();
+				body.put("rules[0].ttl", "0s");
+				connection.sync().xadd(key, body);
+				await().until(() -> conf.getRules().size() == 1);
+				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 0);
+			}
+		}
+	}
+
 	private ConditionFactory await() {
 		return Awaitility.await().timeout(Duration.ofSeconds(1));
 	}

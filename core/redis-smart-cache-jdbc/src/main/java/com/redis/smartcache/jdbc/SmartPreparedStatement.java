@@ -27,7 +27,6 @@ import java.util.TreeMap;
 import javax.sql.RowSet;
 
 import com.redis.smartcache.core.KeyBuilder;
-import com.redis.smartcache.core.Query;
 
 public class SmartPreparedStatement extends SmartStatement implements PreparedStatement {
 
@@ -36,12 +35,11 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	private static final String METHOD_CANNOT_BE_USED = "Cannot use query methods that take a query string on a PreparedStatement";
 	protected static final String PARAMETER_SEPARATOR = ",";
 
-	private final String sql;
 	private final SortedMap<Integer, Object> parameters = new TreeMap<>();
 
 	public SmartPreparedStatement(SmartConnection connection, PreparedStatement statement, String sql) {
 		super(connection, statement);
-		this.sql = sql;
+		init(sql);
 	}
 
 	@Override
@@ -50,15 +48,15 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 	}
 
 	@Override
-	protected String key(Query query) {
+	protected String key(String id) {
 		KeyBuilder keyBuilder = connection.getKeyBuilder();
 		String paramsId = connection.hash(keyBuilder.join(parameters()));
-		return keyBuilder.build(query.getId(), paramsId);
+		return keyBuilder.build(id, paramsId);
 	}
 
 	@Override
 	public ResultSet executeQuery() throws SQLException {
-		return executeQuery(sql, ((PreparedStatement) statement)::executeQuery);
+		return executeQuery(((PreparedStatement) statement)::executeQuery);
 	}
 
 	protected Collection<Object> parameters() {
@@ -72,7 +70,7 @@ public class SmartPreparedStatement extends SmartStatement implements PreparedSt
 
 	@Override
 	public boolean execute() throws SQLException {
-		return execute(sql, ((PreparedStatement) statement)::execute);
+		return execute(((PreparedStatement) statement)::execute);
 	}
 
 	@Override

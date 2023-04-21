@@ -151,19 +151,19 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 
 	@Override
 	public ByteBuffer encodeValue(RowSet rowSet) {
+		if (rowSet == null) {
+			return ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
+		}
+		ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
+		ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
+		byteBuf.clear();
 		try {
-			if (rowSet == null) {
-				return ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
-			}
-			ByteBuffer buffer = ByteBuffer.allocate(maxByteBufferCapacity);
-			ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
-			byteBuf.clear();
 			encode(rowSet, byteBuf);
-			buffer.limit(byteBuf.writerIndex());
-			return buffer;
 		} catch (SQLException e) {
 			throw new IllegalStateException("Could not encode ResultSet", e);
 		}
+		buffer.limit(byteBuf.writerIndex());
+		return buffer;
 	}
 
 	public void encode(ResultSet resultSet, ByteBuf byteBuf) throws SQLException {

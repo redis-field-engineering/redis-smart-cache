@@ -4,18 +4,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.Collection;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
-import javax.sql.RowSet;
-
+import com.redis.smartcache.core.Action;
 import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.QueryAction;
 
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.RequiredSearch;
@@ -24,6 +19,7 @@ public class SmartStatement implements Statement {
 
 	public static final String METER_QUERY = "query";
 	public static final String METER_BACKEND = "backend";
+	public static final String METER_BACKEND_RESULTSET = METER_BACKEND + ".resultset";
 	public static final String METER_PREFIX_CACHE = "cache";
 	public static final String METER_CACHE_GET = METER_PREFIX_CACHE + ".get";
 	public static final String METER_CACHE_PUT = METER_PREFIX_CACHE + ".put";
@@ -35,77 +31,75 @@ public class SmartStatement implements Statement {
 	public static final String TAG_SQL = "sql";
 	public static final String TAG_TYPE = "type";
 	private static final String TYPE = "static";
+	private static final double[] PERCENTILES = { 0.9, 0.99 };
 
 	protected final SmartConnection connection;
 	protected final Statement statement;
-	private QueryAction action;
-	private Optional<RowSet> rowSet = Optional.empty();
+	private Query query;
+	private Action action;
+	private ResultSet resultSet;
 
 	public SmartStatement(SmartConnection connection, Statement statement) {
 		this.connection = connection;
 		this.statement = statement;
 	}
 
-	private RequiredSearch getMeter(String name, Query query, Tag... tags) {
-		return connection.getMeterRegistry().get(name).tags(tags(query).and(tags));
+	protected void init(String sql) {
+		this.query = connection.getQueryCache().computeIfAbsent(sql, this::newQuery);
+		this.action = connection.getRuleSession().fire(query);
 	}
 
-	private Timer getTimer(String name, Query query, Tag... tags) {
-		return getMeter(name, query, tags).timer();
+	private boolean hasResultSet() {
+		return resultSet != null;
 	}
 
-	private Timer createTimer(String name, Query query) {
-		return Timer.builder(name).tags(tags(query)).publishPercentiles(0.9, 0.99)
-				.register(connection.getMeterRegistry());
+	private boolean isCaching() {
+		return action != null && action.isCaching();
 	}
 
 	private Tags tags(Query query) {
-		return Tags.of(TAG_ID, query.getId(), TAG_TYPE, statementType(), TAG_SQL, query.getSql(), TAG_TABLE,
-				csv(query.getTables()));
+		String tables = query.getTables().stream().collect(Collectors.joining(","));
+		return Tags.of(TAG_ID, query.getId(), TAG_TYPE, statementType(), TAG_SQL, query.getSql(), TAG_TABLE, tables);
+	}
+
+	private RequiredSearch getMeter(String name) {
+		return connection.getMeterRegistry().get(name).tags(tags(query));
+	}
+
+	private Timer createTimer(String name, Query query) {
+		return Timer.builder(name).tags(tags(query)).publishPercentiles(PERCENTILES)
+				.register(connection.getMeterRegistry());
+	}
+
+	private Counter createCounter(String name, Query query, String tagKey, String tagValue) {
+		return Counter.builder(name).tags(tags(query)).tag(tagKey, tagValue).register(connection.getMeterRegistry());
 	}
 
 	protected String statementType() {
 		return TYPE;
 	}
 
-	private String csv(Collection<String> tables) {
-		return tables.stream().collect(Collectors.joining(","));
-	}
-
-	private Counter createCounter(String name, Query query, String... tags) {
-		return Counter.builder(name).tags(tags(query)).tags(tags).register(connection.getMeterRegistry());
-	}
-
-	private QueryAction queryAction(String sql) {
-		Query query = getQuery(sql);
-		String key = key(query);
-		return new QueryAction(key, query, connection.getRuleSession().fire(query));
-	}
-
-	private Query getQuery(String sql) {
-		return connection.computeQueryIfAbsent(sql, this::newQuery);
-	}
-
 	private Query newQuery(String sql) {
-		Query query = new Query();
-		query.setId(connection.hash(sql));
-		query.setSql(sql);
-		query.setTables(connection.tableNames(sql));
-		createMeters(query);
-		return query;
+		Query newQuery = new Query();
+		newQuery.setId(connection.hash(sql));
+		newQuery.setSql(sql);
+		newQuery.setTables(connection.tableNames(sql));
+		createTimer(METER_QUERY, newQuery);
+		createTimer(METER_BACKEND, newQuery);
+		createTimer(METER_BACKEND_RESULTSET, newQuery);
+		createTimer(METER_CACHE_GET, newQuery);
+		createTimer(METER_CACHE_PUT, newQuery);
+		createCounter(METER_CACHE_GET, newQuery, TAG_RESULT, TAG_HIT);
+		createCounter(METER_CACHE_GET, newQuery, TAG_RESULT, TAG_MISS);
+		return newQuery;
 	}
 
-	private void createMeters(Query query) {
-		createTimer(METER_QUERY, query);
-		createTimer(METER_BACKEND, query);
-		createTimer(METER_CACHE_GET, query);
-		createTimer(METER_CACHE_PUT, query);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_HIT);
-		createCounter(METER_CACHE_GET, query, TAG_RESULT, TAG_MISS);
+	private String key() {
+		return key(query.getId());
 	}
 
-	protected String key(Query query) {
-		return connection.getKeyBuilder().build(query.getId());
+	protected String key(String id) {
+		return connection.getKeyBuilder().build(id);
 	}
 
 	@Override
@@ -125,58 +119,54 @@ public class SmartStatement implements Statement {
 
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
-		return executeQuery(sql, () -> statement.executeQuery(sql));
+		init(sql);
+		return executeQuery(() -> statement.executeQuery(sql));
 	}
 
-	protected ResultSet executeQuery(String sql, Callable<ResultSet> callable) throws SQLException {
-		QueryAction executeAction = queryAction(sql);
-		return execute(executeAction, () -> {
-			Optional<RowSet> cached = getRowSet(executeAction);
-			if (cached.isPresent()) {
-				return cached.get();
-			}
-			Timer backendTimer = getTimer(METER_BACKEND, executeAction.getQuery());
-			try {
-				ResultSet backendResultSet = backendTimer.recordCallable(callable);
-				if (executeAction.isCaching()) {
-					return put(executeAction, backendResultSet);
-				}
-				return backendResultSet;
-			} catch (SQLException e) {
-				throw e;
-			} catch (Exception e) {
-				throw new SQLException(e);
-			}
+	protected ResultSet executeQuery(Callable<ResultSet> callable) throws SQLException {
+		return time(METER_QUERY, () -> {
+			populateFromCache();
+			return getResultSet(() -> executeBackend(callable));
 		});
 	}
 
-	private Optional<RowSet> getRowSet(QueryAction action) {
-		if (!action.isCaching()) {
-			return Optional.empty();
+	protected boolean execute(Callable<Boolean> callable) throws SQLException {
+		return time(METER_QUERY, () -> {
+			populateFromCache();
+			if (hasResultSet()) {
+				return true;
+			}
+			return executeBackend(callable);
+		});
+	}
+
+	private ResultSet getResultSet(Callable<ResultSet> callable) throws SQLException {
+		if (hasResultSet()) {
+			return resultSet;
 		}
-		RequiredSearch meter = getMeter(METER_CACHE_GET, action.getQuery());
-		Optional<RowSet> cached = Optional.ofNullable(meter.timer().record(() -> doGetRowSet(action)));
-		meter.tag(TAG_RESULT, cached.isPresent() ? TAG_HIT : TAG_MISS).counter().increment();
-		return cached;
-	}
-
-	private RowSet doGetRowSet(QueryAction action) {
-		return connection.getRowSetCache().get(action.getKey());
-	}
-
-	private RowSet put(QueryAction action, ResultSet resultSet) throws SQLException {
-		Timer cachePutTimer = getTimer(METER_CACHE_PUT, action.getQuery());
-		try {
-			return cachePutTimer.recordCallable(() -> doPut(action, resultSet));
-		} catch (SQLException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new SQLException(e);
+		resultSet = time(METER_BACKEND_RESULTSET, callable);
+		if (isCaching()) {
+			resultSet = time(METER_CACHE_PUT, () -> connection.getRowSetCache().put(key(), action.getTtl(), resultSet));
 		}
+		return resultSet;
 	}
 
-	private RowSet doPut(QueryAction action, ResultSet resultSet) throws SQLException {
-		return connection.getRowSetCache().put(action.getKey(), action.getAction().getTtl(), resultSet);
+	private <T> T executeBackend(Callable<T> callable) throws Exception {
+		return getMeter(METER_BACKEND).timer().recordCallable(callable);
+	}
+
+	/**
+	 * 
+	 * @param query the query for which to get cached results
+	 * @return cached result-set for the given query
+	 * @throws SQLException
+	 */
+	private void populateFromCache() throws SQLException {
+		if (!isCaching()) {
+			return;
+		}
+		resultSet = time(METER_CACHE_GET, () -> connection.getRowSetCache().get(key()));
+		getMeter(METER_CACHE_GET).tag(TAG_RESULT, hasResultSet() ? TAG_HIT : TAG_MISS).counter().increment();
 	}
 
 	private void checkClosed() throws SQLException {
@@ -185,25 +175,19 @@ public class SmartStatement implements Statement {
 		}
 	}
 
-	protected boolean execute(String sql, Callable<Boolean> executable) throws SQLException {
-		this.action = queryAction(sql);
-		return execute(action, () -> {
-			this.rowSet = getRowSet(action);
-			if (rowSet.isPresent()) {
-				return true;
-			}
-			return executable.call();
-		});
-	}
-
-	private <T> T execute(QueryAction action, Callable<T> callable) throws SQLException {
+	private <T> T time(String meter, Callable<T> callable) throws SQLException {
 		try {
-			return getTimer(METER_QUERY, action.getQuery()).recordCallable(callable);
+			return getMeter(meter).timer().recordCallable(callable);
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			throw new SQLException(e);
 		}
+	}
+
+	private boolean execute(String sql, Callable<Boolean> callable) throws SQLException {
+		init(sql);
+		return execute(callable);
 	}
 
 	@Override
@@ -228,14 +212,7 @@ public class SmartStatement implements Statement {
 
 	@Override
 	public ResultSet getResultSet() throws SQLException {
-		if (rowSet.isPresent()) {
-			return rowSet.get();
-		}
-		ResultSet resultSet = statement.getResultSet();
-		if (action.isCaching()) {
-			return put(action, resultSet);
-		}
-		return resultSet;
+		return getResultSet(statement::getResultSet);
 	}
 
 	@Override
@@ -361,7 +338,9 @@ public class SmartStatement implements Statement {
 	@Override
 	public void close() throws SQLException {
 		statement.close();
+		query = null;
 		action = null;
+		resultSet = null;
 	}
 
 	@Override

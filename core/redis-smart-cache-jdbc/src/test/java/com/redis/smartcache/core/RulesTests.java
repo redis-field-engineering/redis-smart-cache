@@ -20,50 +20,58 @@ class RulesTests {
 	private static final String ORDERS_O = ORDERS + " o";
 
 	private static final SQLParser PARSER = new SQLParser();
-	private static final Duration ttl = new Duration(123, TimeUnit.SECONDS);
+	private static final Duration DEFAULT_TTL = new Duration(123, TimeUnit.SECONDS);
 
 	@Test
 	void testTables() {
-		RuleConfig rule = RuleConfig.tables(PRODUCTS, CUSTOMERS, ORDERS).ttl(ttl).build();
+		RuleConfig rule = RuleConfig.tables(PRODUCTS, CUSTOMERS, ORDERS).ttl(DEFAULT_TTL).build();
 		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
-		Assertions.assertEquals(ttl.toMillis(), ruleSession
+		Assertions.assertEquals(DEFAULT_TTL.toMillis(), ruleSession
 				.fire(query("SELECT * FROM " + PRODUCTS_P + ", " + CUSTOMERS_C + ", " + ORDERS_O)).getTtl().toMillis());
 		Assertions.assertFalse(ruleSession.fire(query("SELECT * FROM " + PRODUCTS_P + ", " + CUSTOMERS_C)).isCaching());
 	}
 
 	@Test
 	void testTablesAny() {
-		RuleConfig rule = RuleConfig.tablesAny(PRODUCTS, CUSTOMERS).ttl(ttl).build();
+		RuleConfig rule = RuleConfig.tablesAny(PRODUCTS, CUSTOMERS).ttl(DEFAULT_TTL).build();
 		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
-		Assertions.assertEquals(ttl.toMillis(),
+		Assertions.assertEquals(DEFAULT_TTL.toMillis(),
 				ruleSession.fire(query("SELECT * FROM " + PRODUCTS_P)).getTtl().toMillis());
 		Assertions.assertFalse(ruleSession.fire(query("SELECT * FROM " + ORDERS_O)).isCaching());
 	}
 
 	@Test
 	void testTablesAll() {
-		RuleConfig rule = RuleConfig.tablesAll(PRODUCTS, CUSTOMERS).ttl(ttl).build();
+		RuleConfig rule = RuleConfig.tablesAll(PRODUCTS, CUSTOMERS).ttl(DEFAULT_TTL).build();
 		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
-		Assertions.assertEquals(ttl.toMillis(), ruleSession
+		Assertions.assertEquals(DEFAULT_TTL.toMillis(), ruleSession
 				.fire(query("SELECT * FROM " + PRODUCTS_P + ", " + CUSTOMERS_C + ", " + ORDERS_O)).getTtl().toMillis());
 		Assertions.assertFalse(ruleSession.fire(query("SELECT * FROM " + ORDERS_O)).isCaching());
 	}
 
 	@Test
 	void testRegex() {
-		RuleConfig rule = RuleConfig.regex("SELECT\\s+\\*\\s+FROM\\s+.*").ttl(ttl).build();
+		RuleConfig rule = RuleConfig.regex("SELECT\\s+\\*\\s+FROM\\s+.*").ttl(DEFAULT_TTL).build();
 		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
-		Assertions.assertEquals(ttl.toMillis(), ruleSession.fire(query("SELECT * FROM blah")).getTtl().toMillis());
+		Assertions.assertEquals(DEFAULT_TTL.toMillis(),
+				ruleSession.fire(query("SELECT * FROM blah")).getTtl().toMillis());
 		Assertions.assertFalse(ruleSession.fire(query("SELECT COUNT(*) FROM blah")).isCaching());
 	}
 
 	@Test
 	void testQueryIds() {
 		String sql = "SELECT * FROM blah";
-		RuleConfig rule = RuleConfig.queryIds(String.valueOf(HashingFunctions.crc32(sql))).ttl(ttl).build();
+		RuleConfig rule = RuleConfig.queryIds(String.valueOf(HashingFunctions.crc32(sql))).ttl(DEFAULT_TTL).build();
 		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
-		Assertions.assertEquals(ttl.toMillis(), ruleSession.fire(query(sql)).getTtl().toMillis());
+		Assertions.assertEquals(DEFAULT_TTL.toMillis(), ruleSession.fire(query(sql)).getTtl().toMillis());
 		Assertions.assertFalse(ruleSession.fire(query("SELECT COUNT(*) FROM blah")).isCaching());
+	}
+
+	@Test
+	void testDisableCaching() {
+		RuleConfig rule = RuleConfig.passthrough().ttl(Duration.valueOf("0s")).build();
+		QueryRuleSession ruleSession = QueryRuleSession.of(RulesetConfig.of(rule));
+		Assertions.assertFalse(ruleSession.fire(query("SELECT * FROM blah")).isCaching());
 	}
 
 	private Query query(String sql) {

@@ -4,17 +4,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 
-import javax.sql.RowSet;
-
-public interface RowSetCache extends AutoCloseable {
+public interface ResultSetCache extends AutoCloseable {
 
 	/**
 	 * 
 	 * @param key the unique key to get the ResultSet for.
 	 * @return RowSet that was retrieved from cache or null if none
 	 */
-	RowSet get(String key);
+	ResultSet get(String key);
 
-	RowSet put(String key, Duration ttl, ResultSet resultSet) throws SQLException;
+	ResultSet put(String key, Duration ttl, ResultSet resultSet) throws SQLException;
 
 }

@@ -48,8 +48,8 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 	}
 
 	public Action fire(Query query) {
-		Action action = new Action(query);
-		super.fire(query, action);
+		Action action = new Action();
+		fire(query, action);
 		return action;
 	}
 

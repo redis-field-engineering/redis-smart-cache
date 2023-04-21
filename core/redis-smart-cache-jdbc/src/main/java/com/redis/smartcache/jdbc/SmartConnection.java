@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 
@@ -29,7 +28,7 @@ import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.core.RowSetCache;
+import com.redis.smartcache.core.ResultSetCache;
 import com.redis.smartcache.core.SQLParser;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,14 +41,14 @@ public class SmartConnection implements Connection {
 	private final SQLParser parser = new SQLParser();
 	private final RowSetFactory rowSetFactory;
 	private final Connection connection;
-	private final RowSetCache rowSetCache;
+	private final ResultSetCache rowSetCache;
 	private final MeterRegistry meterRegistry;
 	private final QueryRuleSession session;
 	private final KeyBuilder keyBuilder;
 	private final Map<String, Query> queryCache;
 
 	public SmartConnection(Connection connection, QueryRuleSession session, MeterRegistry meterRegistry,
-			RowSetFactory rowSetFactory, RowSetCache rowSetCache, Map<String, Query> queryCache,
+			RowSetFactory rowSetFactory, ResultSetCache rowSetCache, Map<String, Query> queryCache,
 			KeyBuilder keyBuilder) {
 		this.connection = connection;
 		this.session = session;
@@ -76,7 +75,7 @@ public class SmartConnection implements Connection {
 		return session;
 	}
 
-	public RowSetCache getRowSetCache() {
+	public ResultSetCache getRowSetCache() {
 		return rowSetCache;
 	}
 
@@ -380,10 +379,8 @@ public class SmartConnection implements Connection {
 		return parser.extractTableNames(sql);
 	}
 
-	public Query computeQueryIfAbsent(String sql, Function<? super String, ? extends Query> mappingFunction) {
-		synchronized (queryCache) {
-			return queryCache.computeIfAbsent(sql, mappingFunction);
-		}
+	public Map<String, Query> getQueryCache() {
+		return queryCache;
 	}
 
 }

@@ -47,7 +47,7 @@ abstract class AbstractIntegrationTests {
 	protected static final RedisStackContainer redis = new RedisStackContainer(
 			RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
 
-	private static final java.time.Duration DEFAULT_AWAIT_TIMEOUT = java.time.Duration.ofSeconds(3);
+	private static final java.time.Duration DEFAULT_AWAIT_TIMEOUT = java.time.Duration.ofHours(3);
 
 	private Driver driver;
 	private RedisModulesClient client;

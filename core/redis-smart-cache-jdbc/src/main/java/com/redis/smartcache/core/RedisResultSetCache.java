@@ -14,7 +14,7 @@ import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.RedisCodec;
 
-public class RedisResultSetCache implements RowSetCache {
+public class RedisResultSetCache implements ResultSetCache {
 
 	private final RowSetFactory rowSetFactory;
 	private final StatefulRedisConnection<String, RowSet> connection;

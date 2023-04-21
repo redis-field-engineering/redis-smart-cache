@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -41,7 +42,7 @@ import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RedisResultSetCache;
-import com.redis.smartcache.core.RowSetCache;
+import com.redis.smartcache.core.ResultSetCache;
 import com.redis.smartcache.core.StreamConfigManager;
 import com.redis.smartcache.core.codec.RowSetCodec;
 import com.redis.smartcache.jdbc.SmartConnection;
@@ -171,7 +172,7 @@ public class Driver implements java.sql.Driver {
 				queryCache, keyBuilder);
 	}
 
-	private RowSetCache rowSetCache(Config config) {
+	private ResultSetCache rowSetCache(Config config) {
 		AbstractRedisClient client = client(config);
 		RedisCodec<String, RowSet> codec = resultSetCodec(config);
 		return new RedisResultSetCache(ROW_SET_FACTORY, client, codec);
@@ -192,7 +193,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private Map<String, Query> createQueryCache(Config config) {
-		return new EvictingLinkedHashMap<>(config.getAnalyzer().getCacheCapacity());
+		return Collections.synchronizedMap(new EvictingLinkedHashMap<>(config.getAnalyzer().getCacheCapacity()));
 	}
 
 	private static RedisCodec<String, RowSet> resultSetCodec(Config config) {

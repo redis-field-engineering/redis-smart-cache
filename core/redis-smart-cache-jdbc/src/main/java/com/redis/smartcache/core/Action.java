@@ -7,16 +7,7 @@ public class Action {
 	public static final Duration TTL_NO_CACHING = Duration.ZERO;
 	public static final long TTL_NO_EXPIRATION = -1;
 
-	private final Query query;
 	private Duration ttl = TTL_NO_CACHING;
-
-	public Action(Query query) {
-		this.query = query;
-	}
-
-	public Query getQuery() {
-		return query;
-	}
 
 	public Duration getTtl() {
 		return ttl;
@@ -30,7 +21,7 @@ public class Action {
 	}
 
 	public boolean isCaching() {
-		return !Action.TTL_NO_CACHING.equals(ttl);
+		return !TTL_NO_CACHING.equals(ttl);
 	}
 
 }

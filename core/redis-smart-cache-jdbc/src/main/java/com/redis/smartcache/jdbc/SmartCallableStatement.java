@@ -20,7 +20,6 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 public class SmartCallableStatement extends SmartPreparedStatement implements CallableStatement {
@@ -40,27 +39,7 @@ public class SmartCallableStatement extends SmartPreparedStatement implements Ca
 
 	@Override
 	protected Collection<Object> parameters() {
-		return parameters.entrySet().stream().map(Parameter::new).collect(Collectors.toList());
-	}
-
-	private static class Parameter {
-
-		private final String key;
-		private final Object value;
-
-		public Parameter(String key, Object value) {
-			this.key = key;
-			this.value = value;
-		}
-
-		public Parameter(Entry<String, Object> entry) {
-			this(entry.getKey(), entry.getValue());
-		}
-
-		@Override
-		public String toString() {
-			return key + "=" + value;
-		}
+		return parameters.entrySet().stream().map(CallableParameter::new).collect(Collectors.toList());
 	}
 
 	@Override
