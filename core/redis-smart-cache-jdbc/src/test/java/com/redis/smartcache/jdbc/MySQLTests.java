@@ -23,6 +23,7 @@ import com.redis.lettucemod.search.Document;
 import com.redis.lettucemod.search.SearchResults;
 import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.Fields;
 
 @SuppressWarnings("unchecked")
 class MySQLTests extends AbstractIntegrationTests {
@@ -59,8 +60,8 @@ class MySQLTests extends AbstractIntegrationTests {
 		SearchResults<String, String> results = commands.ftSearch(index, "*");
 		Assertions.assertEquals(5, results.size());
 		for (Document<String, String> doc : results) {
-			Assertions.assertTrue(doc.get(SmartStatement.TAG_SQL)
-					.equalsIgnoreCase("select * from " + doc.get(SmartStatement.TAG_TABLE)));
+			Assertions
+					.assertTrue(doc.get(Fields.TAG_SQL).equalsIgnoreCase("select * from " + doc.get(Fields.TAG_TABLE)));
 		}
 		Assertions.assertEquals("459d4345", redisConnection.sync().hget("smartcache:query:459d4345", "id"));
 	}

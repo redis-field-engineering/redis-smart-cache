@@ -30,7 +30,8 @@ import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.RuleConfig;
-import com.redis.smartcache.core.Utils;
+import com.redis.smartcache.core.KeyBuilder;
+import com.redis.smartcache.core.Mappers;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.Duration;
@@ -111,7 +112,7 @@ abstract class AbstractIntegrationTests {
 		for (Consumer<Config> configurer : configurers) {
 			configurer.accept(config);
 		}
-		Properties info = Driver.properties(config);
+		Properties info = Mappers.properties(config);
 		info.setProperty("user", database.getUsername());
 		info.setProperty("password", database.getPassword());
 		return driver.connect("jdbc:" + redis.getRedisURI(), info);
@@ -192,7 +193,7 @@ abstract class AbstractIntegrationTests {
 				} catch (Exception e) {
 					log.log(Level.SEVERE, "Could not execute statement", e);
 				}
-				String keyPattern = Driver.keyBuilder(new Config(), Driver.KEYSPACE_CACHE).build("*");
+				String keyPattern = KeyBuilder.of(new Config()).sub(Driver.KEYSPACE_CACHE).build("*");
 				return !redisConnection.sync().keys(keyPattern).isEmpty();
 			});
 			Utils.assertEquals(executor.execute(backendConnection), executor.execute(smartConnection));

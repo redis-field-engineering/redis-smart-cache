@@ -1,0 +1,23 @@
+dependencies {
+    implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
+    implementation 'org.springframework:spring-beans'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
+    implementation group: 'io.airlift', name: 'units', version: airliftVersion
+    implementation 'io.micrometer:micrometer-registry-jmx'
+    implementation group: 'com.redis', name: 'micrometer-registry-redis', version: micrometerRedisVersion
+    testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
+    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
+}
+
+bootJar {
+    enabled = false
+}
+
+jar {
+    archiveClassifier = ''
+}
+
+compileJava {
+    options.release = 8
+}

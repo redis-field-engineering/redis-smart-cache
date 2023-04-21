@@ -11,8 +11,8 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import com.redis.smartcache.core.codec.RowSetCodec;
-import com.redis.smartcache.core.codec.SerializedResultSetCodec;
+import com.redis.smartcache.jdbc.RowSetCodec;
+import com.redis.smartcache.jdbc.codec.SerializedResultSetCodec;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
 

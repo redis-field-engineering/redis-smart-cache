@@ -22,6 +22,7 @@ import org.testcontainers.utility.DockerImageName;
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.KeyBuilder;
+import com.redis.smartcache.core.Mappers;
 
 @SuppressWarnings("unchecked")
 class PostgresTests extends AbstractIntegrationTests {
@@ -124,7 +125,7 @@ class PostgresTests extends AbstractIntegrationTests {
 		config.getDriver().setClassName(POSTGRES.getDriverClassName());
 		config.getDriver().setUrl(POSTGRES.getJdbcUrl());
 		config.getMetrics().setEnabled(false);
-		Properties info = Driver.properties(config);
+		Properties info = Mappers.properties(config);
 		info.setProperty("user", POSTGRES.getUsername());
 		info.setProperty("password", POSTGRES.getPassword());
 		java.sql.Driver driver = DriverManager.getDriver("jdbc:" + redis.getRedisURI());

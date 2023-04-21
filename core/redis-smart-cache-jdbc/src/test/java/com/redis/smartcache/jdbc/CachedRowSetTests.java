@@ -9,7 +9,6 @@ import javax.sql.rowset.CachedRowSet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.redis.smartcache.core.Utils;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
 import com.redis.smartcache.test.RowSetBuilder;

@@ -1,10 +1,7 @@
 dependencies {
+    implementation project(':redis-smart-cache-core')
     implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
-    implementation 'org.springframework:spring-beans'
-    implementation 'com.fasterxml.jackson.core:jackson-databind'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
-    implementation 'io.micrometer:micrometer-registry-jmx'
-    implementation group: 'com.redis', name: 'micrometer-registry-redis', version: micrometerRedisVersion
+    implementation 'io.micrometer:micrometer-core'
     implementation group: 'io.trino', name: 'trino-parser', version: trinoVersion
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
     testImplementation project(':redis-smart-cache-test')

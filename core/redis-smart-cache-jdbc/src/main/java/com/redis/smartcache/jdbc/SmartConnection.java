@@ -26,10 +26,6 @@ import javax.sql.rowset.RowSetFactory;
 
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.KeyBuilder;
-import com.redis.smartcache.core.Query;
-import com.redis.smartcache.core.QueryRuleSession;
-import com.redis.smartcache.core.ResultSetCache;
-import com.redis.smartcache.core.SQLParser;
 
 import io.micrometer.core.instrument.MeterRegistry;
 

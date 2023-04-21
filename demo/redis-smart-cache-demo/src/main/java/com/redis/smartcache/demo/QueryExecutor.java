@@ -22,6 +22,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import com.redis.smartcache.Driver;
+import com.redis.smartcache.core.Mappers;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -55,7 +56,7 @@ public class QueryExecutor implements AutoCloseable {
 		hikariConfig.setDriverClassName(Driver.class.getName());
 		config.getSmartcache().getDriver().setUrl(dataSourceProperties.determineUrl());
 		config.getSmartcache().getDriver().setClassName(dataSourceProperties.determineDriverClassName());
-		Properties props = Driver.properties(config.getSmartcache());
+		Properties props = Mappers.properties(config.getSmartcache());
 		for (String propertyName : props.stringPropertyNames()) {
 			hikariConfig.addDataSourceProperty(propertyName, props.getProperty(propertyName));
 		}

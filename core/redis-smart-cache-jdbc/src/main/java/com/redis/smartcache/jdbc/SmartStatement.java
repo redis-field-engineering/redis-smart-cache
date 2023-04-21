@@ -7,8 +7,7 @@ import java.sql.Statement;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
-import com.redis.smartcache.core.Action;
-import com.redis.smartcache.core.Query;
+import com.redis.smartcache.core.Fields;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tags;
@@ -17,7 +16,6 @@ import io.micrometer.core.instrument.search.RequiredSearch;
 
 public class SmartStatement implements Statement {
 
-	public static final String METER_QUERY = "query";
 	public static final String METER_BACKEND = "backend";
 	public static final String METER_BACKEND_RESULTSET = METER_BACKEND + ".resultset";
 	public static final String METER_PREFIX_CACHE = "cache";
@@ -26,10 +24,6 @@ public class SmartStatement implements Statement {
 	public static final String TAG_RESULT = "result";
 	public static final String TAG_MISS = "miss";
 	public static final String TAG_HIT = "hit";
-	public static final String TAG_ID = "id";
-	public static final String TAG_TABLE = "table";
-	public static final String TAG_SQL = "sql";
-	public static final String TAG_TYPE = "type";
 	private static final String TYPE = "static";
 	private static final double[] PERCENTILES = { 0.9, 0.99 };
 
@@ -59,7 +53,8 @@ public class SmartStatement implements Statement {
 
 	private Tags tags(Query query) {
 		String tables = query.getTables().stream().collect(Collectors.joining(","));
-		return Tags.of(TAG_ID, query.getId(), TAG_TYPE, statementType(), TAG_SQL, query.getSql(), TAG_TABLE, tables);
+		return Tags.of(Fields.TAG_ID, query.getId(), Fields.TAG_TYPE, statementType(), Fields.TAG_SQL, query.getSql(),
+				Fields.TAG_TABLE, tables);
 	}
 
 	private RequiredSearch getMeter(String name) {
@@ -84,7 +79,7 @@ public class SmartStatement implements Statement {
 		newQuery.setId(connection.hash(sql));
 		newQuery.setSql(sql);
 		newQuery.setTables(connection.tableNames(sql));
-		createTimer(METER_QUERY, newQuery);
+		createTimer(Fields.METER_QUERY, newQuery);
 		createTimer(METER_BACKEND, newQuery);
 		createTimer(METER_BACKEND_RESULTSET, newQuery);
 		createTimer(METER_CACHE_GET, newQuery);
@@ -124,14 +119,14 @@ public class SmartStatement implements Statement {
 	}
 
 	protected ResultSet executeQuery(Callable<ResultSet> callable) throws SQLException {
-		return time(METER_QUERY, () -> {
+		return time(Fields.METER_QUERY, () -> {
 			populateFromCache();
 			return getResultSet(() -> executeBackend(callable));
 		});
 	}
 
 	protected boolean execute(Callable<Boolean> callable) throws SQLException {
-		return time(METER_QUERY, () -> {
+		return time(Fields.METER_QUERY, () -> {
 			populateFromCache();
 			if (hasResultSet()) {
 				return true;
