@@ -27,6 +27,7 @@ import javax.sql.rowset.RowSetFactory;
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.KeyBuilder;
 
+import com.redis.smartcache.core.Query;
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class SmartConnection implements Connection {

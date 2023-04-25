@@ -2,6 +2,7 @@ package com.redis.smartcache.jdbc;
 
 import java.util.concurrent.TimeUnit;
 
+import com.redis.smartcache.core.Query;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

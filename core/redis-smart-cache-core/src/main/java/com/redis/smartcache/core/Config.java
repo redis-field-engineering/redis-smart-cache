@@ -361,6 +361,7 @@ public class Config {
 		private List<String> tablesAny;
 		private List<String> tablesAll;
 		private String regex;
+
 		private List<String> queryIds;
 		private Duration ttl = DEFAULT_TTL;
 

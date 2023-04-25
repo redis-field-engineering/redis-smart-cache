@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import com.redis.smartcache.core.Fields;
 
+import com.redis.smartcache.core.Query;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;

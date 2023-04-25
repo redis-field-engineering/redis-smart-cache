@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Predicates;
 import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.rules.CollectionRule;
 import com.redis.smartcache.core.rules.PredicateRule;
 import com.redis.smartcache.core.rules.RegexRule;
