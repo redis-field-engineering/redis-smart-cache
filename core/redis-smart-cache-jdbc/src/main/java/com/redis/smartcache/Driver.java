@@ -140,7 +140,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private Map<String, Query> createQueryCache(Config config) {
-		return Collections.synchronizedMap(new EvictingLinkedHashMap<>(config.getAnalyzer().getCacheCapacity()));
+		return Collections.synchronizedMap(new EvictingLinkedHashMap<>(config.getQueryCacheCapacity()));
 	}
 
 	private static RedisCodec<String, RowSet> resultSetCodec(Config config) {
