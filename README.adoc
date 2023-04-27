@@ -341,7 +341,16 @@ Allowed values are defined on a property-by-property basis, refer to the specifi
 [[property_type_list]]
 ===== `list`
 
-The properties of type list support a set of values that consist of a comma-separated list of <<property_type_string>>s, such as `a,b,c` and `customers,products`.
+The properties of type list support a set of values consistent with how https://cowtowncoder.medium.com/reading-writing-java-properties-files-using-jackson-2-8-efd7a8da9d4c[Jackson properties] are serialized in an array with `field.position` e.g. if the first rule in the configuration was a tables-any "customers,orders" it would be serialized as something equivalent to:
+
+[source]
+----
+1) 1) "1682625171488-0"
+   2)  1) "rules.1.tables-any.1"
+       2) "customers"
+       3) "rules.1.tables-any.2"
+       4) "orders"
+----
 
 === Rules
 {product-name} uses rules to determine how SQL queries are cached.
@@ -349,14 +358,11 @@ Rule configuration is stored in a Redis stream located at the key `{property-pre
 {product-name} will dynamically update to reflect configuration messages added to the stream. 
 
 Here is the default rule configuration:
-[source,properties]
+[source]
 ----
-tables    = null
-tablesAny = null
-tablesAll = null
-regex     = null
-queryIds  = null
-ttl       = 0s
+1) 1) "1682622362951-0"
+   2)  1) "rules.1.ttl"
+       2) "0s"
 ----
 
 This default configuration contains a single passthrough rule (i.e. it applies to all SQL queries) with a TTL of 0 seconds, which means that no SQL results will be cached.
@@ -369,28 +375,78 @@ Only the first rule with matching criteria will be considered, and its action ap
 ===== `tables`
 
 * Type: <<property_type_list>>
-* Example: `products,customers,orders`
+* Example:
++
+[source]
+----
+1) 1) "1682625092479-0"
+   2)  1) "rules.1.ttl"
+       2) "50m"
+       3) "rules.1.tables.1"
+       4) "products"
+       5) "rules.1.tables.2"
+       6) "customers"
+       7) "rules.1.tables.3"
+       8) "orders"
+----
 
 Triggers if the given tables are exactly the same as the list in the SQL query (order does not matter).
 
 ===== `tablesAny`
 
 * Type: <<property_type_list>>
-* Example: `products,customers,orders`
+* Example:
++
+[source]
+----
+1) 1) "1682625171488-0"
+   2)  1) "rules.1.ttl"
+       2) "50m"
+       3) "rules.1.tables-any.1"
+       4) "products"
+       5) "rules.1.tables-any.2"
+       6) "customers"
+       7) "rules.1.tables-any.3"
+       8) "orders"
+----
 
 Triggers if any of the given tables shows up in the SQL query.
 
 ===== `tablesAll`
 
 * Type: <<property_type_list>>
-* Example: `products,customers,orders`
+* Example:
++
+[source]
+----
+1) 1) "1682625239844-0"
+   2)  1) "rules.1.ttl"
+       2) "50m"
+       3) "rules.1.tables-all.1"
+       4) "products"
+       5) "rules.1.tables-all.2"
+       6) "customers"
+       7) "rules.1.tables-all.3"
+       8) "orders"
+----
 
 Triggers if all the given tables show up in the SQL query.
 
 ===== `queryIds`
 
 * Type: <<property_type_list>>
-* Example: `a3bb9911,ffff0000`
+* Example:
++
+[source]
+----
+1) 1) "1682626067029-0"
+   2) 1) "rules.1.ttl"
+      2) "50m"
+      3) "rules.1.query-ids.1"
+      4) "5a934c95"
+      5) "rules.1.query-ids.2"
+      6) "beab0f6f"
+----
 
 Triggers if the SQL query ID matches any of the given IDs.
 
@@ -400,7 +456,16 @@ TIP: An ID is the CRC32 hash of the SQL query. You can use an online CRC32 calcu
 ===== `regex`
 
 * Type: <<property_type_string>>
-* Example: `SELECT \* FROM test\.\w*`
+* Example:
++
+[source]
+----
+1) 1) "1682626136637-0"
+   2) 1) "rules.1.ttl"
+      2) "50m"
+      3) "rules.1.regex"
+      4) "SELECT \\* FROM test\\.w*"
+----
 
 Triggers if given regular expression matches the SQL query.
 
@@ -412,6 +477,14 @@ TIP: It is a good idea to test regexes at https://regex101.com[regex101.com].
 
 * Type: <<property_type_duration>>
 * Default value: `0s`
+* Example:
++
+[source]
+----
+1) 1) "1682626067029-0"
+   2) 1) "rules.1.ttl"
+      2) "50m"
+----
 
 Sets the time-to-live for the corresponding cache entry.
 
