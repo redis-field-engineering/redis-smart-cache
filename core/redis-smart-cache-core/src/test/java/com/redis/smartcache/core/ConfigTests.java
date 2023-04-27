@@ -3,9 +3,7 @@ package com.redis.smartcache.core;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +23,7 @@ import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Config.RulesetConfig;
 import com.redis.testcontainers.RedisStackContainer;
 
+import io.airlift.units.Duration;
 import io.lettuce.core.Range;
 import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XReadArgs.StreamOffset;
@@ -62,18 +61,18 @@ class ConfigTests {
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "123s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 123);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 123);
 				body.put("rules[0].ttl", "456s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
 			RulesetConfig conf2 = new RulesetConfig();
 			try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, conf2, mapper)) {
 				manager2.start();
-				await().until(() -> conf2.getRules().size() == 1);
-				await().until(() -> conf2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf2.getRules().length == 1);
+				await().until(() -> conf2.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
 		}
 	}
@@ -90,11 +89,11 @@ class ConfigTests {
 		properties.put("rules.4.query-ids.1", "ab324499");
 		properties.put("rules.4.ttl", "10.00s");
 		RulesetConfig conf = new RulesetConfig();
-		conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
-		conf.getRules().add(
-				RuleConfig.regex("SELECT \\* FROM customers").ttl(io.airlift.units.Duration.valueOf("30m")).build());
-		conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
-		conf.getRules().add(RuleConfig.queryIds("ab324499").ttl(io.airlift.units.Duration.valueOf("10s")).build());
+		RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+		RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+		RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+		RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
+		conf.setRules(rule1, rule2, rule3, rule4);
 		String key = "config";
 		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 				StatefulRedisModulesConnection<String, String> connection = client.connect();
@@ -118,11 +117,11 @@ class ConfigTests {
 		properties.put("rules.4.query-ids.1", "ab324499");
 		properties.put("rules.4.ttl", "10.00s");
 		RulesetConfig conf = new RulesetConfig();
-		conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
-		conf.getRules().add(
-				RuleConfig.regex("SELECT \\* FROM customers").ttl(io.airlift.units.Duration.valueOf("30m")).build());
-		conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
-		conf.getRules().add(RuleConfig.queryIds("ab324499").ttl(io.airlift.units.Duration.valueOf("10s")).build());
+		RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+		RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+		RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+		RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
+		conf.setRules(rule1, rule2, rule3, rule4);
 		Assertions.assertEquals(conf, mapper.readMapAs(properties, RulesetConfig.class));
 		Assertions.assertEquals(properties, mapper.writeValueAsMap(conf));
 	}
@@ -134,10 +133,10 @@ class ConfigTests {
 		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
 			RulesetConfig conf = new RulesetConfig();
-			conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
-			conf.getRules().add(RuleConfig.regex("SELECT \\* FROM customers")
-					.ttl(io.airlift.units.Duration.valueOf("30m")).build());
-			conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
+			RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+			RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+			RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+			conf.setRules(rule1, rule2, rule3);
 			JavaPropsMapper mapper = Mappers.propsMapper();
 			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
 				manager.start();
@@ -146,14 +145,14 @@ class ConfigTests {
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "0s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 0);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 0);
 			}
 		}
 	}
 
 	private ConditionFactory await() {
-		return Awaitility.await().timeout(Duration.ofSeconds(1));
+		return Awaitility.await().timeout(java.time.Duration.ofSeconds(1));
 	}
 
 	@Test
@@ -162,7 +161,7 @@ class ConfigTests {
 		EventList eventList = new EventList();
 		config.addPropertyChangeListener(eventList);
 		RuleConfig newRule = RuleConfig.tables("table1").build();
-		config.setRules(Arrays.asList(newRule));
+		config.setRules(newRule);
 		Assertions.assertEquals(1, eventList.getEvents().size());
 		Assertions.assertEquals(RulesetConfig.PROPERTY_RULES, eventList.getEvents().get(0).getPropertyName());
 	}

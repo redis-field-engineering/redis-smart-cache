@@ -108,7 +108,7 @@ abstract class AbstractIntegrationTests {
 		Config config = bootstrapConfig();
 		config.getDriver().setClassName(database.getDriverClassName());
 		config.getDriver().setUrl(database.getJdbcUrl());
-		config.getRuleset().getRules().add(RuleConfig.passthrough().ttl(Duration.valueOf("300s")).build());
+		config.getRuleset().setRules(RuleConfig.passthrough().ttl(Duration.valueOf("300s")).build());
 		for (Consumer<Config> configurer : configurers) {
 			configurer.accept(config);
 		}
@@ -122,6 +122,7 @@ abstract class AbstractIntegrationTests {
 		Config config = new Config();
 		config.getRedis().setCodecBufferSizeInBytes(BUFFER_SIZE);
 		config.getMetrics().setEnabled(false);
+		config.getRuleset().setRules(RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build());
 		return config;
 	}
 

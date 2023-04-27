@@ -2,7 +2,6 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -318,40 +317,46 @@ public class Config {
 	public static class RulesetConfig {
 
 		public static final String PROPERTY_RULES = "rules";
+		public static final RuleConfig DEFAULT_RULE = RuleConfig.passthrough().build();
 
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
-		private List<RuleConfig> rules = new ArrayList<>();
+		private RuleConfig[] rules = { DEFAULT_RULE };
 
 		public void addPropertyChangeListener(PropertyChangeListener listener) {
 			support.addPropertyChangeListener(listener);
-			rules.forEach(r -> r.addPropertyChangeListener(listener));
+			for (RuleConfig rule : rules) {
+				rule.addPropertyChangeListener(listener);
+			}
 		}
 
 		public void removePropertyChangeListener(PropertyChangeListener listener) {
 			support.removePropertyChangeListener(listener);
-			rules.forEach(r -> r.removePropertyChangeListener(listener));
+			for (RuleConfig rule : rules) {
+				rule.removePropertyChangeListener(listener);
+			}
 		}
 
-		public List<RuleConfig> getRules() {
+		public RuleConfig[] getRules() {
 			return rules;
 		}
 
-		public void setRules(List<RuleConfig> rules) {
+		public void setRules(RuleConfig... rules) {
 			support.firePropertyChange(PROPERTY_RULES, this.rules, rules);
 			this.rules = rules;
 		}
 
 		public static RulesetConfig of(RuleConfig... rules) {
 			RulesetConfig ruleset = new RulesetConfig();
-			for (RuleConfig rule : rules) {
-				ruleset.getRules().add(rule);
-			}
+			ruleset.setRules(rules);
 			return ruleset;
 		}
 
 		@Override
 		public int hashCode() {
-			return Objects.hash(rules);
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + Arrays.hashCode(rules);
+			return result;
 		}
 
 		@Override
@@ -363,14 +368,15 @@ public class Config {
 			if (getClass() != obj.getClass())
 				return false;
 			RulesetConfig other = (RulesetConfig) obj;
-			return Objects.equals(rules, other.rules);
+			return Arrays.equals(rules, other.rules);
 		}
 
 	}
 
 	public static class RuleConfig {
 
-		public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
+		public static final Duration TTL_NO_CACHING = Duration.succinctNanos(0);
+		public static final Duration DEFAULT_TTL = TTL_NO_CACHING;
 
 		private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
@@ -379,7 +385,7 @@ public class Config {
 		private List<String> tablesAll;
 		private String regex;
 		private List<String> queryIds;
-		private Duration ttl = DEFAULT_TTL;
+		private Duration ttl = TTL_NO_CACHING;
 
 		public RuleConfig() {
 		}

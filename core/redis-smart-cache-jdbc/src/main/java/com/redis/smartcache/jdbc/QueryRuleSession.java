@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Predicates;
 import com.redis.smartcache.core.Config.RuleConfig;
@@ -32,7 +33,7 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 	}
 
 	private static List<Rule<Query, Action>> rules(RulesetConfig ruleset) {
-		return ruleset.getRules().stream().map(QueryRuleSession::rule).collect(Collectors.toList());
+		return Stream.of(ruleset.getRules()).map(QueryRuleSession::rule).collect(Collectors.toList());
 	}
 
 	@SuppressWarnings("unchecked")
