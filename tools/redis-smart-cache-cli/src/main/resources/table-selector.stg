@@ -28,7 +28,6 @@ info(model) ::= <<
 
 // component result
 result(model) ::= <<
-[Hello World\n]
 <question_name(model)> <model.value; format="style-value">
 >>
 
@@ -37,7 +36,7 @@ running(model) ::= <<
 Hit 'enter' to select a query
 Hit escape to go back
 hit ctrl+c to exit
-<question_name(model)> <info(model)>
+<question_name(model)>
 <model.rows:{x|<select_item(x)>}; separator="\n">
 >>
 

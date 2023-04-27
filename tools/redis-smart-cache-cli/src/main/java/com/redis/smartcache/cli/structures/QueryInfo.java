@@ -135,6 +135,37 @@ public class QueryInfo implements TableInfoItem{
         sb.append("|");
         return sb.toString();
     }
+    public String toFormattedString(int width){
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Query id: %s%n", query.getId()));
+        if(query.getSql().length()+11 > width){
+            List<String> substrings = Util.chopString(query.getSql(), width);
+            sb.append("Query sql:\n");
+            for(String s : substrings){
+                sb.append(String.format("%s%n",s));
+            }
+        }
+        else{
+            sb.append(String.format("Query sql: %s%n", query.getSql()));
+        }
+
+        sb.append(String.format("Query tables: %s%n", query.getTables()));
+        if (currentRule!=null){
+            sb.append(String.format("Current TTL: %s%n", currentRule.getTtl()));
+        }
+        else{
+            sb.append(String.format("Current TTL:%n"));
+        }
+
+        if (pendingRule!=null){
+            sb.append(String.format("Pending TTL: %s%n", pendingRule.getTtl()));
+        }
+        else{
+            sb.append(String.format("Pending TTL:%n"));
+        }
+
+        return sb.toString();
+    }
 
     //builder
 

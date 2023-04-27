@@ -2,10 +2,14 @@ package com.redis.smartcache.core;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
+import com.redis.lettucemod.api.StatefulRedisModulesConnection;
+import com.redis.lettucemod.util.RedisModulesUtils;
 import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.Config.RuleConfig;
 
 import io.lettuce.core.AbstractRedisClient;
 
@@ -23,6 +27,13 @@ public class RulesetManager implements AutoCloseable {
 
 	public RulesetConfig getRuleset(Config config) {
 		return configManagers.computeIfAbsent(config, this::createConfigManager).get();
+	}
+
+	public void pushUpdatedRules(Config conf){
+		List<RuleConfig> rules = conf.getRuleset().getRules();
+		AbstractRedisClient client = clientManager.getClient(conf);
+		StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
+
 	}
 
 	private ConfigManager<RulesetConfig> createConfigManager(Config config) {

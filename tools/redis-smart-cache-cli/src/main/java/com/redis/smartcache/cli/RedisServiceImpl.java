@@ -1,29 +1,18 @@
 package com.redis.smartcache.cli;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.api.sync.RediSearchCommands;
-import com.redis.lettucemod.api.sync.RedisTimeSeriesCommands;
 import com.redis.lettucemod.search.Document;
 import com.redis.lettucemod.search.SearchResults;
-import com.redis.lettucemod.timeseries.GetResult;
-import com.redis.lettucemod.timeseries.Label;
 import com.redis.smartcache.cli.structures.QueryInfo;
-import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.ClientManager;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.RuleConfig;
-import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.RulesetManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import io.airlift.units.Duration;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class RedisServiceImpl implements RedisService{
@@ -41,7 +30,7 @@ public class RedisServiceImpl implements RedisService{
         return connection.sync().ping();
     }
 
-    public List<RuleConfig> GetRules(){
+    public List<RuleConfig> getRules(){
         RulesetManager rulesetManager = new RulesetManager(manager);
 
         Config.RulesetConfig ruleSetConfig = rulesetManager.getRuleset(conf);
@@ -63,7 +52,7 @@ public class RedisServiceImpl implements RedisService{
 
     public List<QueryInfo> getQueries(String applicationName){
         List<QueryInfo> response = new ArrayList<>();
-        List<RuleConfig> rules = GetRules();
+        List<RuleConfig> rules = getRules();
 
         RediSearchCommands<String, String> searchCommands = connection.sync();
 
@@ -78,5 +67,10 @@ public class RedisServiceImpl implements RedisService{
 
         }
         return response;
+    }
+
+    public void commitNewRules(List<RuleConfig> rules){
+        conf.getRuleset().setRules(rules);
+
     }
 }

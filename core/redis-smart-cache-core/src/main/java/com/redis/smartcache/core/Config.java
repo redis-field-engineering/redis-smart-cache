@@ -511,7 +511,7 @@ public class Config {
 			private List<String> queryIds;
 			private Duration ttl = DEFAULT_TTL;
 
-			private Builder() {
+			public Builder() {
 			}
 
 			public Builder tables(String... tables) {

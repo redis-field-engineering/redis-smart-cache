@@ -1,5 +1,7 @@
 package com.redis.smartcache.cli.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public final class Util {
@@ -51,5 +53,16 @@ public final class Util {
         } catch (NumberFormatException e){
             return Optional.empty();
         }
+    }
+
+    public static List<String> chopString(String s, int width){
+        List<String> substrings = new ArrayList<>();
+
+        for(int i = 0; i < s.length(); i+= width){
+            int endIndex = Math.min(i+width, s.length());
+            substrings.add(s.substring(i, endIndex));
+        }
+
+        return substrings;
     }
 }

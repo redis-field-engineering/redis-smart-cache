@@ -11,6 +11,7 @@ import org.springframework.shell.component.support.*;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -18,17 +19,27 @@ import static org.jline.keymap.KeyMap.*;
 import static org.jline.keymap.KeyMap.key;
 
 public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
-        extends AbstractSelectorComponent<T, TableSelector.SingleItemSelectorContext<T, I>, I> {
+        extends AbstractTableSelectorComponent<T, TableSelector.SingleItemSelectorContext<T, I>, I> {
 
     private SingleItemSelectorContext<T, I> currentContext;
 
+    private boolean exitSelects;
+    private boolean stale = false;
     private String header;
+    private AtomicInteger start = new AtomicInteger(0);
+    private AtomicInteger pos = new AtomicInteger(0);
+    private Comparator<I> comparator = (o1, o2) -> 0;
+    private int maxItems = 5;
 
-    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header) {
-        super(terminal, name, items, true, comparator);
+    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header, boolean exitSelects) {
+        super(terminal, name, items, exitSelects, comparator);
         this.header = header;
         setRenderer(new DefaultRenderer());
         setTemplateLocation("classpath:table-selector.stg");
+        if (comparator != null){
+            this.comparator = comparator;
+        }
+        this.exitSelects = exitSelects;
     }
 
     @Override
@@ -59,103 +70,32 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
         return context;
     }
 
-    @Override
-    protected void bindKeyMap(KeyMap<String> keyMap) {
-        keyMap.bind(OPERATION_SELECT, " ");
-        keyMap.bind(OPERATION_DOWN, ctrl('E'), key(getTerminal(), InfoCmp.Capability.key_down));
-        keyMap.bind(OPERATION_UP, ctrl('Y'), key(getTerminal(), InfoCmp.Capability.key_up));
-        keyMap.bind(OPERATION_EXIT, "\r");
-        keyMap.bind(OPERATION_BACKSPACE, del(), key(getTerminal(), InfoCmp.Capability.key_backspace));
+    private AbstractTableSelectorComponent.ItemStateViewProjection buildItemStateView(int skip, SelectorComponentContext<T, I, ?> context) {
+        List<ItemState<I>> itemStates = context.getItemStates();
+        if (itemStates == null) {
+            AtomicInteger index = new AtomicInteger(0);
+            itemStates = context.getItems().stream()
+                    .sorted(comparator)
+                    .map(item -> ItemState.of(item, item.getName(), index.getAndIncrement(), item.isEnabled(), item.isSelected()))
+                    .collect(Collectors.toList());
+            context.setItemStates(itemStates);
+        }
+        AtomicInteger reindex = new AtomicInteger(0);
+        List<ItemState<I>> filtered = itemStates.stream()
+                .filter(i -> {
+                    return i.matches(context.getInput());
+                })
+                .map(i -> {
+                    i.index = reindex.getAndIncrement();
+                    return i;
+                })
+                .collect(Collectors.toList());
+        List<ItemState<I>> items = filtered.stream()
+                .skip(skip)
+                .limit(maxItems)
+                .collect(Collectors.toList());
+        return new AbstractTableSelectorComponent.ItemStateViewProjection(items, filtered.size());
     }
-
-//    @Override
-//    protected boolean read(BindingReader bindingReader, KeyMap<String> keyMap, TableSelector.SingleItemSelectorContext<T, I>  context){
-//
-//        if (stale) {
-//            start.set(0);
-//            pos.set(0);
-//            stale = false;
-//        }
-//        TableSelector.SingleItemSelectorContext<T, I> thisContext = getThisContext(context);
-//        ItemStateViewProjection buildItemStateView = buildItemStateView(start.get(), thisContext);
-//        List<ItemState<I>> itemStateView = buildItemStateView.items;
-//        String operation = bindingReader.readBinding(keyMap);
-//        log.debug("Binding read result {}", operation);
-//        if (operation == null) {
-//            return true;
-//        }
-//        String input;
-//        switch (operation) {
-//            case OPERATION_SELECT:
-//                if (!exitSelects) {
-//                    itemStateView.forEach(i -> {
-//                        if (i.index == start.get() + pos.get() && i.enabled) {
-//                            i.selected = !i.selected;
-//                        }
-//                    });
-//                }
-//                break;
-//            case OPERATION_DOWN:
-//                if (start.get() + pos.get() + 1 < itemStateView.size()) {
-//                    pos.incrementAndGet();
-//                }
-//                else if (start.get() + pos.get() + 1 >= buildItemStateView.total) {
-//                    start.set(0);
-//                    pos.set(0);
-//                }
-//                else {
-//                    start.incrementAndGet();
-//                }
-//                break;
-//            case OPERATION_UP:
-//                if (start.get() > 0 && pos.get() == 0) {
-//                    start.decrementAndGet();
-//                }
-//                else if (start.get() + pos.get() >= itemStateView.size()) {
-//                    pos.decrementAndGet();
-//                }
-//                else if (start.get() + pos.get() <= 0) {
-//                    start.set(buildItemStateView.total - Math.min(maxItems, itemStateView.size()));
-//                    pos.set(itemStateView.size() - 1);
-//                }
-//                else {
-//                    pos.decrementAndGet();
-//                }
-//                break;
-//            case OPERATION_BACKSPACE:
-//                input = thisContext.getInput();
-//                if (StringUtils.hasLength(input)) {
-//                    input = input.length() > 1 ? input.substring(0, input.length() - 1) : null;
-//                }
-//                thisContext.setInput(input);
-//                break;
-//            case OPERATION_EXIT:
-//                if (exitSelects) {
-//                    if (itemStateView.size() == 0) {
-//                        // filter shows nothing, prevent exit
-//                        break;
-//                    }
-//                    itemStateView.forEach(i -> {
-//                        if (i.index == start.get() + pos.get()) {
-//                            i.selected = !i.selected;
-//                        }
-//                    });
-//                }
-//                List<I> values = thisContext.getItemStates().stream()
-//                        .filter(i -> i.selected)
-//                        .map(i -> i.item)
-//                        .collect(Collectors.toList());
-//                thisContext.setResultItems(values);
-//                return true;
-//            default:
-//                break;
-//        }
-//        thisContext.setCursorRow(start.get() + pos.get());
-//        buildItemStateView = buildItemStateView(start.get(), thisContext);
-//        thisContext.setItemStateView(buildItemStateView.items);
-//        return false;
-//    }
-//
 
     /**
      * Context {@link TableSelector}.
@@ -238,6 +178,10 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
 
         @Override
         public Optional<String> getValue() {
+            if (!getResultItem().isPresent()){
+                return Optional.empty();
+            }
+
             return getResultItem().map(item -> itemMapper.apply(item.getItem()));
         }
 
@@ -245,9 +189,6 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
         public Map<String, Object> toTemplateModel() {
             Map<String, Object> attributes = super.toTemplateModel();
             attributes.put("header", header);
-//            getValue().ifPresent(value -> {
-//                attributes.put("value", value);
-//            });©
 
             List<Map<String,Object>> rows = new ArrayList<>();
             for (int i = 0; i<getItems().size();i++){
