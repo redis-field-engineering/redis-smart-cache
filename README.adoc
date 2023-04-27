@@ -341,13 +341,13 @@ Here is the default rule configuration:
       "tablesAll": null,
       "regex": null,
       "queryIds": null,
-      "ttl": "1h"
+      "ttl": "0s"
     }
   ]
 }
 ----
 
-This default configuration contains a single passthrough rule where all SQL query results will be assigned a TTL of 1 hour.
+This default configuration contains a single passthrough rule with a TTL of 0 seconds, which means that no SQL results will be cached.
 
 Rules are processed in order and consist of *criteria* (conditions) and *actions* (results).
 Only the first rule with matching criteria will be considered, and its action applied.
@@ -399,7 +399,7 @@ TIP: It is a good idea to test regexes at https://regex101.com[regex101.com].
 ===== `ttl`
 
 * Type: <<property_type_duration>>
-* Default value: `1h`
+* Default value: `0s`
 
 Sets the time-to-live for the corresponding cache entry.
 
