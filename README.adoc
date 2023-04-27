@@ -523,14 +523,14 @@ query-ids: a3bb9911, abcd1233
 |image:check.svg[Check,20]
 
 |
-[source,json]
+[source,text]
 ----
 regex: SELECT .+ FROM trans.*
 ----
 |image:cross.svg[Check,20]
 
 |
-[source,json]
+[source,text]
 ----
 regex: SELECT .+ FROM cust.*
 ----
