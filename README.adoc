@@ -96,7 +96,7 @@ Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
 
 image:grafana-import-dashboard.png[Import Dashboard,width=380]
 
-Next, click `Upload JSON file` and in the `Import via grafana.com` field enter this id: `18441`.
+Next, in the `Import via grafana.com` field enter this id: `18441`.
 
 At the bottom of the page, select the Redis datasource that you just created and click `Import`.
 
@@ -147,13 +147,11 @@ jdbc:redis://cache.redis.cloud:6379
 
 See https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details#uri-syntax[Lettuce's URI syntax] for all of the possible URI parameters you can use here.
 
-Next step is providing bootstrap configuration.
+Next step is providing bootstrap configuration which is done through JDBC properties.
 
 === Configuration
 
-{product-name} configuration is done through JDBC properties.
-
-Refer to the <<property_types>> section for details on different property types.
+Refer to the <<property_types>> section below for details on different property types.
 
 ==== Application
 
@@ -167,7 +165,14 @@ This is the prefix for all Redis keys used by {product-name}, such as cache entr
 
 NOTE: This property should be the same across all instances of an application.
 
-==== Backend database
+===== `{property-prefix}.query-cache-capacity`
+
+* Type: <<property_type_integer>>
+* Default value: `10000`
+
+Capacity of the parsed query cache.
+
+==== Driver
 
 ===== `{property-prefix}.driver.class-name`
 
@@ -182,6 +187,7 @@ Class name of the backend database JDBC driver, for example `oracle.jdbc.OracleD
 * *Required*
 
 JDBC URL for the backend database, for example `jdbc:oracle:thin:@myhost:1521:orcl`.
+
 
 ===== Additional properties
 
@@ -246,53 +252,6 @@ Overrides password in Redis URI.
 
 Maximum capacity of the buffer used to encode a result set.
 
-==== Query Analyzer
-
-The following properties are used to configure the query analyzer component.
-
-===== `{property-prefix}.analyzer.pool-size`
-
-* Type: <<property_type_integer>>
-* Default value: `8`
-
-Maximum number of connections that can be allocated by the pool at a given time.
-Use a negative value for no limit.
-
-===== `{property-prefix}.analyzer.cache-capacity`
-
-* Type: <<property_type_integer>>
-* Default value: `10000`
-
-Capacity of the parsed query cache.
-
-===== `{property-prefix}.analyzer.queue-capacity`
-
-* Type: <<property_type_integer>>
-* Default value: `10000`
-
-Capacity of the query writer queue.
-
-===== `{property-prefix}.analyzer.threads`
-
-* Type: <<property_type_integer>>
-* Default value: `1`
-
-Number of writer threads.
-
-===== `{property-prefix}.analyzer.batch-size`
-
-* Type: <<property_type_integer>>
-* Default value: `50`
-
-Number of query items to write at a time (i.e. pipeline size).
-
-===== `{property-prefix}.analyzer.flush-interval`
-
-* Type: <<property_type_duration>>
-* Default value: `50ms`
-
-Max duration between writes.
-
 ==== Metrics
 
 ===== `{property-prefix}.metrics.enabled`
@@ -317,37 +276,90 @@ Meter registry type. Use `REDIS` for TimeSeries + RediSearch, `SIMPLE` for in-me
 
 Metrics publishing interval.
 
-[[config_step]]
-===== `{property-prefix}.ruleset.refresh`
+[[property_types]]
+==== Property Types
 
-* Type: <<property_type_duration>>
-* Default value: `10s`
+{product-name} configuration properties support different value types.
 
-Rule config refresh interval.
+[[property_type_boolean]]
+===== `boolean`
+
+The properties of type boolean support two values, `true` or `false`.
+
+[[property_type_data_size]]
+===== `data size`
+
+The properties of type data size support values that describe an amount of data, measured in byte-based units.
+These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
+For example, the value `6MB` describes six megabytes.
+
+The data size type supports the following units:
+
+* B: Bytes
+* kB: Kilobytes
+* MB: Megabytes
+* GB: Gigabytes
+
+[[property_type_duration]]
+===== `duration`
+
+The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
+For example, the value `7m` describes seven minutes.
+
+The duration type supports the following units:
+
+* ns: Nanoseconds
+* us: Microseconds
+* ms: Milliseconds
+* s: Seconds
+* m: Minutes
+* h: Hours
+* d: Days
+
+A duration of 0 is treated as zero regardless of the unit that follows.
+For example, 0s and 0m both mean the same thing.
+
+Properties of type duration also support decimal values, such as `2.25d`.
+These are handled as a fractional value of the specified unit.
+For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
+
+[[property_type_integer]]
+===== `integer`
+
+The properties of type integer support whole numeric values, such as `5` and `1000`.
+Negative values are supported as well, for example `-7`.
+Integer type values must be whole numbers, decimal values such as 2.5 are not supported.
+
+Some integer type properties enforce their own minimum and maximum values.
+
+[[property_type_string]]
+===== `string`
+
+The properties of type string support a set of values that consist of a sequence of characters.
+Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
+
+[[property_type_list]]
+===== `list`
+
+The properties of type list support a set of values that consist of a comma-separated list of <<property_type_string>>s, such as `a,b,c` and `customers,products`.
 
 === Rules
 {product-name} uses rules to determine how SQL queries are cached.
-Rule configuration is stored in a Redis JSON document located at the key `{property-prefix}:config` and can be modified at runtime.
-{product-name} will dynamically update to reflect changes made to the JSON document (see <<config_step>> above to change the refresh rate). 
+Rule configuration is stored in a Redis stream located at the key `{property-prefix}:config` and can be modified at runtime.
+{product-name} will dynamically update to reflect configuration messages added to the stream. 
 
 Here is the default rule configuration:
-[source,json]
+[source,properties]
 ----
-{
-  "rules": [
-    {
-      "tables": null,
-      "tablesAny": null,
-      "tablesAll": null,
-      "regex": null,
-      "queryIds": null,
-      "ttl": "0s"
-    }
-  ]
-}
+tables    = null
+tablesAny = null
+tablesAll = null
+regex     = null
+queryIds  = null
+ttl       = 0s
 ----
 
-This default configuration contains a single passthrough rule with a TTL of 0 seconds, which means that no SQL results will be cached.
+This default configuration contains a single passthrough rule (i.e. it applies to all SQL queries) with a TTL of 0 seconds, which means that no SQL results will be cached.
 
 Rules are processed in order and consist of *criteria* (conditions) and *actions* (results).
 Only the first rule with matching criteria will be considered, and its action applied.
@@ -408,147 +420,52 @@ Use `0s` to disable caching.
 ==== Examples
 
 ===== `SELECT * FROM customers c, products p, orders o` 
-[cols="6a,^1",options="header"]
+[cols="1,1,^1",options="header"]
 |==========================
-|Criteria|Match
+|Criteria
+|Value
+|Match
 
-|
-[source,json]
-----
-{ "tables": ["orders", "products"] }
-----
+|`tables`
+|`orders, products`
 |image:cross.svg[Check,20]
 
-|
-[source,json]
-----
-{ "tables": ["orders", "products", "customers"] }
-----
+|`tables`
+|`orders, products, customers`
 |image:check.svg[Check,20]
 
-|
-[source,json]
-----
-{ "tablesAny": ["transactions"] }
-----
+|`tablesAny`
+|`transactions`
 |image:cross.svg[Check,20]
 
-|
-[source,json]
-----
-{ "tablesAny": ["transactions", "orders"] }
-----
+|`tablesAny`
+|`transactions, orders`
 |image:check.svg[Check,20]
 
-|
-[source,json]
-----
-{ "tablesAll": ["transactions", "orders", "products"] }
-----
+|`tablesAll`
+|`transactions, orders.products`
 |image:cross.svg[Check,20]
 
-|
-[source,json]
-----
-{ "tablesAll": ["orders", "products"] }
-----
+|`tablesAll`
+|`orders, products`
 |image:check.svg[Check,20]
 
-|
-[source,json]
-----
-{ "queryIds": ["aaff2b5c", "56789"] }
-----
+|`queryIds`
+|`aaff2b5c, 56789`
 |image:cross.svg[Check,20]
 
-|
-[source,json]
-----
-{ "queryIds": ["a3bb9911", "abcd1233"] }
-----
+|`queryIds`
+|`a3bb9911, abcd1233`
 |image:check.svg[Check,20]
 
-|
-[source,json]
-----
-{ "regex": "SELECT .+ FROM trans.*" }
-----
+|`regex`
+|`SELECT .+ FROM trans.*`
 |image:cross.svg[Check,20]
 
-|
-[source,json]
-----
-{ "regex": "SELECT .+ FROM cust.*" }
-----
+|`regex`
+|`SELECT .+ FROM cust.*`
 |image:check.svg[Check,20]
 |==========================
-
-[[property_types]]
-=== Property value types
-
-{product-name} configuration properties support different value types.
-
-[[property_type_boolean]]
-==== `boolean`
-
-The properties of type boolean support two values, `true` or `false`.
-
-[[property_type_data_size]]
-==== `data size`
-
-The properties of type data size support values that describe an amount of data, measured in byte-based units.
-These units are incremented in multiples of 1024, so one megabyte is 1024 kilobytes, one kilobyte is 1024 bytes, and so on.
-For example, the value `6MB` describes six megabytes.
-
-The data size type supports the following units:
-
-* B: Bytes
-* kB: Kilobytes
-* MB: Megabytes
-* GB: Gigabytes
-
-[[property_type_duration]]
-==== `duration`
-
-The properties of type duration support values describing an amount of time, using the syntax of a non-negative number followed by a time unit.
-For example, the value `7m` describes seven minutes.
-
-The duration type supports the following units:
-
-* ns: Nanoseconds
-* us: Microseconds
-* ms: Milliseconds
-* s: Seconds
-* m: Minutes
-* h: Hours
-* d: Days
-
-A duration of 0 is treated as zero regardless of the unit that follows.
-For example, 0s and 0m both mean the same thing.
-
-Properties of type duration also support decimal values, such as `2.25d`.
-These are handled as a fractional value of the specified unit.
-For example, the value `1.5m` equals one and a half minutes, or 90 seconds.
-
-[[property_type_integer]]
-==== `integer`
-
-The properties of type integer support whole numeric values, such as `5` and `1000`.
-Negative values are supported as well, for example `-7`.
-Integer type values must be whole numbers, decimal values such as 2.5 are not supported.
-
-Some integer type properties enforce their own minimum and maximum values.
-
-[[property_type_string]]
-==== `string`
-
-The properties of type string support a set of values that consist of a sequence of characters.
-Allowed values are defined on a property-by-property basis, refer to the specific property for its supported and default values.
-
-[[property_type_list]]
-==== `list`
-
-The properties of type list support a set of values that consist of a comma-separated list of <<property_type_string>>s, such as `a,b,c` and `customers,products`.
 
 == Support
 
