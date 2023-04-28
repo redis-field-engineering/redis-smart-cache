@@ -20,7 +20,7 @@ apply plugin: 'org.kordamp.gradle.kordamp-parentbuild'
 rootProject.name = 'redis-smart-cache'
 
 projects {
-    directories = ['core', 'demo', 'tools']
+    directories = ['core', 'demo']
 
     plugins {
         all {
@@ -29,7 +29,7 @@ projects {
         path(':') {
             id 'org.kordamp.gradle.java-project'
         }
-        dirs(['core', 'demo', 'tools']) {
+        dirs(['core', 'demo']) {
             id 'java-library'
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'
