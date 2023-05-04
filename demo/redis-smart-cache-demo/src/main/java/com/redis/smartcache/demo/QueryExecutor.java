@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -36,6 +37,15 @@ public class QueryExecutor implements AutoCloseable {
 	private static final Logger log = Logger.getLogger(QueryExecutor.class.getName());
 
 	private static final String QUERY = "SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?";
+
+	private static final List<String> QUERIES = Arrays.asList(
+			"SELECT orders.orderNumber, orders.orderDate, orders.requiredDate, orders.shippedDate, orders.status, orders.customerNumber, customers.customerName, orderdetails.productCode, products.productName, orderdetails.quantityOrdered FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?",
+			"SELECT customers.customerName, customers.phone, customers.country FROM orders JOIN customers ON orders.customerNumber = customers.customerNumber, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?",
+			"SELECT orderdetails.productCode, orders.orderDate FROM orders JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?",
+			"SELECT orderdetails.productCode, orders.orderDate, orders.requiredDate FROM orders JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?",
+			"SELECT orderdetails.productCode FROM orders JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?",
+			"SELECT products.productName, orders.orderDate, orders.requiredDate FROM orders JOIN orderdetails ON orders.orderNumber = orderdetails.orderNumber JOIN products ON orderdetails.productCode = products.productCode, (SELECT SLEEP(?)) as sleep WHERE orders.orderNumber = ?"
+	);
 
 	private final RedisURI redisURI;
 	private final DataSourceProperties dataSourceProperties;
@@ -104,7 +114,7 @@ public class QueryExecutor implements AutoCloseable {
 			int count = 0;
 			while (!stopped) {
 				try (Connection connection = dataSource.getConnection();
-						PreparedStatement statement = connection.prepareStatement(QUERY)) {
+						PreparedStatement statement = connection.prepareStatement(QUERIES.get(random.nextInt(QUERIES.size())))) {
 					int orderNumber = random.nextInt(totalRows) + 1;
 					statement.setInt(1, random.nextInt(5));
 					statement.setInt(2, orderNumber);
