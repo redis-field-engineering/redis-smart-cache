@@ -2,16 +2,14 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
 import io.lettuce.core.SslVerifyMode;
+
 
 public class Config {
 
@@ -351,7 +349,7 @@ public class Config {
 
 	}
 
-	public static class RuleConfig {
+	public static class RuleConfig implements Cloneable {
 
 		public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
 
@@ -375,6 +373,30 @@ public class Config {
 			this.regex = builder.regex;
 			this.queryIds = builder.queryIds;
 			this.ttl = builder.ttl;
+		}
+
+		@Override
+		public RuleConfig clone(){
+			RuleConfig res = new RuleConfig();
+			if (tables != null){
+				res.tables = new ArrayList<>(this.tables);
+			}
+
+			if (tablesAll != null){
+				res.tablesAll = new ArrayList<>(this.tablesAll);
+			}
+
+			if (tablesAny != null){
+				res.tablesAny = new ArrayList<>(this.tablesAny);
+			}
+
+			if (queryIds != null){
+				res.queryIds = new ArrayList<>(this.queryIds);
+			}
+
+			res.regex = this.regex;
+			res.ttl = this.ttl;
+			return res;
 		}
 
 		public void addPropertyChangeListener(PropertyChangeListener listener) {

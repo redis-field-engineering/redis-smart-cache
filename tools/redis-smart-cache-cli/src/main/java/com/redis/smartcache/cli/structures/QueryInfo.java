@@ -10,7 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
-public class QueryInfo implements TableInfoItem{
+public class QueryInfo implements RowStringable {
     private Query query;
 
     private RuleConfig currentRule;

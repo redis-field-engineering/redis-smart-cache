@@ -33,9 +33,10 @@ result(model) ::= <<
 
 // component is running
 running(model) ::= <<
-Hit 'enter' to select a query
-Hit escape to go back
-hit ctrl+c to exit
+press 'enter' to edit
+press 'c' to commit
+press 'esc' to go back
+press ctrl+c to exit
 <question_name(model)>
 <model.rows:{x|<select_item(x)>}; separator="\n">
 >>

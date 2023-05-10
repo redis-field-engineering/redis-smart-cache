@@ -1,24 +1,17 @@
 package com.redis.smartcache.cli.components;
 
-import com.redis.smartcache.cli.structures.TableInfoItem;
-import org.jline.keymap.BindingReader;
-import org.jline.keymap.KeyMap;
+import com.redis.smartcache.cli.structures.RowStringable;
 import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedString;
-import org.jline.utils.InfoCmp;
 import org.springframework.shell.component.context.ComponentContext;
 import org.springframework.shell.component.support.*;
-import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.jline.keymap.KeyMap.*;
-import static org.jline.keymap.KeyMap.key;
-
-public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
+public class TableSelector<T extends RowStringable, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
         extends AbstractTableSelectorComponent<T, TableSelector.SingleItemSelectorContext<T, I>, I> {
 
     private SingleItemSelectorContext<T, I> currentContext;
@@ -29,9 +22,10 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
     private AtomicInteger start = new AtomicInteger(0);
     private AtomicInteger pos = new AtomicInteger(0);
     private Comparator<I> comparator = (o1, o2) -> 0;
-    private int maxItems = 5;
+    private final int maxItems = 5;
+    private final int numColumns;
 
-    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header, boolean exitSelects) {
+    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header, boolean exitSelects, int numColumns) {
         super(terminal, name, items, exitSelects, comparator);
         this.header = header;
         setRenderer(new DefaultRenderer());
@@ -40,6 +34,7 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
             this.comparator = comparator;
         }
         this.exitSelects = exitSelects;
+        this.numColumns = numColumns;
     }
 
     @Override
@@ -47,7 +42,7 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
         if (context != null && currentContext == context) {
             return currentContext;
         }
-        currentContext = TableSelector.SingleItemSelectorContext.empty(getItemMapper());
+        currentContext = TableSelector.SingleItemSelectorContext.empty(getItemMapper(), numColumns);
         currentContext.setName(name);
         currentContext.setHeader(header);
         currentContext.setWidth(getTerminal().getWidth());
@@ -100,7 +95,7 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
     /**
      * Context {@link TableSelector}.
      */
-    public interface SingleItemSelectorContext<T extends TableInfoItem, I extends Nameable & Matchable & Itemable<T>>
+    public interface SingleItemSelectorContext<T extends RowStringable, I extends Nameable & Matchable & Itemable<T>>
             extends SelectorComponentContext<T, I, SingleItemSelectorContext<T, I>> {
 
         /**
@@ -126,8 +121,8 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
          *
          * @return empty context
          */
-        static <C extends TableInfoItem, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty() {
-            return new TableSelector.DefaultSingleItemSelectorContext<>();
+        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(int numColumns) {
+            return new TableSelector.DefaultSingleItemSelectorContext<>(numColumns);
         }
 
         /**
@@ -135,19 +130,20 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
          *
          * @return context
          */
-        static <C extends TableInfoItem, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper) {
-            return new TableSelector.DefaultSingleItemSelectorContext<>(itemMapper);
+        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper, int numColumns) {
+            return new TableSelector.DefaultSingleItemSelectorContext<>(itemMapper, numColumns);
         }
     }
 
-    private static class DefaultSingleItemSelectorContext<T extends TableInfoItem, I extends Nameable & Matchable & Itemable<T>> extends
+    private static class DefaultSingleItemSelectorContext<T extends RowStringable, I extends Nameable & Matchable & Itemable<T>> extends
             BaseSelectorComponentContext<T, I, SingleItemSelectorContext<T, I>> implements SingleItemSelectorContext<T, I> {
 
+        private int numColumns;
         private String header;
         private int width;
 
         private int getColWidth(){
-            return (width-10)/8;
+            return (width-10)/numColumns;
         }
 
         public void setWidth(int width){
@@ -161,10 +157,12 @@ public class TableSelector<T extends TableInfoItem, I extends Nameable & Matchab
 
         private Function<T, String> itemMapper = item -> item.toRowString(width);
 
-        DefaultSingleItemSelectorContext() {
+        DefaultSingleItemSelectorContext(int numColumns) {
+            this.numColumns = numColumns;
         }
 
-        DefaultSingleItemSelectorContext(Function<T, String> itemMapper) {
+        DefaultSingleItemSelectorContext(Function<T, String> itemMapper, int numColumns) {
+            this.numColumns = numColumns;
             this.itemMapper = itemMapper;
         }
 

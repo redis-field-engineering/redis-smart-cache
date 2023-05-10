@@ -39,9 +39,13 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
     private I defaultExpose;
     private boolean expose = false;
     private boolean confirmMode = false;
+    private boolean newMode = false;
+    private boolean deleteMode = false;
 
     public static final String OPERATION_ESCAPE = "ESCAPE";
     public static final String OPERATION_CONFIRM = "CONFIRM";
+    public static final String OPERATION_NEW = "NEW";
+    public static final String OPERATION_DELETE = "DELETE";
     public AbstractTableSelectorComponent(Terminal terminal, String name, List<I> items, boolean exitSelects,
                                           Comparator<I> comparator) {
         super(terminal);
@@ -110,6 +114,8 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         keyMap.bind(OPERATION_EXIT, "\r");
         keyMap.bind(OPERATION_ESCAPE,"\033");
         keyMap.bind(OPERATION_CONFIRM, Character.toString('c'));
+        keyMap.bind(OPERATION_NEW, Character.toString('n'));
+        keyMap.bind(OPERATION_DELETE, Character.toString('d'));
 
     }
 
@@ -192,9 +198,16 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
             case OPERATION_CONFIRM:
                 confirmMode = true;
                 return true;
+            case OPERATION_NEW:
+                newMode = true;
+                return true;
+            case OPERATION_DELETE:
+                deleteMode = true;
+                return true;
             default:
                 break;
         }
+
         thisContext.setCursorRow(start.get() + pos.get());
         buildItemStateView = buildItemStateView(start.get(), thisContext);
         thisContext.setItemStateView(buildItemStateView.items);
@@ -258,10 +271,14 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
     public boolean isConfirmMode() {
         return confirmMode;
     }
+    public boolean isNewMode() { return newMode; }
+    public boolean isDeleteMode(){ return deleteMode; }
 
     public void setConfirmMode(boolean confirmMode) {
         this.confirmMode = confirmMode;
     }
+    public void setNewMode(boolean newMode) { this.newMode = newMode; }
+    public void setDeleteMode(boolean deleteMode){ this.deleteMode=deleteMode; }
 
     class ItemStateViewProjection {
         List<ItemState<I>> items;
