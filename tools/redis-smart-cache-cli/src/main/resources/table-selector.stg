@@ -33,10 +33,7 @@ result(model) ::= <<
 
 // component is running
 running(model) ::= <<
-press 'enter' to edit
-press 'c' to commit
-press 'esc' to go back
-press ctrl+c to exit
+<model.instructions>
 <question_name(model)>
 <model.rows:{x|<select_item(x)>}; separator="\n">
 >>

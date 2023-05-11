@@ -22,6 +22,6 @@ public class RuleTypeInfo implements RowStringable{
 
     @Override
     public String toRowString(int colWidth) {
-        return Util.center(type.getValue(),colWidth);
+        return type.getValue();
     }
 }

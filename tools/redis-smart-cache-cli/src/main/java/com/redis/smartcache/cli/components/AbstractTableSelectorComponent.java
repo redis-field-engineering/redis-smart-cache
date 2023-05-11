@@ -16,6 +16,7 @@ import org.springframework.util.StringUtils;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,6 +42,16 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
     private boolean confirmMode = false;
     private boolean newMode = false;
     private boolean deleteMode = false;
+
+    public boolean isEscapeMode() {
+        return escapeMode;
+    }
+
+    public void setEscapeMode(boolean escapeMode) {
+        this.escapeMode = escapeMode;
+    }
+
+    private boolean escapeMode = false;
 
     public static final String OPERATION_ESCAPE = "ESCAPE";
     public static final String OPERATION_CONFIRM = "CONFIRM";
@@ -133,19 +144,26 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
     @Override
     protected boolean read(BindingReader bindingReader, KeyMap<String> keyMap, C context) {
 
+        String operation = bindingReader.readBinding(keyMap);
+        if(Objects.equals(operation, OPERATION_ESCAPE)){
+            escapeMode = true;
+            return true;
+        }
+
         if (stale) {
             start.set(0);
             pos.set(0);
             stale = false;
         }
+
         C thisContext = getThisContext(context);
         ItemStateViewProjection buildItemStateView = buildItemStateView(start.get(), thisContext);
         List<ItemState<I>> itemStateView = buildItemStateView.items;
-        String operation = bindingReader.readBinding(keyMap);
+
         if (operation == null) {
             return true;
         }
-        String input;
+
         switch (operation) {
             case OPERATION_DOWN:
                 if (start.get() + pos.get() + 1 < itemStateView.size()) {
@@ -191,9 +209,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
                         .map(i -> i.item)
                         .collect(Collectors.toList());
                 thisContext.setResultItems(values);
-                return true;
-            case OPERATION_ESCAPE:
-                thisContext.setResultItems(null);
                 return true;
             case OPERATION_CONFIRM:
                 confirmMode = true;

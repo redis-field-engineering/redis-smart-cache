@@ -6,6 +6,7 @@ import com.redis.smartcache.cli.components.ConfirmationInputExtension;
 import com.redis.smartcache.cli.components.StringInputExtension;
 import com.redis.smartcache.cli.components.TableSelector;
 import com.redis.smartcache.cli.structures.*;
+import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.Config.RuleConfig;
 import org.jline.utils.InfoCmp;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,8 @@ public class Commands extends AbstractShellComponent {
     final String EXIT = "Exit";
     final String[] ruleTypes = {QUERY_IDS, TABLES, TABLES_ANY, TABLES_ALL, REGEX};
 
+    final String tableInstructions = "press 'enter' to edit\npress 'c' to commit\npress 'esc' to go back\npress ctrl+c to exit\n";
+
     @Autowired
     private ComponentFlow.Builder componentFlowBuilder;
 
@@ -55,17 +58,28 @@ public class Commands extends AbstractShellComponent {
         );
 
         TableSelector<RuleTypeInfo, SelectorItem<RuleTypeInfo>> component = new TableSelector<RuleTypeInfo, SelectorItem<RuleTypeInfo>>(getTerminal(),
-                ruleTypes, "rules", null, "Select Rule Type", true, 1);
+                ruleTypes, "rules", null, "Select Rule Type", true, 1, "");
         component.setResourceLoader(getResourceLoader());
         component.setTemplateExecutor(getTemplateExecutor());
         TableSelector.SingleItemSelectorContext<RuleTypeInfo, SelectorItem<RuleTypeInfo>> context = component
-                .run(TableSelector.SingleItemSelectorContext.empty(1));
+                .run(TableSelector.SingleItemSelectorContext.empty(1, ""));
+        if(!component.isEscapeMode()){
+            return Optional.of(context.getResultItem().get().getItem());
+        }
 
         return Optional.empty();
     }
 
-    public Optional<Duration> getTtl(){
-        StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(),"Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m):","30m");
+    public Optional<Duration> getTtl(String message){
+        String prompt;
+        if(message.isEmpty()){
+            prompt = "Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m):";
+        }
+        else{
+            prompt = String.format("%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m):",message);
+        }
+
+        StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(), prompt,"30m");
         stringInputComponent.setResourceLoader(getResourceLoader());
         stringInputComponent.setTemplateExecutor(getTemplateExecutor());
         StringInput.StringInputContext stringInputContext = stringInputComponent.run(StringInput.StringInputContext.empty());
@@ -91,6 +105,8 @@ public class Commands extends AbstractShellComponent {
     public Optional<Boolean> getConfirmation(RuleInfo info){
         String prompt = String.format("Rule Type: %s, Rule Match: %s, Rule TTL: %s", info.ruleType(), info.ruleMatch(), info.getRule().getTtl());
         ConfirmationInputExtension component = new ConfirmationInputExtension(getTerminal(), prompt, false);
+        component.setResourceLoader(getResourceLoader());
+        component.setTemplateExecutor(getTemplateExecutor());
         ConfirmationInput.ConfirmationInputContext context = component.run(ConfirmationInput.ConfirmationInputContext.empty());
         if(component.isEscapeMode()){
             return Optional.empty();
@@ -100,21 +116,46 @@ public class Commands extends AbstractShellComponent {
     }
 
     public Optional <RuleConfig> newRuleDialogCustom(boolean confirm){
-        boolean selectorEscaped = false;
-
+        Optional<Boolean> confirmed = Optional.empty();
+        Optional<RuleTypeInfo> ruleType = Optional.empty();
+        Optional<Duration> ttl = Optional.empty();
+        Optional<String> match = Optional.empty();
+        Optional<RuleConfig> rule = Optional.empty();
         do{
-            Optional<RuleTypeInfo> ruleType = getRuleType();
-            if(!ruleType.isPresent())
-            {
-                selectorEscaped = true;
-            }else{
-
+            ruleType = getRuleType();
+            if(!ruleType.isPresent()){
+                break;
             }
 
-        }while(!selectorEscaped);
+            do{
+                match = getMatch(ruleType.get());
+                if(!match.isPresent()){
+                    break;
+                }
+
+                ttl = getTtl("");
+            } while(!ttl.isPresent());
+
+            if(!match.isPresent()){
+                continue;
+            }
+
+            rule = Optional.of(Util.createRule(ruleType.get().getType(), match.get(),ttl.get()));
+
+            if(confirm){
+                confirmed = getConfirmation(new RuleInfo(rule.get(), RuleInfo.Status.New));
+                if(confirmed.isPresent() && !confirmed.get()){
+                    break;
+                }
+            }
+
+        }while(!confirmed.isPresent() && confirm);
+
+        if(confirmed.isPresent() && confirmed.get()){
+            return rule;
+        }
 
         return Optional.empty();
-
     }
 
     public Optional<RuleConfig> newRuleDialog(boolean confirm){
@@ -177,6 +218,7 @@ public class Commands extends AbstractShellComponent {
 
         if(confirmed){
             List<RuleConfig> rules = client.getRules();
+
             RuleConfig.Builder builder = new RuleConfig.Builder().ttl(Duration.valueOf(ttl));
             switch (ruleType){
                 case QUERY_IDS:
@@ -204,7 +246,7 @@ public class Commands extends AbstractShellComponent {
 
     @ShellMethod(key = "create-rule", value = "Create a new rule", group = "Components")
     public String createRule(){
-        Optional<RuleConfig> newRule = newRuleDialog(true);
+        Optional<RuleConfig> newRule = newRuleDialogCustom(true);
         if(newRule.isPresent()){
             List<RuleConfig> rules = client.getRules();
             rules.add(0, newRule.get());
@@ -334,11 +376,11 @@ public class Commands extends AbstractShellComponent {
             List<SelectorItem<RuleInfo>> ruleInfos = rules.stream().map(rule -> SelectorItem.of(UUID.randomUUID().toString(),rule)).collect(Collectors.toList());
 
             TableSelector<RuleInfo, SelectorItem<RuleInfo>> component = new TableSelector<RuleInfo, SelectorItem<RuleInfo>>(getTerminal(),
-                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth()-10)/4), true, 4);
+                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth()-10)/4), true, 4, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(3));
+                    .run(TableSelector.SingleItemSelectorContext.empty(3, tableInstructions));
             Optional<SelectorItem<RuleInfo>> res = context.getResultItem();
 
             if(component.isConfirmMode()){
@@ -359,7 +401,7 @@ public class Commands extends AbstractShellComponent {
                 component.setConfirmMode(false);
                 continue;
             }
-            if(res.isPresent()){
+            if(!component.isEscapeMode() && res.isPresent()){
                 res.get().getItem().setRule(editRuleDialog(res.get().getItem()));
             }
             else if(component.isNewMode()){
@@ -399,18 +441,18 @@ public class Commands extends AbstractShellComponent {
             }
 
             TableSelector<Table, SelectorItem<Table>> component = new TableSelector<Table, SelectorItem<Table>>(getTerminal(),
-                    tables, "tables", null, Table.headerRow((getTerminal().getWidth()-10)/4), true, 4);
+                    tables, "tables", null, Table.headerRow((getTerminal().getWidth()-10)/4), true, 4, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             TableSelector.SingleItemSelectorContext<Table, SelectorItem<Table>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(4));
+                    .run(TableSelector.SingleItemSelectorContext.empty(4, tableInstructions));
             Optional<SelectorItem<Table>> res = context.getResultItem();
 
             if(component.isConfirmMode()){
                 component.setConfirmMode(false);
                 continue;
             }
-            if(res.isPresent()){
+            if(!component.isEscapeMode() && res.isPresent()){
                 ComponentFlow flow = componentFlowBuilder.clone().reset()
                     .withStringInput("ttl")
                         .name(String.format("Create rule to cache table:%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m):", res.get().getName()))
@@ -439,27 +481,31 @@ public class Commands extends AbstractShellComponent {
         return "";
     }
 
+    private List<SelectorItem<QueryInfo>> getQueries(){
+        List<SelectorItem<QueryInfo>> queries = new ArrayList<>();
+
+        for (QueryInfo q : client.getQueries("smartcache")){
+            queries.add(SelectorItem.of(q.getQueryId(),q));
+        }
+        return queries;
+    }
+
     @ShellMethod(key = "list-queries", value = "Get the table of queries", group = "Components")
     public String listQueries(){
         List<RuleConfig> rules = client.getRules();
 
         Map<Duration, RuleConfig> pendingRules = new HashMap<>();
 
-        List<SelectorItem<QueryInfo>> queries = new ArrayList<>();
-
-        for (QueryInfo q : client.getQueries("smartcache")){
-            queries.add(SelectorItem.of(q.getQueryId(),q));
-        }
+        List<SelectorItem<QueryInfo>> queries = getQueries();
 
         while(true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
             TableSelector<QueryInfo, SelectorItem<QueryInfo>> component = new TableSelector<>(getTerminal(),
-                    queries, "queries", null, QueryInfo.getHeaderRow((getTerminal().getWidth()-10)/8), true, 8);
+                    queries, "queries", null, QueryInfo.getHeaderRow((getTerminal().getWidth()-10)/8), true, 8, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             TableSelector.SingleItemSelectorContext<QueryInfo, SelectorItem<QueryInfo>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(8));
-
+                    .run(TableSelector.SingleItemSelectorContext.empty(8, tableInstructions));
             Optional<SelectorItem<QueryInfo>> resOpt = context.getResultItem();
 
             if (component.isConfirmMode()){
@@ -486,40 +532,21 @@ public class Commands extends AbstractShellComponent {
                         }
 
                         client.commitRules(rules);
+                        queries = getQueries();
                     }
                     else{
                         component.setConfirmMode(false);
                     }
                 }
             }
-            else if (resOpt.isPresent()){
+            else if (!component.isEscapeMode() && resOpt.isPresent()){
+
                 QueryInfo result = resOpt.get().getItem();
 
                 String info = result.toFormattedString(getTerminal().getWidth());
-                Optional<Duration> duration = Optional.empty();
+                Optional<Duration> duration = getTtl(info);
 
-                String prompt = String.format("%s%nEnter TTL:", info);
-                boolean exited = false;
-
-                while (!duration.isPresent()){
-                    StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(),prompt,"30m");
-                    stringInputComponent.setResourceLoader(getResourceLoader());
-                    stringInputComponent.setTemplateExecutor(getTemplateExecutor());
-                    StringInput.StringInputContext stringInputContext = stringInputComponent.run(StringInput.StringInputContext.empty());
-                    if (stringInputComponent.isEscapeMode()){
-
-                        exited = true;
-                        break;
-                    }
-
-                    try {
-                        duration = Optional.of(Duration.valueOf(stringInputContext.getResultValue()));
-                    } catch (IllegalArgumentException ex){
-                        prompt = String.format("%s%nPrevious Input was Invalid%nEnter TTL", info);
-                    }
-                }
-
-                if(exited){
+                if(!duration.isPresent()){
                     continue;
                 }
 
@@ -532,7 +559,6 @@ public class Commands extends AbstractShellComponent {
                     pendingRules.put(duration.get(),rule);
                 }
                 queries.get(context.getCursorRow()).getItem().setPendingRule(rule);
-//                return String.format("Selected query id: %s index: %d, ttl: %s", result.getQueryId(), context.getCursorRow(), stringInputContext.getResultValue());
             }
             else{
                 break;

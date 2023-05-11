@@ -1,5 +1,9 @@
 package com.redis.smartcache.cli.util;
 
+import com.redis.smartcache.cli.structures.RuleType;
+import com.redis.smartcache.core.Config;
+import io.airlift.units.Duration;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -64,5 +68,28 @@ public final class Util {
         }
 
         return substrings;
+    }
+
+    public static Config.RuleConfig createRule(RuleType ruleType, String match, Duration ttl){
+        Config.RuleConfig.Builder builder = new Config.RuleConfig.Builder().ttl(ttl);
+        switch (ruleType){
+            case QUERY_IDS:
+                builder.queryIds(match);
+                break;
+            case TABLES_ANY:
+                builder.tablesAny(match);
+                break;
+            case TABLES:
+                builder.tables(match);
+                break;
+            case TABLES_ALL:
+                builder.tablesAll(match);
+                break;
+            case REGEX:
+                builder.regex(match);
+                break;
+        }
+
+        return builder.build();
     }
 }

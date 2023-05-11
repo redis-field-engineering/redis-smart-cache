@@ -24,8 +24,9 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
     private Comparator<I> comparator = (o1, o2) -> 0;
     private final int maxItems = 5;
     private final int numColumns;
+    private final String instructions;
 
-    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header, boolean exitSelects, int numColumns) {
+    public TableSelector(Terminal terminal, List<I> items, String name, Comparator<I> comparator, String header, boolean exitSelects, int numColumns, String instructions) {
         super(terminal, name, items, exitSelects, comparator);
         this.header = header;
         setRenderer(new DefaultRenderer());
@@ -35,6 +36,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
         }
         this.exitSelects = exitSelects;
         this.numColumns = numColumns;
+        this.instructions = instructions;
     }
 
     @Override
@@ -42,7 +44,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
         if (context != null && currentContext == context) {
             return currentContext;
         }
-        currentContext = TableSelector.SingleItemSelectorContext.empty(getItemMapper(), numColumns);
+        currentContext = TableSelector.SingleItemSelectorContext.empty(getItemMapper(), numColumns, instructions);
         currentContext.setName(name);
         currentContext.setHeader(header);
         currentContext.setWidth(getTerminal().getWidth());
@@ -121,8 +123,8 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
          *
          * @return empty context
          */
-        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(int numColumns) {
-            return new TableSelector.DefaultSingleItemSelectorContext<>(numColumns);
+        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(int numColumns, String instructions) {
+            return new TableSelector.DefaultSingleItemSelectorContext<>(numColumns,instructions);
         }
 
         /**
@@ -130,15 +132,16 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
          *
          * @return context
          */
-        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper, int numColumns) {
-            return new TableSelector.DefaultSingleItemSelectorContext<>(itemMapper, numColumns);
+        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper, int numColumns, String instructions) {
+            return new TableSelector.DefaultSingleItemSelectorContext<>(itemMapper, numColumns, instructions);
         }
     }
 
     private static class DefaultSingleItemSelectorContext<T extends RowStringable, I extends Nameable & Matchable & Itemable<T>> extends
             BaseSelectorComponentContext<T, I, SingleItemSelectorContext<T, I>> implements SingleItemSelectorContext<T, I> {
 
-        private int numColumns;
+        private String instructions;
+        private final int numColumns;
         private String header;
         private int width;
 
@@ -157,13 +160,15 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
 
         private Function<T, String> itemMapper = item -> item.toRowString(width);
 
-        DefaultSingleItemSelectorContext(int numColumns) {
+        DefaultSingleItemSelectorContext(int numColumns, String instructions) {
             this.numColumns = numColumns;
+            this.instructions = instructions;
         }
 
-        DefaultSingleItemSelectorContext(Function<T, String> itemMapper, int numColumns) {
+        DefaultSingleItemSelectorContext(Function<T, String> itemMapper, int numColumns, String instructions) {
             this.numColumns = numColumns;
             this.itemMapper = itemMapper;
+            this.instructions = instructions;
         }
 
         @Override
@@ -187,6 +192,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
         public Map<String, Object> toTemplateModel() {
             Map<String, Object> attributes = super.toTemplateModel();
             attributes.put("header", header);
+            attributes.put("instructions", instructions);
 
             List<Map<String,Object>> rows = new ArrayList<>();
             for (int i = 0; i<getItems().size();i++){
