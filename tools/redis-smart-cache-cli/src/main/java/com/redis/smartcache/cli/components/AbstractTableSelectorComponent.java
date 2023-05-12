@@ -11,12 +11,10 @@ import org.springframework.shell.component.context.ComponentContext;
 import org.springframework.shell.component.support.*;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StopWatch;
 import org.springframework.util.StringUtils;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -120,6 +118,7 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
 
     @Override
     protected void bindKeyMap(KeyMap<String> keyMap) {
+        keyMap.setAmbiguousTimeout(1);
         keyMap.bind(OPERATION_DOWN, ctrl('E'), key(getTerminal(), InfoCmp.Capability.key_down));
         keyMap.bind(OPERATION_UP, ctrl('Y'), key(getTerminal(), InfoCmp.Capability.key_up));
         keyMap.bind(OPERATION_EXIT, "\r");
@@ -148,7 +147,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
 
     @Override
     protected boolean read(BindingReader bindingReader, KeyMap<String> keyMap, C context) {
-
         String operation = bindingReader.readBinding(keyMap);
         if(Objects.equals(operation, OPERATION_ESCAPE)){
             escapeMode = true;
