@@ -137,7 +137,12 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         ItemStateViewProjection buildItemStateView = buildItemStateView(start.get(), thisContext);
         List<ItemState<I>> itemStateView = buildItemStateView.items;
         thisContext.setItemStateView(itemStateView);
+        if(context != null && context.getCursorRow() != 0){
+            pos.set(context.getCursorRow()-start.get());
+        }
+
         thisContext.setCursorRow(start.get() + pos.get());
+
         return thisContext;
     }
 

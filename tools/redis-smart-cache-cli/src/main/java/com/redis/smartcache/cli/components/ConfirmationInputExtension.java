@@ -34,6 +34,7 @@ public class ConfirmationInputExtension extends ConfirmationInput {
 
     public ConfirmationInputExtension(Terminal terminal, String name, boolean defaultValue) {
         super(terminal, name, defaultValue);
+        setTemplateLocation("classpath:confirmation-input.stg");
     }
 
     public ConfirmationInputExtension(Terminal terminal, String name, boolean defaultValue, Function<ConfirmationInputContext, List<AttributedString>> renderer) {

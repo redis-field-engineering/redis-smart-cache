@@ -16,16 +16,22 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
+//@Service
 public class RedisServiceImpl implements RedisService{
-    @Autowired
+//    @Autowired
     Config conf;
 
-    @Autowired
+//    @Autowired
     ClientManager manager;
 
-    @Autowired
+//    @Autowired
     StatefulRedisModulesConnection<String, String> connection;
+
+    public RedisServiceImpl(RedisConfig config){
+        conf = config.conf();
+        manager = config.abstractRedisClient();
+        connection = config.modClient();
+    }
 
 
     public String ping(){

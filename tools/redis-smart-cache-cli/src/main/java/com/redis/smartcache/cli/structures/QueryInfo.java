@@ -15,6 +15,15 @@ public class QueryInfo implements RowStringable {
 
     private RuleConfig currentRule;
     private RuleConfig pendingRule;
+
+    public long getCount() {
+        return count;
+    }
+
+    public double getMeanQueryTime() {
+        return meanQueryTime;
+    }
+
     private long count;
     private double meanQueryTime;
 
@@ -92,7 +101,34 @@ public class QueryInfo implements RowStringable {
         this.currentRule = rule;
     }
 
-    public static String getHeaderRow(int colWidth){
+    public static int compare(QueryInfo first, QueryInfo second, SortDirection sortDirection, SortField sortBy){
+        switch(sortBy){
+            case accessFrequency:
+                if(sortDirection == SortDirection.asc){
+
+                    return Long.compare(first.getCount(), second.getCount());
+                }
+                return Long.compare(second.getCount(), first.getCount());
+            case queryTime:
+                if(sortDirection == SortDirection.asc){
+                    return Double.compare(first.getMeanQueryTime(), second.getMeanQueryTime());
+                }
+                return Double.compare(second.getMeanQueryTime(), first.getMeanQueryTime());
+            case tables:
+                if(sortDirection == SortDirection.asc){
+                    return first.getQueryTablesString().compareTo(second.getQueryTablesString());
+                }
+                return second.getQueryTablesString().compareTo(first.getQueryTablesString());
+            case id:
+                if (sortDirection == SortDirection.asc) {
+                    return first.getQueryId().compareTo(second.getQueryId());
+                }
+                return second.getQueryId().compareTo(first.getQueryId());
+        }
+        return Long.compare(first.getCount(), second.getCount());
+    }
+
+    public static String getHeaderRow(int colWidth, boolean includePending){
         StringBuilder sb = new StringBuilder();
         sb.append("|");
         sb.append(Util.center("Id",colWidth));
@@ -105,8 +141,11 @@ public class QueryInfo implements RowStringable {
         sb.append("|");
         sb.append(Util.center("Current TTL", colWidth));
         sb.append("|");
-        sb.append(Util.center("Pending TTL", colWidth));
-        sb.append("|");
+        if(includePending){
+            sb.append(Util.center("Pending TTL", colWidth));
+            sb.append("|");
+        }
+
         sb.append(Util.center("Access Frequency", colWidth));
         sb.append("|");
         sb.append(Util.center("Mean Query Time", colWidth));
@@ -115,6 +154,10 @@ public class QueryInfo implements RowStringable {
     }
 
     public String toRowString(int colWidth){
+        return toRowString(colWidth, true);
+    }
+
+    public String toRowString(int colWidth, boolean includePending){
         StringBuilder sb = new StringBuilder();
         sb.append("|");
         sb.append(Util.center(getQueryId(),colWidth));
@@ -127,8 +170,11 @@ public class QueryInfo implements RowStringable {
         sb.append("|");
         sb.append(Util.center(getCurrentTtlString(),colWidth));
         sb.append("|");
-        sb.append(Util.center(getPendingRuleTtlString(),colWidth));
-        sb.append("|");
+        if(includePending){
+            sb.append(Util.center(getPendingRuleTtlString(),colWidth));
+            sb.append("|");
+        }
+
         sb.append(Util.center(String.valueOf(count),colWidth));
         sb.append("|");
         sb.append(Util.center(String.valueOf(meanQueryTime),colWidth));

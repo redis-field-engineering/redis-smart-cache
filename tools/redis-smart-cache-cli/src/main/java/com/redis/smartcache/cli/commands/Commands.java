@@ -1,7 +1,6 @@
 package com.redis.smartcache.cli.commands;
 
-import com.redis.smartcache.cli.Constants;
-import com.redis.smartcache.cli.RedisService;
+import com.redis.smartcache.cli.*;
 import com.redis.smartcache.cli.components.ConfirmationInputExtension;
 import com.redis.smartcache.cli.components.StringInputExtension;
 import com.redis.smartcache.cli.components.TableSelector;
@@ -18,6 +17,8 @@ import org.springframework.shell.standard.AbstractShellComponent;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 import io.airlift.units.Duration;
+import org.springframework.shell.standard.ShellOption;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,13 +41,10 @@ public class Commands extends AbstractShellComponent {
     @Autowired
     private ComponentFlow.Builder componentFlowBuilder;
 
-    @Autowired
-    RedisService client;
-
-    @ShellMethod(key = "ping", value = "ping")
-    String ping(){
+    String ping(RedisService client){
         return client.ping();
     }
+
 
     public Optional<RuleTypeInfo> getRuleType(){
         List<SelectorItem<RuleTypeInfo>> ruleTypes = Arrays.asList(
@@ -63,7 +61,7 @@ public class Commands extends AbstractShellComponent {
         component.setTemplateExecutor(getTemplateExecutor());
         TableSelector.SingleItemSelectorContext<RuleTypeInfo, SelectorItem<RuleTypeInfo>> context = component
                 .run(TableSelector.SingleItemSelectorContext.empty(1, ""));
-        if(!component.isEscapeMode()){
+        if(!component.isEscapeMode() && context.getResultItem().isPresent()){
             return Optional.of(context.getResultItem().get().getItem());
         }
 
@@ -151,115 +149,83 @@ public class Commands extends AbstractShellComponent {
 
         }while(!confirmed.isPresent() && confirm);
 
-        if(confirmed.isPresent() && confirmed.get()){
+        if((confirmed.isPresent() && confirmed.get()) || !confirm){
             return rule;
         }
 
         return Optional.empty();
     }
 
-    public Optional<RuleConfig> newRuleDialog(boolean confirm){
-        List<SelectorItem<String>> options = new ArrayList<>();
-        for(String option : ruleTypes){
-            options.add(SelectorItem.of(option, option));
-        }
-
-        Map<String,String> map = Arrays.stream(ruleTypes).collect(Collectors.toMap(str->str,str->str, (oldValue,newValue)->oldValue, HashMap::new));
-
-        Optional<RuleTypeInfo> ruleTypeInfo = getRuleType();
-
-
-
-        ComponentFlow flow = componentFlowBuilder.clone().reset()
-                .withSingleItemSelector("ruleType")
-                .name("Select Rule Type")
-                .selectItems(map)
-                .next(ctx->ctx.getResultItem().get().getItem())
-                .and()
-                .withStringInput(TABLES)
-                .name("Enter a comma-separated list of tables to match against:")
-                .next(ctx->"TTL")
-                .and()
-                .withStringInput(TABLES_ANY)
-                .name("Enter a comma-separated list of tables to match against:")
-                .next(x->"TTL")
-                .and()
-                .withStringInput(TABLES_ALL)
-                .name("Enter a comma-separated list of tables to match against:")
-                .next(x->"TTL")
-                .and()
-                .withStringInput(QUERY_IDS)
-                .name("Enter a comma-separated list of Query IDs to match against:")
-                .next(x->"TTL")
-                .and()
-                .withStringInput(REGEX)
-                .name("Enter a regular expression to match against:")
-                .next(x->"TTL")
-                .and()
-                .withStringInput("TTL")
-                .name("Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m):")
-                .next(x-> confirm ? "Confirm" : null)
-                .and()
-                .withConfirmationInput("Confirm")
-                .name("Would you like to commit this new rule?")
-                .next(null)
-                .template("classpath:confirmation-input.stg")
-                .and()
-                .templateExecutor(getTemplateExecutor())
-                .resourceLoader(getResourceLoader())
-                .build();
-
-        ComponentFlow.ComponentFlowResult res = flow.run();
-
-        String ruleType = res.getContext().get("ruleType");
-        String match = res.getContext().get(ruleType);
-        String ttl = res.getContext().get("TTL");
-        boolean confirmed = !confirm || (boolean)res.getContext().get("Confirm");
-
-        if(confirmed){
-            List<RuleConfig> rules = client.getRules();
-
-            RuleConfig.Builder builder = new RuleConfig.Builder().ttl(Duration.valueOf(ttl));
-            switch (ruleType){
-                case QUERY_IDS:
-                    builder.queryIds(match);
-                    break;
-                case TABLES_ANY:
-                    builder.tablesAny(match);
-                    break;
-                case TABLES:
-                    builder.tables(match);
-                    break;
-                case TABLES_ALL:
-                    builder.tablesAll(match);
-                    break;
-                case REGEX:
-                    builder.regex(match);
-                    break;
-            }
-
-            return Optional.of(builder.build());
-        }
-
-        return Optional.empty();
-    }
-
-    @ShellMethod(key = "create-rule", value = "Create a new rule", group = "Components")
-    public String createRule(){
+    public void createRule(RedisService client){
         Optional<RuleConfig> newRule = newRuleDialogCustom(true);
         if(newRule.isPresent()){
             List<RuleConfig> rules = client.getRules();
             rules.add(0, newRule.get());
             client.commitRules(rules);
-            return "New rule committed";
+        }
+    }
 
+    /**
+     * There does not appear to be any means in Spring Shell to autowire configuration parameters,
+     * hence we need to initialize the client in each individual command, this is fine since we'll just pass the client
+     * around in the interactive command and the non-interactive commands are run ad-hoc.
+     * @param host the Redis host
+     * @param port the Redis port
+     * @return a connected RedisService
+     */
+    private static RedisService initializeClient(String host, String port){
+        RedisConfig config = new RedisConfig(host,port);
+        RedisService client = new RedisServiceImpl(config);
+        return client;
+    }
+
+    @ShellMethod(key = "list-queries")
+    public String listQueries(
+            @ShellOption(value = {"-n","--hostname"}, defaultValue = "localhost")String host,
+            @ShellOption(value = {"-p","--port"}, defaultValue = "6379") String port,
+            @ShellOption(value = {"-s","--application-name"}, defaultValue = "smartcache") String applicationName,
+            @ShellOption(value = {"-d","--sort-direction"}, defaultValue = "desc") String sortDirectionStr,
+            @ShellOption(value = {"-b","--sort-by"}, defaultValue = "query-time") String sortByStr
+    ){
+        SortDirection sortDirection;
+        SortField sortBy;
+        try{
+            sortDirection = SortDirection.valueOf(sortDirectionStr.toLowerCase());
+        }
+        catch (IllegalArgumentException e){
+            return String.format("Invalid Sort Direction %s", sortDirectionStr);
         }
 
-        return "Rule creation not confirmed, exiting.";
+        try{
+            sortBy = SortField.valueOfOverride(sortByStr.toLowerCase());
+        }
+        catch(IllegalArgumentException e){
+            return String.format("Invalid Sort By: %s", sortByStr);
+        }
+
+
+        RedisService client = initializeClient(host,port);
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n");
+        List<QueryInfo> queries = client.getQueries(applicationName);
+
+        queries.sort((first,second)->QueryInfo.compare(first,second,sortDirection,sortBy));
+
+        int columnWidth = (getTerminal().getWidth()-10)/8;
+        sb.append(String.format("%s%n",QueryInfo.getHeaderRow(columnWidth, false)));
+        for(QueryInfo qi : queries){
+            sb.append(String.format("%s%n",qi.toRowString(columnWidth, false)));
+        }
+        return sb.toString();
     }
 
     @ShellMethod(key="Interactive")
-    public String interactive(){
+    public String interactive(
+            @ShellOption(value = {"-n","--hostname"}, defaultValue = "localhost")String host,
+            @ShellOption(value = {"-p","--port"}, defaultValue = "6379") String port
+    ){
+        RedisService client = initializeClient(host,port);
+
         String[] options = {LIST_APPLICATION_QUERIES, LIST_TABLES, CREATE_RULE, LIST_RULES, EXIT};
         Map<String, String> subCommands = new HashMap<>();
         for(String o : options){
@@ -267,32 +233,36 @@ public class Commands extends AbstractShellComponent {
         }
 
         String nextAction = "";
+        TableSelector.SingleItemSelectorContext<Action, SelectorItem<Action>> context = TableSelector.SingleItemSelectorContext.empty(1, "");
 
         while(!nextAction.equals(EXIT)){
-            ComponentFlow flow = componentFlowBuilder.clone().reset()
-                    .resourceLoader(getResourceLoader()).templateExecutor(getTemplateExecutor())
-                    .withSingleItemSelector("Main Menu")
-                    .selectItems(subCommands)
-                    .name("Select action")
-                    .next(x->null)
-                    .and()
-                    .build();
 
+            List<SelectorItem<Action>> actions = Arrays.stream(options).map(x->SelectorItem.of(x,new Action(x))).collect(Collectors.toList());
+            TableSelector<Action, SelectorItem<Action>> component = new TableSelector<>(getTerminal(),
+                    actions, "Select action", null, "Select Action", true, 1, "");
+            component.setResourceLoader(getResourceLoader());
+            component.setTemplateExecutor(getTemplateExecutor());
 
-            nextAction = (String)flow.run().getContext().get("Main Menu");
+            context = component.run(context);
+
+            if(component.isEscapeMode()){
+                System.exit(0);
+            }
+
+            nextAction = context.getResultItem().get().getItem().getAction();
 
             switch (nextAction){
                 case CREATE_RULE:
-                    createRule();
+                    createRule(client);
                     break;
                 case LIST_APPLICATION_QUERIES:
-                    listQueries();
+                    queryTable(client);
                     break;
                 case LIST_TABLES:
-                    listTables();
+                    tablesTable(client);
                     break;
                 case LIST_RULES:
-                    listRules();
+                    ruleTable(client);
                     break;
             }
 
@@ -365,22 +335,25 @@ public class Commands extends AbstractShellComponent {
         return newRule;
     }
 
-    @ShellMethod(key="list-rules", value = "Display currently active rules in a tabular view")
-    public String listRules(){
+    public void ruleTable(RedisService client){
         List<RuleInfo> rules = client.getRules().stream().map(x->new RuleInfo(x, RuleInfo.Status.Current)).collect(Collectors.toList());
+        String instructions = "press 'enter' to edit\npress 'c' to commit\npress 'esc' to go back\npress ctrl+c to exit\n";;
+        int cursorRow = 0;
 
+        TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = TableSelector.SingleItemSelectorContext.empty(3, tableInstructions);
 
         while (true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
 
             List<SelectorItem<RuleInfo>> ruleInfos = rules.stream().map(rule -> SelectorItem.of(UUID.randomUUID().toString(),rule)).collect(Collectors.toList());
 
-            TableSelector<RuleInfo, SelectorItem<RuleInfo>> component = new TableSelector<RuleInfo, SelectorItem<RuleInfo>>(getTerminal(),
-                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth()-10)/4), true, 4, tableInstructions);
+            TableSelector<RuleInfo, SelectorItem<RuleInfo>> component = new TableSelector<>(getTerminal(),
+                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth() - 10) / 4), true, 4, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
-            TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(3, tableInstructions));
+            context.setCursorRow(cursorRow);
+            context = component.run(context);
+            cursorRow = context.getCursorRow();
             Optional<SelectorItem<RuleInfo>> res = context.getResultItem();
 
             if(component.isConfirmMode()){
@@ -405,7 +378,7 @@ public class Commands extends AbstractShellComponent {
                 res.get().getItem().setRule(editRuleDialog(res.get().getItem()));
             }
             else if(component.isNewMode()){
-                Optional<RuleConfig> newRule = newRuleDialog(false);
+                Optional<RuleConfig> newRule = newRuleDialogCustom(false);
                 if (newRule.isPresent()){
                     rules.add(0, new RuleInfo(newRule.get(), RuleInfo.Status.New));
                 }
@@ -428,11 +401,11 @@ public class Commands extends AbstractShellComponent {
             }
 
         }
-        return "";
     }
 
-    @ShellMethod(key = "list-tables", value = "Get the tables that are currently being watched by smart cache and set up rules for them", group = "Components")
-    public String listTables(){
+    public void tablesTable(RedisService client){
+        int cursorRow = 0;
+        TableSelector.SingleItemSelectorContext<Table, SelectorItem<Table>> context = TableSelector.SingleItemSelectorContext.empty(4, tableInstructions);
         while(true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
             List<SelectorItem<Table>> tables = new ArrayList<>();
@@ -444,8 +417,9 @@ public class Commands extends AbstractShellComponent {
                     tables, "tables", null, Table.headerRow((getTerminal().getWidth()-10)/4), true, 4, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
-            TableSelector.SingleItemSelectorContext<Table, SelectorItem<Table>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(4, tableInstructions));
+            context.setCursorRow(cursorRow);
+            context = component.run(context);
+            cursorRow = context.getCursorRow();
             Optional<SelectorItem<Table>> res = context.getResultItem();
 
             if(component.isConfirmMode()){
@@ -478,10 +452,9 @@ public class Commands extends AbstractShellComponent {
                 break;
             }
         }
-        return "";
     }
 
-    private List<SelectorItem<QueryInfo>> getQueries(){
+    private List<SelectorItem<QueryInfo>> getQueries(RedisService client){
         List<SelectorItem<QueryInfo>> queries = new ArrayList<>();
 
         for (QueryInfo q : client.getQueries("smartcache")){
@@ -490,22 +463,26 @@ public class Commands extends AbstractShellComponent {
         return queries;
     }
 
-    @ShellMethod(key = "list-queries", value = "Get the table of queries", group = "Components")
-    public String listQueries(){
+    public void queryTable(RedisService client){
         List<RuleConfig> rules = client.getRules();
 
         Map<Duration, RuleConfig> pendingRules = new HashMap<>();
 
-        List<SelectorItem<QueryInfo>> queries = getQueries();
+        List<SelectorItem<QueryInfo>> queries = getQueries(client);
+        int cursorRow = 0;
+        TableSelector.SingleItemSelectorContext<QueryInfo, SelectorItem<QueryInfo>> context = TableSelector.SingleItemSelectorContext.empty(8, tableInstructions);
 
         while(true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
             TableSelector<QueryInfo, SelectorItem<QueryInfo>> component = new TableSelector<>(getTerminal(),
-                    queries, "queries", null, QueryInfo.getHeaderRow((getTerminal().getWidth()-10)/8), true, 8, tableInstructions);
+                    queries, "queries", null, QueryInfo.getHeaderRow((getTerminal().getWidth()-10)/8, true), true, 8, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
-            TableSelector.SingleItemSelectorContext<QueryInfo, SelectorItem<QueryInfo>> context = component
-                    .run(TableSelector.SingleItemSelectorContext.empty(8, tableInstructions));
+
+            context.setCursorRow(cursorRow);
+            context = component.run(context);
+            cursorRow = context.getCursorRow();
+//            System.out.printf("Cursor row: %d", cursorRow);
             Optional<SelectorItem<QueryInfo>> resOpt = context.getResultItem();
 
             if (component.isConfirmMode()){
@@ -532,7 +509,7 @@ public class Commands extends AbstractShellComponent {
                         }
 
                         client.commitRules(rules);
-                        queries = getQueries();
+                        queries = getQueries(client);
                     }
                     else{
                         component.setConfirmMode(false);
@@ -565,6 +542,5 @@ public class Commands extends AbstractShellComponent {
             }
         }
 
-        return "";
     }
 }

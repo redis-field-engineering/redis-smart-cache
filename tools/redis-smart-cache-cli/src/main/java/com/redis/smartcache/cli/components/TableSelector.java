@@ -44,8 +44,20 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
         if (context != null && currentContext == context) {
             return currentContext;
         }
+
+        int cursorRow = 0;
+        if(context !=null){
+            if(context instanceof SingleItemSelectorContext){
+                Integer cr = ((SingleItemSelectorContext<?, ?>)context).getCursorRow();
+                if(cr != null){
+                    cursorRow = cr;
+                }
+            }
+        }
+
         currentContext = TableSelector.SingleItemSelectorContext.empty(getItemMapper(), numColumns, instructions);
         currentContext.setName(name);
+        currentContext.setCursorRow(cursorRow);
         currentContext.setHeader(header);
         currentContext.setWidth(getTerminal().getWidth());
         if (currentContext.getItems() == null) {
@@ -60,6 +72,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
     @Override
     protected SingleItemSelectorContext<T, I> runInternal(SingleItemSelectorContext<T, I> context) {
         super.runInternal(context);
+
         // if there's no tty don't try to loop as it would then cause user interaction
         if (hasTty()) {
             loop(context);
@@ -198,6 +211,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
             for (int i = 0; i<getItems().size();i++){
                 Map<String,Object> map = new HashMap<>();
                 map.put("name", getItems().get(i).getItem().toRowString(getColWidth()));
+//                System.out.printf("Cursor row: %d", getCursorRow());
                 map.put("selected", getCursorRow().intValue() == i);
                 rows.add(map);
             }
