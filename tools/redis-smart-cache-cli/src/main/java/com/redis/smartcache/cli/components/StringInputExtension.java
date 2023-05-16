@@ -3,14 +3,9 @@ package com.redis.smartcache.cli.components;
 import org.jline.keymap.BindingReader;
 import org.jline.keymap.KeyMap;
 import org.jline.terminal.Terminal;
-import org.jline.utils.AttributedString;
 import org.jline.utils.InfoCmp;
 import org.springframework.shell.component.StringInput;
 import org.springframework.util.StringUtils;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Function;
 
 import static org.jline.keymap.KeyMap.del;
 import static org.jline.keymap.KeyMap.key;
@@ -23,16 +18,9 @@ public class StringInputExtension extends StringInput {
 
     private boolean isEscapeMode = false;
     private final String OPERATION_ESCAPE = "ESCAPE";
-    public StringInputExtension(Terminal terminal) {
-        super(terminal);
-    }
 
     public StringInputExtension(Terminal terminal, String name, String defaultValue) {
         super(terminal, name, defaultValue);
-    }
-
-    public StringInputExtension(Terminal terminal, String name, String defaultValue, Function<StringInputContext, List<AttributedString>> renderer) {
-        super(terminal, name, defaultValue, renderer);
     }
 
     @Override

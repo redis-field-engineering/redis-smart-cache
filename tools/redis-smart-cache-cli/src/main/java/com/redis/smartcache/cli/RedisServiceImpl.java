@@ -73,26 +73,22 @@ public class RedisServiceImpl implements RedisService{
     }
 
     public void commitRules(List<RuleConfig> rules){
-        Map<String, List<RuleConfig>> otherMap = new HashMap<>();
-        otherMap.put("rules",rules); // TODO: Without this the rules are serialized as ruleNum.attribute.etc - there must be a better way to get it to serialize correctly to rules.ruleNum.attribute.etc
+        Map<String, List<RuleConfig>> map = new HashMap<>();
+        map.put("rules",rules); // TODO: Without this the rules are serialized as ruleNum.attribute.etc - there must be a better way to get it to serialize correctly to rules.ruleNum.attribute.etc
         JavaPropsMapper mapper = Mappers.propsMapper();
         try{
-            Properties props = mapper.writeValueAsProperties(otherMap);
-            Map<String,String> map = new HashMap<>();
-            XAddArgs args = new XAddArgs();
+            Properties props = mapper.writeValueAsProperties(map);
             List<String> listArgs = new ArrayList<>();
 
             for(Object o : props.keySet().stream().sorted().collect(Collectors.toList())){
-                map.put((String)o, (String)props.get(o));
-
                 listArgs.add((String)o);
                 listArgs.add((String)props.get(o));
             }
 
             String key = KeyBuilder.of(conf).build(RulesetManager.KEY_CONFIG);
             connection.sync().xadd(key,listArgs.toArray());
-        } catch (IOException e){
-            System.err.println(e);
+        } catch (IOException ignored){
+
         }
     }
 

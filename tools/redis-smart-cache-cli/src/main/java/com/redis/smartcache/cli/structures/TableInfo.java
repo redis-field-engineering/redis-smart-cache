@@ -34,32 +34,28 @@ public class TableInfo implements RowInfo {
     }
 
     public static String headerRow(int colWidth){
-        StringBuilder sb = new StringBuilder();
-        sb.append("|");
-        sb.append(Util.center("Table Name",colWidth));
-        sb.append("|");
-        sb.append(Util.center("TTL", colWidth));
-        sb.append("|");
-        sb.append(Util.center("Avg Query Time", colWidth));
-        sb.append("|");
-        sb.append(Util.center("Access Frequency", colWidth));
-        sb.append("|");
-        return sb.toString();
+        return "|" +
+                Util.center("Table Name", colWidth) +
+                "|" +
+                Util.center("TTL", colWidth) +
+                "|" +
+                Util.center("Avg Query Time", colWidth) +
+                "|" +
+                Util.center("Access Frequency", colWidth) +
+                "|";
     }
 
     @Override
     public String toRowString(int colWidth) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("|");
-        sb.append(Util.center(getName(),colWidth));
-        sb.append("|");
-        sb.append(Util.center(this.ttlStr(),colWidth));
-        sb.append("|");
-        sb.append(Util.center(String.format("%.3fms", getQueryTime()),colWidth));
-        sb.append("|");
-        sb.append(Util.center(String.valueOf(getAccessFrequency()),colWidth));
-        sb.append("|");
-        return sb.toString();
+        return "|" +
+                Util.center(getName(), colWidth) +
+                "|" +
+                Util.center(this.ttlStr(), colWidth) +
+                "|" +
+                Util.center(String.format("%.3fms", getQueryTime()), colWidth) +
+                "|" +
+                Util.center(String.valueOf(getAccessFrequency()), colWidth) +
+                "|";
     }
 
     public static class Builder{
@@ -76,9 +72,8 @@ public class TableInfo implements RowInfo {
             return this;
         }
 
-        public Builder rule(Config.RuleConfig rule){
+        public void rule(Config.RuleConfig rule){
             this.rule = rule;
-            return this;
         }
 
         public Builder queryTime(double queryTime){

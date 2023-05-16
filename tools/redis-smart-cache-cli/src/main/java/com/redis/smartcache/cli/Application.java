@@ -1,12 +1,8 @@
 package com.redis.smartcache.cli;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.logging.LogLevel;
-import org.springframework.boot.logging.LoggingSystem;
-import org.springframework.context.ApplicationContext;
 
 import java.util.Arrays;
 import java.util.List;

@@ -18,20 +18,7 @@ public class ConfirmationInputExtension extends ConfirmationInput {
         return isEscapeMode;
     }
 
-    public void setEscapeMode(boolean exitMode) {
-        isEscapeMode = exitMode;
-    }
-
     private boolean isEscapeMode = false;
-
-    public ConfirmationInputExtension(Terminal terminal) {
-        super(terminal);
-    }
-
-    public ConfirmationInputExtension(Terminal terminal, String name) {
-        super(terminal, name);
-    }
-
     public ConfirmationInputExtension(Terminal terminal, String name, boolean defaultValue) {
         super(terminal, name, defaultValue);
         setTemplateLocation("classpath:confirmation-input.stg");

@@ -5,13 +5,10 @@ import com.redis.smartcache.core.Config.RuleConfig;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.cli.util.Util;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class QueryInfo implements RowInfo {
-    private Query query;
+    private final Query query;
 
     private RuleConfig currentRule;
     private RuleConfig pendingRule;
@@ -24,13 +21,9 @@ public class QueryInfo implements RowInfo {
         return meanQueryTime;
     }
 
-    private long count;
-    private double meanQueryTime;
+    private final long count;
+    private final double meanQueryTime;
 
-
-    public QueryInfo(){
-
-    }
 
     private QueryInfo(Builder builder) {
         this.query = builder.query;
@@ -70,7 +63,7 @@ public class QueryInfo implements RowInfo {
     }
 
     public boolean getIsCached(){
-        return currentRule != null && currentRule.getTtl().toString() != "0s";
+        return currentRule != null && !Objects.equals(currentRule.getTtl().toString(), "0s");
     }
 
     public String getCurrentTtlString(){
@@ -87,10 +80,6 @@ public class QueryInfo implements RowInfo {
         }
 
         return pendingRule.getTtl().toString();
-    }
-
-    public void setQuery(Query query){
-        this.query = query;
     }
 
     public void setPendingRule(RuleConfig rule){
@@ -289,7 +278,7 @@ public class QueryInfo implements RowInfo {
         Query query = new Query.QueryBuilder()
                 .setId(doc.get("id"))
                 .setSql(doc.get("sql"))
-                .setTables(new HashSet<String>(Arrays.asList(doc.get("table").split(","))))
+                .setTables(new HashSet<>(Arrays.asList(doc.get("table").split(","))))
                 .build();
 
         Builder builder = new Builder();

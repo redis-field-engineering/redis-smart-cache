@@ -4,37 +4,32 @@ import org.jline.keymap.BindingReader;
 import org.jline.keymap.KeyMap;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.shell.component.context.BaseComponentContext;
 import org.springframework.shell.component.context.ComponentContext;
 import org.springframework.shell.component.support.*;
-import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StopWatch;
-import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.jline.keymap.KeyMap.*;
+import static org.jline.keymap.KeyMap.ctrl;
 import static org.jline.keymap.KeyMap.key;
 
 public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableSelectorComponent.SelectorComponentContext<T, I, C>, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
         extends AbstractComponent<C> {
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractTableSelectorComponent.class);
     protected final String name;
     private final List<I> items;
     private Comparator<I> comparator = (o1, o2) -> 0;
     private final boolean exitSelects;
-    private int maxItems = 5;
-    private Function<T, String> itemMapper = Object::toString;
+    private final int maxItems = 5;
     private boolean stale = false;
-    private AtomicInteger start = new AtomicInteger(0);
-    private AtomicInteger pos = new AtomicInteger(0);
+    private final AtomicInteger start = new AtomicInteger(0);
+    private final AtomicInteger pos = new AtomicInteger(0);
     private I defaultExpose;
     private boolean expose = false;
     private boolean confirmMode = false;
@@ -43,10 +38,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
 
     public boolean isEscapeMode() {
         return escapeMode;
-    }
-
-    public void setEscapeMode(boolean escapeMode) {
-        this.escapeMode = escapeMode;
     }
 
     private boolean escapeMode = false;
@@ -63,47 +54,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         this.exitSelects = exitSelects;
         if (comparator != null) {
             this.comparator = comparator;
-        }
-    }
-
-    /**
-     * Set max items to show.
-     *
-     * @param maxItems max items
-     */
-    public void setMaxItems(int maxItems) {
-        Assert.state(maxItems > 0 || maxItems < 33, "maxItems has to be between 1 and 32");
-        this.maxItems = maxItems;
-    }
-
-    /**
-     * Sets an item mapper.
-     *
-     * @param itemMapper the item mapper
-     */
-    public void setItemMapper(Function<T, String> itemMapper) {
-        Assert.notNull(itemMapper, "itemMapper cannot be null");
-        this.itemMapper = itemMapper;
-    }
-
-    /**
-     * Gets an item mapper.
-     *
-     * @return
-     */
-    public Function<T, String> getItemMapper() {
-        return itemMapper;
-    }
-
-    /**
-     * Sets default expose item when component start.
-     *
-     * @param defaultExpose the default item
-     */
-    public void setDefaultExpose(I defaultExpose) {
-        this.defaultExpose = defaultExpose;
-        if (defaultExpose != null) {
-            expose = true;
         }
     }
 
@@ -271,13 +221,8 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         }
         AtomicInteger reindex = new AtomicInteger(0);
         List<ItemState<I>> filtered = itemStates.stream()
-                .filter(i -> {
-                    return i.matches(context.getInput());
-                })
-                .map(i -> {
-                    i.index = reindex.getAndIncrement();
-                    return i;
-                })
+                .filter(i -> i.matches(context.getInput()))
+                .peek(i -> i.index = reindex.getAndIncrement())
                 .collect(Collectors.toList());
         List<ItemState<I>> items = filtered.stream()
                 .skip(skip)
@@ -314,13 +259,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
             extends ComponentContext<C> {
 
         /**
-         * Gets a name.
-         *
-         * @return a name
-         */
-        String getName();
-
-        /**
          * Sets a name
          *
          * @param name the name
@@ -333,13 +271,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
          * @return an input
          */
         String getInput();
-
-        /**
-         * Sets an input.
-         *
-         * @param input the input
-         */
-        void setInput(String input);
 
         /**
          * Gets an item states
@@ -356,25 +287,11 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         void setItemStates(List<ItemState<I>> itemStateView);
 
         /**
-         * Gets an item state view.
-         *
-         * @return an item state view
-         */
-        List<ItemState<I>> getItemStateView();
-
-        /**
          * Sets an item state view
          *
          * @param itemStateView the item state view
          */
         void setItemStateView(List<ItemState<I>> itemStateView);
-
-        /**
-         * Return if there is a result.
-         *
-         * @return true if context represents result
-         */
-        boolean isResult();
 
         /**
          * Gets a cursor row.
@@ -418,14 +335,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
          */
         void setResultItems(List<I> items);
 
-        /**
-         * Creates an empty {@link SelectorComponentContext}.
-         *
-         * @return empty context
-         */
-        static <T, I extends Nameable & Matchable & Itemable<T>, C extends SelectorComponentContext<T, I, C>> SelectorComponentContext<T, I, C> empty() {
-            return new BaseSelectorComponentContext<>();
-        }
     }
 
     /**
@@ -442,8 +351,7 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         private List<I> items;
         private List<I> resultItems;
 
-        @Override
-        public String getName() {
+        private String getName() {
             return name;
         }
 
@@ -458,11 +366,6 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         }
 
         @Override
-        public void setInput(String input) {
-            this.input = input;
-        }
-
-        @Override
         public List<ItemState<I>> getItemStates() {
             return itemStates;
         }
@@ -470,20 +373,18 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         @Override
         public void setItemStates(List<ItemState<I>> itemStates) {
             this.itemStates = itemStates;
-        };
+        }
 
-        @Override
-        public List<ItemState<I>> getItemStateView() {
+        private List<ItemState<I>> getItemStateView() {
             return itemStateView;
         }
 
         @Override
         public void setItemStateView(List<ItemState<I>> itemStateView) {
             this.itemStateView = itemStateView;
-        };
+        }
 
-        @Override
-        public boolean isResult() {
+        private boolean isResult() {
             return resultItems != null;
         }
 
@@ -502,11 +403,11 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
             attributes.put("isResult", isResult());
             attributes.put("cursorRow", getCursorRow());
             return attributes;
-        };
+        }
 
         public void setCursorRow(Integer cursorRow) {
             this.cursorRow = cursorRow;
-        };
+        }
 
         @Override
         public List<I> getItems() {
@@ -532,6 +433,7 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
         public String toString() {
             return "DefaultSelectorComponentContext [cursorRow=" + cursorRow + "]";
         }
+
     }
 
     /**
@@ -554,26 +456,14 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
 
         public boolean matches(String match) {
             return item.matches(match);
-        };
-
-        public int getIndex() {
-            return index;
         }
 
         public String getName() {
             return name;
         }
 
-        public boolean isSelected() {
-            return selected;
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
         static <I extends Matchable> ItemState<I> of(I item, String name, int index, boolean enabled, boolean selected) {
-            return new ItemState<I>(item, name, index, enabled, selected);
+            return new ItemState<>(item, name, index, enabled, selected);
         }
     }
 

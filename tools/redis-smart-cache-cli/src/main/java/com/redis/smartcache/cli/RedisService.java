@@ -7,7 +7,6 @@ import com.redis.smartcache.core.Config;
 import java.util.List;
 
 public interface RedisService {
-    String ping();
     List<QueryInfo> getQueries();
     void commitRules(List<Config.RuleConfig> rules);
     List<Config.RuleConfig> getRules();

@@ -83,30 +83,26 @@ public class RuleInfo implements RowInfo {
 
     @Override
     public String toRowString(int colWidth) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("|");
-        sb.append(Util.center(ruleType().getValue(), colWidth));
-        sb.append("|");
-        sb.append(Util.center(ruleMatch(), colWidth));
-        sb.append("|");
-        sb.append(Util.center(rule.getTtl().toString(),colWidth));
-        sb.append("|");
-        sb.append(Util.center(status.toString(),colWidth));
-        sb.append("|");
-        return sb.toString();
+        return "|" +
+                Util.center(ruleType().getValue(), colWidth) +
+                "|" +
+                Util.center(ruleMatch(), colWidth) +
+                "|" +
+                Util.center(rule.getTtl().toString(), colWidth) +
+                "|" +
+                Util.center(status.toString(), colWidth) +
+                "|";
     }
 
     public static String getHeaderRow(int colWidth){
-        StringBuilder sb = new StringBuilder();
-        sb.append("|");
-        sb.append(Util.center("Type",colWidth));
-        sb.append("|");
-        sb.append(Util.center("Match", colWidth));
-        sb.append("|");
-        sb.append(Util.center("TTL", colWidth));
-        sb.append("|");
-        sb.append(Util.center("Status", colWidth));
-        sb.append("|");
-        return sb.toString();
+        return "|" +
+                Util.center("Type", colWidth) +
+                "|" +
+                Util.center("Match", colWidth) +
+                "|" +
+                Util.center("TTL", colWidth) +
+                "|" +
+                Util.center("Status", colWidth) +
+                "|";
     }
 }
