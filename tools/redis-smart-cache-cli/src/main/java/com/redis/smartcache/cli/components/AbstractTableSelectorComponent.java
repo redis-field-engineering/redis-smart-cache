@@ -29,9 +29,9 @@ public abstract class AbstractTableSelectorComponent<T, C extends AbstractTableS
     protected final String name;
     private final List<I> items;
     private Comparator<I> comparator = (o1, o2) -> 0;
-    private boolean exitSelects;
+    private final boolean exitSelects;
     private int maxItems = 5;
-    private Function<T, String> itemMapper = item -> item.toString();
+    private Function<T, String> itemMapper = Object::toString;
     private boolean stale = false;
     private AtomicInteger start = new AtomicInteger(0);
     private AtomicInteger pos = new AtomicInteger(0);

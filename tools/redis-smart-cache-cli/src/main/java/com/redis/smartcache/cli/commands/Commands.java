@@ -347,8 +347,9 @@ public class Commands extends AbstractShellComponent {
     }
 
     public void tablesTable(RedisService client){
+        String instructions = "press 'enter' to edit\npress 'esc' to go back\npress ctrl+c to exit\n";
         int cursorRow = 0;
-        TableSelector.SingleItemSelectorContext<TableInfo, SelectorItem<TableInfo>> context = TableSelector.SingleItemSelectorContext.empty(4, tableInstructions);
+        TableSelector.SingleItemSelectorContext<TableInfo, SelectorItem<TableInfo>> context = TableSelector.SingleItemSelectorContext.empty(4, instructions);
         while(true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
             List<SelectorItem<TableInfo>> tables = new ArrayList<>();
@@ -357,7 +358,7 @@ public class Commands extends AbstractShellComponent {
             }
 
             TableSelector<TableInfo, SelectorItem<TableInfo>> component = new TableSelector<>(getTerminal(),
-                    tables, "tables", null, TableInfo.headerRow((getTerminal().getWidth() - 10) / 4), true, 4, tableInstructions);
+                    tables, "tables", null, TableInfo.headerRow((getTerminal().getWidth() - 10) / 4), true, 4, instructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             context.setCursorRow(cursorRow);
