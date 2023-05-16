@@ -12,3 +12,4 @@ hs_err_pid*.log
 .vscode
 /README.html
 /spring-shell.log
+tools/redis-smart-cache-cli/spring-shell.log

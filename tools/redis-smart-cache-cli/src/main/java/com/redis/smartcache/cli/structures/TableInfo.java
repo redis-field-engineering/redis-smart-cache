@@ -3,7 +3,7 @@ package com.redis.smartcache.cli.structures;
 import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.Config;
 
-public class Table implements RowStringable {
+public class TableInfo implements RowInfo {
 
     private String name;
     private Config.RuleConfig rule;
@@ -55,7 +55,7 @@ public class Table implements RowStringable {
         sb.append("|");
         sb.append(Util.center(this.ttlStr(),colWidth));
         sb.append("|");
-        sb.append(Util.center(String.valueOf(getQueryTime()),colWidth));
+        sb.append(Util.center(String.format("%.3fms", getQueryTime()),colWidth));
         sb.append("|");
         sb.append(Util.center(String.valueOf(getAccessFrequency()),colWidth));
         sb.append("|");
@@ -91,13 +91,13 @@ public class Table implements RowStringable {
             return this;
         }
 
-        public Table build(){
-            Table table = new Table();
-            table.name = name;
-            table.rule = rule;
-            table.queryTime = queryTime;
-            table.accessFrequency = accessFrequency;
-            return table;
+        public TableInfo build(){
+            TableInfo tableInfo = new TableInfo();
+            tableInfo.name = name;
+            tableInfo.rule = rule;
+            tableInfo.queryTime = queryTime;
+            tableInfo.accessFrequency = accessFrequency;
+            return tableInfo;
         }
     }
 }

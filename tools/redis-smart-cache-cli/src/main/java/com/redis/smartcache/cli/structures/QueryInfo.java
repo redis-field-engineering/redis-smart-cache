@@ -10,7 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
-public class QueryInfo implements RowStringable {
+public class QueryInfo implements RowInfo {
     private Query query;
 
     private RuleConfig currentRule;
@@ -177,7 +177,7 @@ public class QueryInfo implements RowStringable {
 
         sb.append(Util.center(String.valueOf(count),colWidth));
         sb.append("|");
-        sb.append(Util.center(String.valueOf(meanQueryTime),colWidth));
+        sb.append(Util.center(String.format("%.3fms", meanQueryTime),colWidth));
         sb.append("|");
         return sb.toString();
     }

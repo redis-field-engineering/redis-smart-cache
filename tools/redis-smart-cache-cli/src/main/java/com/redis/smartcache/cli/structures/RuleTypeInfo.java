@@ -1,8 +1,6 @@
 package com.redis.smartcache.cli.structures;
 
-import com.redis.smartcache.cli.util.Util;
-
-public class RuleTypeInfo implements RowStringable{
+public class RuleTypeInfo implements RowInfo {
     public RuleType getType() {
         return type;
     }

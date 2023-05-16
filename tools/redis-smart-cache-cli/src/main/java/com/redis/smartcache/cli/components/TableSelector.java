@@ -1,6 +1,6 @@
 package com.redis.smartcache.cli.components;
 
-import com.redis.smartcache.cli.structures.RowStringable;
+import com.redis.smartcache.cli.structures.RowInfo;
 import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedString;
 import org.springframework.shell.component.context.ComponentContext;
@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class TableSelector<T extends RowStringable, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
+public class TableSelector<T extends RowInfo, I extends Nameable & Matchable & Enableable & Selectable & Itemable<T>>
         extends AbstractTableSelectorComponent<T, TableSelector.SingleItemSelectorContext<T, I>, I> {
 
     private SingleItemSelectorContext<T, I> currentContext;
@@ -110,7 +110,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
     /**
      * Context {@link TableSelector}.
      */
-    public interface SingleItemSelectorContext<T extends RowStringable, I extends Nameable & Matchable & Itemable<T>>
+    public interface SingleItemSelectorContext<T extends RowInfo, I extends Nameable & Matchable & Itemable<T>>
             extends SelectorComponentContext<T, I, SingleItemSelectorContext<T, I>> {
 
         /**
@@ -136,7 +136,7 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
          *
          * @return empty context
          */
-        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(int numColumns, String instructions) {
+        static <C extends RowInfo, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(int numColumns, String instructions) {
             return new TableSelector.DefaultSingleItemSelectorContext<>(numColumns,instructions);
         }
 
@@ -145,12 +145,12 @@ public class TableSelector<T extends RowStringable, I extends Nameable & Matchab
          *
          * @return context
          */
-        static <C extends RowStringable, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper, int numColumns, String instructions) {
+        static <C extends RowInfo, I extends Nameable & Matchable & Itemable<C>> SingleItemSelectorContext<C, I> empty(Function<C, String> itemMapper, int numColumns, String instructions) {
             return new TableSelector.DefaultSingleItemSelectorContext<>(itemMapper, numColumns, instructions);
         }
     }
 
-    private static class DefaultSingleItemSelectorContext<T extends RowStringable, I extends Nameable & Matchable & Itemable<T>> extends
+    private static class DefaultSingleItemSelectorContext<T extends RowInfo, I extends Nameable & Matchable & Itemable<T>> extends
             BaseSelectorComponentContext<T, I, SingleItemSelectorContext<T, I>> implements SingleItemSelectorContext<T, I> {
 
         private String instructions;

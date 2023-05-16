@@ -1,5 +1,5 @@
 package com.redis.smartcache.cli.structures;
 
-public interface RowStringable {
+public interface RowInfo {
     String toRowString(int colWidth);
 }

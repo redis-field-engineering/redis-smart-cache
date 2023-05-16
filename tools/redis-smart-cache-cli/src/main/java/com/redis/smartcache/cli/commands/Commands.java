@@ -24,26 +24,16 @@ import java.util.stream.Collectors;
 
 @ShellComponent
 public class Commands extends AbstractShellComponent {
-    final String QUERY_IDS = "Query IDs";
-    final String TABLES = "Tables";
-    final String TABLES_ANY = "Tables Any";
-    final String TABLES_ALL = "Tables All";
-    final String REGEX = "Regex";
     final String LIST_APPLICATION_QUERIES = "List application queries";
     final String CREATE_RULE = "Create query caching rule";
     final String LIST_TABLES = "List Tables";
     final String LIST_RULES = "List Rules";
     final String EXIT = "Exit";
-    final String[] ruleTypes = {QUERY_IDS, TABLES, TABLES_ANY, TABLES_ALL, REGEX};
 
     final String tableInstructions = "press 'enter' to edit\npress 'c' to commit\npress 'esc' to go back\npress ctrl+c to exit\n";
 
     @Autowired
     private ComponentFlow.Builder componentFlowBuilder;
-
-    String ping(RedisService client){
-        return client.ping();
-    }
 
 
     public Optional<RuleTypeInfo> getRuleType(){
@@ -55,7 +45,7 @@ public class Commands extends AbstractShellComponent {
                 SelectorItem.of(RuleType.REGEX.getValue(), new RuleTypeInfo(RuleType.REGEX,"Enter a regular expression to match against:"))
         );
 
-        TableSelector<RuleTypeInfo, SelectorItem<RuleTypeInfo>> component = new TableSelector<RuleTypeInfo, SelectorItem<RuleTypeInfo>>(getTerminal(),
+        TableSelector<RuleTypeInfo, SelectorItem<RuleTypeInfo>> component = new TableSelector<>(getTerminal(),
                 ruleTypes, "rules", null, "Select Rule Type", true, 1, "");
         component.setResourceLoader(getResourceLoader());
         component.setTemplateExecutor(getTemplateExecutor());
@@ -69,23 +59,35 @@ public class Commands extends AbstractShellComponent {
     }
 
     public Optional<Duration> getTtl(String message){
-        String prompt;
-        if(message.isEmpty()){
-            prompt = "Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m):";
-        }
-        else{
-            prompt = String.format("%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m):",message);
+        boolean displayError = false;
+        while(true){
+            String prompt;
+            if(message.isEmpty()){
+                prompt = "Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m)";
+            }
+            else{
+                prompt = String.format("%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m)",message);
+            }
+
+            prompt += displayError?" - Invalidly formatted duration, please try again:" : ":";
+
+            StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(), prompt,"30m");
+            stringInputComponent.setResourceLoader(getResourceLoader());
+            stringInputComponent.setTemplateExecutor(getTemplateExecutor());
+            StringInput.StringInputContext stringInputContext = stringInputComponent.run(StringInput.StringInputContext.empty());
+            if(stringInputComponent.isEscapeMode()){
+                return Optional.empty();
+            }
+
+            try{
+                return Optional.of(Duration.valueOf(stringInputContext.getResultValue()));
+            }
+            catch (IllegalArgumentException e){
+                displayError = true;
+            }
         }
 
-        StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(), prompt,"30m");
-        stringInputComponent.setResourceLoader(getResourceLoader());
-        stringInputComponent.setTemplateExecutor(getTemplateExecutor());
-        StringInput.StringInputContext stringInputContext = stringInputComponent.run(StringInput.StringInputContext.empty());
-        if(stringInputComponent.isEscapeMode()){
-            return Optional.empty();
-        }
 
-        return Optional.of(Duration.valueOf(stringInputContext.getResultValue()));
     }
 
     public Optional<String> getMatch(RuleTypeInfo ruleType){
@@ -114,10 +116,10 @@ public class Commands extends AbstractShellComponent {
     }
 
     public Optional <RuleConfig> newRuleDialogCustom(boolean confirm){
+        Optional<RuleTypeInfo> ruleType;
+        Optional<String> match;
         Optional<Boolean> confirmed = Optional.empty();
-        Optional<RuleTypeInfo> ruleType = Optional.empty();
         Optional<Duration> ttl = Optional.empty();
-        Optional<String> match = Optional.empty();
         Optional<RuleConfig> rule = Optional.empty();
         do{
             ruleType = getRuleType();
@@ -173,10 +175,9 @@ public class Commands extends AbstractShellComponent {
      * @param port the Redis port
      * @return a connected RedisService
      */
-    private static RedisService initializeClient(String host, String port){
-        RedisConfig config = new RedisConfig(host,port);
-        RedisService client = new RedisServiceImpl(config);
-        return client;
+    private static RedisService initializeClient(String host, String port, String applicationName){
+        RedisConfig config = new RedisConfig(host,port, applicationName);
+        return new RedisServiceImpl(config);
     }
 
     @ShellMethod(key = "list-queries")
@@ -204,10 +205,10 @@ public class Commands extends AbstractShellComponent {
         }
 
 
-        RedisService client = initializeClient(host,port);
+        RedisService client = initializeClient(host, port, applicationName);
         StringBuilder sb = new StringBuilder();
         sb.append("\n");
-        List<QueryInfo> queries = client.getQueries(applicationName);
+        List<QueryInfo> queries = client.getQueries();
 
         queries.sort((first,second)->QueryInfo.compare(first,second,sortDirection,sortBy));
 
@@ -222,15 +223,12 @@ public class Commands extends AbstractShellComponent {
     @ShellMethod(key="Interactive")
     public String interactive(
             @ShellOption(value = {"-n","--hostname"}, defaultValue = "localhost")String host,
-            @ShellOption(value = {"-p","--port"}, defaultValue = "6379") String port
+            @ShellOption(value = {"-p","--port"}, defaultValue = "6379") String port,
+            @ShellOption(value = {"-s","--application-name"}, defaultValue = "smartcache") String applicationName
     ){
-        RedisService client = initializeClient(host,port);
+        RedisService client = initializeClient(host, port, applicationName);
 
         String[] options = {LIST_APPLICATION_QUERIES, LIST_TABLES, CREATE_RULE, LIST_RULES, EXIT};
-        Map<String, String> subCommands = new HashMap<>();
-        for(String o : options){
-            subCommands.put(o,o);
-        }
 
         String nextAction = "";
         TableSelector.SingleItemSelectorContext<Action, SelectorItem<Action>> context = TableSelector.SingleItemSelectorContext.empty(1, "");
@@ -249,21 +247,23 @@ public class Commands extends AbstractShellComponent {
                 System.exit(0);
             }
 
-            nextAction = context.getResultItem().get().getItem().getAction();
+            if(context.getResultItem().isPresent()){
+                nextAction = context.getResultItem().get().getItem().getAction();
 
-            switch (nextAction){
-                case CREATE_RULE:
-                    createRule(client);
-                    break;
-                case LIST_APPLICATION_QUERIES:
-                    queryTable(client);
-                    break;
-                case LIST_TABLES:
-                    tablesTable(client);
-                    break;
-                case LIST_RULES:
-                    ruleTable(client);
-                    break;
+                switch (nextAction){
+                    case CREATE_RULE:
+                        createRule(client);
+                        break;
+                    case LIST_APPLICATION_QUERIES:
+                        queryTable(client);
+                        break;
+                    case LIST_TABLES:
+                        tablesTable(client);
+                        break;
+                    case LIST_RULES:
+                        ruleTable(client);
+                        break;
+                }
             }
 
             getTerminal().puts(InfoCmp.Capability.clear_screen);
@@ -274,73 +274,12 @@ public class Commands extends AbstractShellComponent {
         return "Interactive!";
     }
 
-    public RuleConfig editRuleDialog(RuleInfo rule){
-        ComponentFlow.Builder builder = componentFlowBuilder.clone().reset();
-        switch (rule.ruleType()){
-            case Constants.TABLES:
-            case Constants.TABLES_ALL:
-            case Constants.TABLES_ANY:
-                builder.withStringInput("match")
-                        .next(ctx->"TTL")
-                        .name("Enter a comma-separated list of tables to match against:")
-                        .and();
-                break;
-            case Constants.QUERY_IDS:
-                builder.withStringInput("match")
-                        .next(ctx->"TTL")
-                        .name("Enter a comma-separated list of Query IDs to match against:")
-                        .and();
-                break;
-            case Constants.REGEX:
-                builder.withStringInput("match")
-                        .next(ctx->"TTL")
-                        .name("Enter a regular expression to match against:")
-                        .and();
-                break;
-            default:
-                return rule.getRule();
-        }
-
-        builder.withStringInput("TTL")
-                .name("Enter a TTL in the form of a duration (e.g. 1h, 300s, 5m):")
-                .next(x->"Confirm")
-                .and();
-
-        ComponentFlow.ComponentFlowResult result = builder.build().run();
-
-        RuleConfig newRule = rule.getRule().clone();
-        String match = result.getContext().get("match");
-        String ttl = result.getContext().get("TTL");
-        newRule.setTtl(Duration.valueOf(ttl));
-        switch (rule.ruleType()){
-            case Constants.QUERY_IDS:
-                newRule.setQueryIds(Arrays.stream(match.split(",")).collect(Collectors.toList()));
-                break;
-            case Constants.TABLES:
-                newRule.setTables(Arrays.stream(match.split(",")).collect(Collectors.toList()));
-                break;
-            case Constants.TABLES_ALL:
-                newRule.setTablesAll(Arrays.stream(match.split(",")).collect(Collectors.toList()));
-                break;
-            case Constants.TABLES_ANY:
-                newRule.setTablesAny(Arrays.stream(match.split(",")).collect(Collectors.toList()));
-                break;
-            case Constants.REGEX:
-                newRule.setRegex(match);
-                break;
-        }
-
-        rule.setStatus(RuleInfo.Status.Editing);
-
-        return newRule;
-    }
-
     public void ruleTable(RedisService client){
         List<RuleInfo> rules = client.getRules().stream().map(x->new RuleInfo(x, RuleInfo.Status.Current)).collect(Collectors.toList());
-        String instructions = "press 'enter' to edit\npress 'c' to commit\npress 'esc' to go back\npress ctrl+c to exit\n";;
+        String instructions = "Press 'enter' to edit an existing rule\nPress 'n' to create a new rule\nPress 'd' to delete a rule\nPress 'c' to commit\nPress 'esc' to go back\nPress ctrl+c to exit\n";
         int cursorRow = 0;
 
-        TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = TableSelector.SingleItemSelectorContext.empty(3, tableInstructions);
+        TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = TableSelector.SingleItemSelectorContext.empty(3, instructions);
 
         while (true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
@@ -348,7 +287,7 @@ public class Commands extends AbstractShellComponent {
             List<SelectorItem<RuleInfo>> ruleInfos = rules.stream().map(rule -> SelectorItem.of(UUID.randomUUID().toString(),rule)).collect(Collectors.toList());
 
             TableSelector<RuleInfo, SelectorItem<RuleInfo>> component = new TableSelector<>(getTerminal(),
-                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth() - 10) / 4), true, 4, tableInstructions);
+                    ruleInfos, "rules", null, RuleInfo.getHeaderRow((getTerminal().getWidth() - 10) / 4), true, 4, instructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             context.setCursorRow(cursorRow);
@@ -375,7 +314,11 @@ public class Commands extends AbstractShellComponent {
                 continue;
             }
             if(!component.isEscapeMode() && res.isPresent()){
-                res.get().getItem().setRule(editRuleDialog(res.get().getItem()));
+                Optional<RuleConfig> updatedRule = newRuleDialogCustom(false);
+                updatedRule.ifPresent(ruleConfig ->{
+                    res.get().getItem().setRule(ruleConfig);
+                    res.get().getItem().setStatus(RuleInfo.Status.Editing);
+                });
             }
             else if(component.isNewMode()){
                 Optional<RuleConfig> newRule = newRuleDialogCustom(false);
@@ -405,48 +348,40 @@ public class Commands extends AbstractShellComponent {
 
     public void tablesTable(RedisService client){
         int cursorRow = 0;
-        TableSelector.SingleItemSelectorContext<Table, SelectorItem<Table>> context = TableSelector.SingleItemSelectorContext.empty(4, tableInstructions);
+        TableSelector.SingleItemSelectorContext<TableInfo, SelectorItem<TableInfo>> context = TableSelector.SingleItemSelectorContext.empty(4, tableInstructions);
         while(true){
             getTerminal().puts(InfoCmp.Capability.clear_screen);
-            List<SelectorItem<Table>> tables = new ArrayList<>();
-            for(Table table : client.getTables()){
-                tables.add(SelectorItem.of(table.getName(),table));
+            List<SelectorItem<TableInfo>> tables = new ArrayList<>();
+            for(TableInfo tableInfo : client.getTables()){
+                tables.add(SelectorItem.of(tableInfo.getName(), tableInfo));
             }
 
-            TableSelector<Table, SelectorItem<Table>> component = new TableSelector<Table, SelectorItem<Table>>(getTerminal(),
-                    tables, "tables", null, Table.headerRow((getTerminal().getWidth()-10)/4), true, 4, tableInstructions);
+            TableSelector<TableInfo, SelectorItem<TableInfo>> component = new TableSelector<>(getTerminal(),
+                    tables, "tables", null, TableInfo.headerRow((getTerminal().getWidth() - 10) / 4), true, 4, tableInstructions);
             component.setResourceLoader(getResourceLoader());
             component.setTemplateExecutor(getTemplateExecutor());
             context.setCursorRow(cursorRow);
             context = component.run(context);
             cursorRow = context.getCursorRow();
-            Optional<SelectorItem<Table>> res = context.getResultItem();
+            Optional<SelectorItem<TableInfo>> res = context.getResultItem();
 
             if(component.isConfirmMode()){
                 component.setConfirmMode(false);
                 continue;
             }
             if(!component.isEscapeMode() && res.isPresent()){
-                ComponentFlow flow = componentFlowBuilder.clone().reset()
-                    .withStringInput("ttl")
-                        .name(String.format("Create rule to cache table:%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m):", res.get().getName()))
-                        .next(ctx->"Confirm")
-                        .and()
-                    .withConfirmationInput("Confirm")
-                        .name("Confirm Pending Update")
-                        .next(null)
-                        .template("classpath:confirmation-input.stg")
-                        .and()
-                    .build();
-                ComponentFlow.ComponentFlowResult flowResult = flow.run();
-                boolean confirmed = flowResult.getContext().get("Confirm");
-                String ttl = flowResult.getContext().get("ttl");
-                if(confirmed && flowResult.getContext().get("ttl") != null){
-                    RuleConfig newRule = new RuleConfig.Builder().ttl(Duration.valueOf(ttl)).tablesAny(res.get().getName()).build();
-                    List<RuleConfig> rules = client.getRules();
-                    rules.add(0, newRule);
-                    client.commitRules(rules);
-                }
+                Optional<Duration> duration = getTtl(String.format("Create rule to cache table:%s", res.get().getName()));
+                duration.ifPresent(ttl->{
+                    RuleConfig newRule = new RuleConfig.Builder().ttl(ttl).tablesAny(res.get().getName()).build();
+                    Optional<Boolean> confirmed = getConfirmation(new RuleInfo(newRule, RuleInfo.Status.New));
+                    confirmed.ifPresent(c->{
+                        if(c){
+                            List<RuleConfig> rules = client.getRules();
+                            rules.add(0, newRule);
+                            client.commitRules(rules);
+                        }
+                    });
+                });
             }
             else{
                 break;
@@ -457,7 +392,7 @@ public class Commands extends AbstractShellComponent {
     private List<SelectorItem<QueryInfo>> getQueries(RedisService client){
         List<SelectorItem<QueryInfo>> queries = new ArrayList<>();
 
-        for (QueryInfo q : client.getQueries("smartcache")){
+        for (QueryInfo q : client.getQueries()){
             queries.add(SelectorItem.of(q.getQueryId(),q));
         }
         return queries;
@@ -482,7 +417,6 @@ public class Commands extends AbstractShellComponent {
             context.setCursorRow(cursorRow);
             context = component.run(context);
             cursorRow = context.getCursorRow();
-//            System.out.printf("Cursor row: %d", cursorRow);
             Optional<SelectorItem<QueryInfo>> resOpt = context.getResultItem();
 
             if (component.isConfirmMode()){

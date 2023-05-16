@@ -1,10 +1,9 @@
 package com.redis.smartcache.cli.structures;
 
-import com.redis.smartcache.cli.Constants;
 import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.Config;
 
-public class RuleInfo implements RowStringable {
+public class RuleInfo implements RowInfo {
     public enum Status{
         Current, Editing, New, Delete
     }
@@ -34,28 +33,28 @@ public class RuleInfo implements RowStringable {
         this.status = status;
     }
 
-    public String ruleType(){
+    public RuleType ruleType(){
         if(rule.getTablesAny() != null){
-            return Constants.TABLES_ANY;
+            return RuleType.TABLES_ANY;
         }
 
         if(rule.getTables() != null){
-            return Constants.TABLES;
+            return RuleType.TABLES;
         }
 
         if(rule.getTablesAll() != null){
-            return Constants.TABLES_ALL;
+            return RuleType.TABLES_ALL;
         }
 
         if(rule.getRegex() != null){
-            return Constants.REGEX;
+            return RuleType.REGEX;
         }
 
         if(rule.getQueryIds() != null){
-            return Constants.QUERY_IDS;
+            return RuleType.QUERY_IDS;
         }
 
-        return "*";
+        return RuleType.ANY;
     }
 
     public String ruleMatch(){
@@ -86,7 +85,7 @@ public class RuleInfo implements RowStringable {
     public String toRowString(int colWidth) {
         StringBuilder sb = new StringBuilder();
         sb.append("|");
-        sb.append(Util.center(ruleType(), colWidth));
+        sb.append(Util.center(ruleType().getValue(), colWidth));
         sb.append("|");
         sb.append(Util.center(ruleMatch(), colWidth));
         sb.append("|");

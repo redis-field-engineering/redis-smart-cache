@@ -7,13 +7,20 @@ import com.redis.smartcache.core.Config;
 
 public class RedisConfig {
 
-    public RedisConfig(String hostname, String port){
+    public RedisConfig(String hostname, String port, String applicationName){
         this.hostname = hostname;
         this.port = port;
+        this.applicationName = applicationName;
     }
 
     private final String hostname;
     private final String port;
+
+    public String getApplicationName() {
+        return applicationName;
+    }
+
+    private final String applicationName;
 
 
     public Config conf(){
@@ -21,6 +28,7 @@ public class RedisConfig {
         Config.RedisConfig conf = new Config.RedisConfig();
         conf.setUri(String.format("redis://%s:%s",hostname,port));
         config.setRedis(conf);
+        config.setName(applicationName);
         return config;
     }
 

@@ -1,6 +1,6 @@
 package com.redis.smartcache.cli.structures;
 
-public class Action implements RowStringable{
+public class Action implements RowInfo {
     String action;
 
     public String getAction(){
