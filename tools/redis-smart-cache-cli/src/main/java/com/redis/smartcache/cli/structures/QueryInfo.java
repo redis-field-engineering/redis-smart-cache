@@ -1,7 +1,7 @@
 package com.redis.smartcache.cli.structures;
 
 import com.redis.lettucemod.search.Document;
-import com.redis.smartcache.core.Config.RuleConfig;
+import com.redis.smartcache.core.RuleConfig;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.cli.util.Util;
 

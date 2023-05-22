@@ -20,7 +20,7 @@ import javax.sql.rowset.RowSetFactory;
 import com.redis.smartcache.core.ClientManager;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.DriverConfig;
-import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.RulesetConfig;
 import com.redis.smartcache.core.EvictingLinkedHashMap;
 import com.redis.smartcache.core.HashingFunctions;
 import com.redis.smartcache.core.KeyBuilder;

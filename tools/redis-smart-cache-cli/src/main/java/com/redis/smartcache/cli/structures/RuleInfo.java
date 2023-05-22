@@ -2,21 +2,22 @@ package com.redis.smartcache.cli.structures;
 
 import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.RuleConfig;
 
 public class RuleInfo implements RowInfo {
     public enum Status{
         Current, Editing, New, Delete
     }
 
-    public Config.RuleConfig getRule() {
+    public RuleConfig getRule() {
         return rule;
     }
 
-    public void setRule(Config.RuleConfig rule) {
+    public void setRule(RuleConfig rule) {
         this.rule = rule;
     }
 
-    Config.RuleConfig rule;
+    RuleConfig rule;
 
     public Status getStatus() {
         return status;
@@ -28,7 +29,7 @@ public class RuleInfo implements RowInfo {
 
     Status status;
 
-    public RuleInfo(Config.RuleConfig rule, Status status){
+    public RuleInfo(RuleConfig rule, Status status){
         this.rule = rule;
         this.status = status;
     }

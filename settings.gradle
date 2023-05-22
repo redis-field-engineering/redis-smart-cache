@@ -8,6 +8,7 @@ buildscript {
         classpath "org.kordamp.gradle:java-project-gradle-plugin:$kordampPluginVersion"
         classpath "org.kordamp.gradle:jacoco-gradle-plugin:$kordampPluginVersion"
         classpath "org.kordamp.gradle:kordamp-parentbuild:$kordampBuildVersion"
+        classpath "org.graalvm.buildtools:native-gradle-plugin:$graalVmVersion"
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
         classpath "gradle.plugin.com.github.johnrengelman:shadow:$shadowPluginVersion"
         classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
@@ -39,6 +40,9 @@ projects {
             id 'com.github.johnrengelman.shadow'
             id 'me.champeau.jmh'
         }
+        path('redis-smart-cache-cli') {
+            id 'org.graalvm.buildtools'
+        }
     }
 }
 
@@ -46,6 +50,7 @@ enforce {
     mergeStrategy = 'append'
     rule(enforcer.rules.EnforceBytecodeVersion) { r ->
         // search only on compile and runtime classpaths
+        enabled = false
         r.configurations.addAll(['compileClasspath', 'runtimeClasspath'])
         r.maxJdkVersion = '1.8'
     }

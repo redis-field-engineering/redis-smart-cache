@@ -2,11 +2,12 @@ package com.redis.smartcache.cli.structures;
 
 import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.RuleConfig;
 
 public class TableInfo implements RowInfo {
 
     private String name;
-    private Config.RuleConfig rule;
+    private RuleConfig rule;
     private double queryTime;
     private long accessFrequency;
 
@@ -21,7 +22,7 @@ public class TableInfo implements RowInfo {
         return name;
     }
 
-    public Config.RuleConfig getRule() {
+    public RuleConfig getRule() {
         return rule;
     }
 
@@ -60,7 +61,7 @@ public class TableInfo implements RowInfo {
 
     public static class Builder{
         private String name;
-        private Config.RuleConfig rule;
+        private RuleConfig rule;
         private double queryTime;
         private long accessFrequency;
 
@@ -72,7 +73,7 @@ public class TableInfo implements RowInfo {
             return this;
         }
 
-        public void rule(Config.RuleConfig rule){
+        public void rule(RuleConfig rule){
             this.rule = rule;
         }
 

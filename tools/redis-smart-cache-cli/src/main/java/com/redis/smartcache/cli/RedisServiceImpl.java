@@ -7,7 +7,7 @@ import com.redis.lettucemod.search.*;
 import com.redis.smartcache.cli.structures.QueryInfo;
 import com.redis.smartcache.cli.structures.TableInfo;
 import com.redis.smartcache.core.*;
-import com.redis.smartcache.core.Config.RuleConfig;
+import com.redis.smartcache.core.RuleConfig;
 import io.lettuce.core.XAddArgs;
 
 import java.io.IOException;
@@ -36,7 +36,7 @@ public class RedisServiceImpl implements RedisService{
     public List<RuleConfig> getRules(){
         RulesetManager rulesetManager = new RulesetManager(manager);
 
-        Config.RulesetConfig ruleSetConfig = rulesetManager.getRuleset(conf);
+        RulesetConfig ruleSetConfig = rulesetManager.getRuleset(conf);
         return ruleSetConfig.getRules();
     }
 

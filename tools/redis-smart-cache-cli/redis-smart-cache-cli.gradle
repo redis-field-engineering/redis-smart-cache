@@ -1,13 +1,36 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+    id 'org.graalvm.buildtools.native'
+}
+
+sourceCompatibility = '17'
+
+graalvmNative{
+    metadataRepository {
+        enabled = true
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springShellVersion', "3.0.3")
+}
+
 dependencies {
-    implementation project(':redis-smart-cache-core')
+    implementation 'org.springframework.shell:spring-shell-starter'
     implementation group: 'io.lettuce', name: 'lettuce-core', version: '6.2.4.RELEASE'
     implementation group: 'org.springframework.data', name: 'spring-data-redis', version: '2.7.11'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
     implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.shell:spring-shell-starter'
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
-    implementation 'com.redis:lettucemod:3.5.0'
+    implementation group: 'com.redis', name: 'lettucemod', version: lettucemodVersion
+    implementation project(':redis-smart-cache-core')
 }
 
 dependencyManagement {
