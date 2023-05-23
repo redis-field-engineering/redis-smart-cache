@@ -1,0 +1,9 @@
+[
+  {"name" : "sun.misc.SignalHandler", "allDeclaredConstructors" : true, "allPublicConstructors" : true, "allDeclaredMethods" : true, "allPublicMethods" : true, "allDeclaredClasses" : true, "allPublicClasses" : true},
+  {"name" : "com.redis.smartcache.core.Config", "allDeclaredConstructors" : true, "allPublicConstructors" : true, "allDeclaredMethods" : true, "allPublicMethods" : true, "allDeclaredClasses" : true, "allPublicClasses" : true},
+  {"name" : "com.redis.smartcache.core.RulesetConfig", "allDeclaredConstructors" : true, "allPublicConstructors" : true, "allDeclaredMethods" : true, "allPublicMethods" : true, "allDeclaredClasses" : true, "allPublicClasses" : true},
+  {"name" : "com.redis.smartcache.core.RuleConfig", "allDeclaredConstructors" : true, "allPublicConstructors" : true, "allDeclaredMethods" : true, "allPublicMethods" : true, "allDeclaredClasses" : true, "allPublicClasses" : true },
+  {"name" : "io.airlift.units.Duration", "allDeclaredConstructors" : true, "allPublicConstructors" : true, "allDeclaredMethods" : true, "allPublicMethods" : true, "allDeclaredClasses" : true, "allPublicClasses" : true},
+  {"name" : "com.redis.lettucemod.api.sync.RediSearchCommands", "allDeclaredConstructors" : true, "allPublicMethods" : true},
+  {"name" : "com.redis.lettucemod.api.async.RediSearchAsyncCommands", "allDeclaredConstructors" : true, "allPublicMethods" : true}
+]

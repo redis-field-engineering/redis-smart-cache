@@ -2,16 +2,17 @@ package com.redis.smartcache.cli;
 
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.api.sync.RediSearchCommands;
+import com.redis.lettucemod.api.async.RediSearchAsyncCommands;
 import com.redis.lettucemod.search.*;
 import com.redis.smartcache.cli.structures.QueryInfo;
 import com.redis.smartcache.cli.structures.TableInfo;
 import com.redis.smartcache.core.*;
-import com.redis.smartcache.core.RuleConfig;
-import io.lettuce.core.XAddArgs;
+import io.lettuce.core.RedisFuture;
+import io.lettuce.core.internal.Futures;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 //@Service
@@ -57,9 +58,7 @@ public class RedisServiceImpl implements RedisService{
         List<QueryInfo> response = new ArrayList<>();
         List<RuleConfig> rules = getRules();
 
-        RediSearchCommands<String, String> searchCommands = connection.sync();
-
-        SearchResults<String, String> searchResults = searchCommands.ftSearch(IndexName(conf.getName()), "*");
+        SearchResults<String, String> searchResults = connection.sync().ftSearch(IndexName(conf.getName()), "*");
 
         for(Document<String, String> doc : searchResults){
 

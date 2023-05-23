@@ -8,7 +8,6 @@ buildscript {
         classpath "org.kordamp.gradle:java-project-gradle-plugin:$kordampPluginVersion"
         classpath "org.kordamp.gradle:jacoco-gradle-plugin:$kordampPluginVersion"
         classpath "org.kordamp.gradle:kordamp-parentbuild:$kordampBuildVersion"
-        classpath "org.graalvm.buildtools:native-gradle-plugin:$graalVmVersion"
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
         classpath "gradle.plugin.com.github.johnrengelman:shadow:$shadowPluginVersion"
         classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
@@ -21,7 +20,7 @@ apply plugin: 'org.kordamp.gradle.kordamp-parentbuild'
 rootProject.name = 'redis-smart-cache'
 
 projects {
-    directories = ['core', 'demo', 'tools']
+    directories = ['core', 'demo']
 
     plugins {
         all {
@@ -30,7 +29,7 @@ projects {
         path(':') {
             id 'org.kordamp.gradle.java-project'
         }
-        dirs(['core', 'demo', 'tools']) {
+        dirs(['core', 'demo']) {
             id 'java-library'
             id 'org.springframework.boot'
             id 'io.spring.dependency-management'

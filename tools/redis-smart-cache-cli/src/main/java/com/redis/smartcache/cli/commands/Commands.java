@@ -7,6 +7,7 @@ import com.redis.smartcache.cli.components.TableSelector;
 import com.redis.smartcache.cli.structures.*;
 import com.redis.smartcache.cli.util.Util;
 import com.redis.smartcache.core.RuleConfig;
+import org.jline.terminal.impl.DumbTerminal;
 import org.jline.utils.InfoCmp;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.shell.component.ConfirmationInput;
