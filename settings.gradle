@@ -39,6 +39,9 @@ projects {
             id 'com.github.johnrengelman.shadow'
             id 'me.champeau.jmh'
         }
+        path('redis-smart-cache-cli') {
+            id 'org.graalvm.buildtools'
+        }
     }
 }
 
@@ -46,6 +49,7 @@ enforce {
     mergeStrategy = 'append'
     rule(enforcer.rules.EnforceBytecodeVersion) { r ->
         // search only on compile and runtime classpaths
+        enabled = false
         r.configurations.addAll(['compileClasspath', 'runtimeClasspath'])
         r.maxJdkVersion = '1.8'
     }

@@ -77,6 +77,10 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		Executors.newSingleThreadExecutor().submit(reader);
 	}
 
+	public void pushUpdatedRules(){
+
+	}
+
 	@SuppressWarnings("unchecked")
 	private void update(StreamMessage<String, String> message) {
 		T newConfig;

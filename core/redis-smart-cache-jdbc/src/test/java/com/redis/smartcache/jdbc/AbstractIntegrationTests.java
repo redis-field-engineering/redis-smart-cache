@@ -29,7 +29,7 @@ import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.Config;
-import com.redis.smartcache.core.Config.RuleConfig;
+import com.redis.smartcache.core.RuleConfig;
 import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Mappers;
 import com.redis.testcontainers.RedisStackContainer;

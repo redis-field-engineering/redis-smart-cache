@@ -1,0 +1,55 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.0.7'
+	id 'io.spring.dependency-management' version '1.1.0'
+	id 'org.graalvm.buildtools.native' version '0.9.20'
+}
+
+graalvmNative {
+	metadataRepository {
+		enabled = true
+	}
+	binaries {
+		main{
+			buildArgs.add('-H:ResourceConfigurationFiles=../../../src/main/resources/native-image/resource-config.json')
+			buildArgs.add('-H:DynamicProxyConfigurationFiles=../../../src/main/resources/proxy-config.json')
+			buildArgs.add('-H:ReflectionConfigurationFiles=../../../src/main/resources/reflection-config.json')
+		}
+	}
+
+}
+
+group = 'com.redis.smartcache'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '17'
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('springShellVersion', "3.0.3")
+}
+
+dependencies {
+	implementation 'org.springframework.shell:spring-shell-starter'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	implementation group: 'io.lettuce', name: 'lettuce-core', version: '6.2.4.RELEASE'
+	implementation group: 'org.springframework.data', name: 'spring-data-redis', version: '2.7.11'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-properties'
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation group: 'io.airlift', name: 'units', version: airliftVersion
+	implementation 'com.redis:lettucemod:3.5.1'
+	implementation files("/Users/steve.lorello/projects/smart-cache/redis-smart-cache/core/redis-smart-cache-core/build/libs/redis-smart-cache-core-0.2.2-SNAPSHOT.jar") //TODO: replace with sensible version
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.shell:spring-shell-dependencies:${springShellVersion}"
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

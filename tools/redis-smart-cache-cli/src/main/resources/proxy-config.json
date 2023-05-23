@@ -1,0 +1,5 @@
+[
+  {"interfaces": ["com.redis.lettucemod.api.sync.RedisModulesCommands", "io.lettuce.core.cluster.api.sync.RedisClusterCommands"]},
+  {"interfaces": ["com.redis.lettucemod.api.sync.RediSearchCommands", "com.redis.lettucemod.api.async.RediSearchAsyncCommands"]}
+
+]

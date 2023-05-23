@@ -2,11 +2,12 @@ package com.redis.smartcache.jdbc;
 
 import java.util.concurrent.TimeUnit;
 
+import com.redis.smartcache.core.Query;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.redis.smartcache.core.Config.RuleConfig;
-import com.redis.smartcache.core.Config.RulesetConfig;
+import com.redis.smartcache.core.RuleConfig;
+import com.redis.smartcache.core.RulesetConfig;
 import com.redis.smartcache.core.HashingFunctions;
 
 import io.airlift.units.Duration;
