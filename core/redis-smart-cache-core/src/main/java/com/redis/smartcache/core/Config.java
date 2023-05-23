@@ -1,26 +1,26 @@
 package com.redis.smartcache.core;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
 import io.lettuce.core.SslVerifyMode;
 
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
 
 public class Config {
 
 	public static final String DEFAULT_NAME = "smartcache";
+	public static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
 
 	private String name = DEFAULT_NAME;
+	private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
+
 	private DriverConfig driver = new DriverConfig();
 	private RedisConfig redis = new RedisConfig();
 	private RulesetConfig ruleset = new RulesetConfig();
 	private MetricsConfig metrics = new MetricsConfig();
-	private AnalyzerConfig analyzer = new AnalyzerConfig();
 
 	public String getName() {
 		return name;
@@ -28,6 +28,14 @@ public class Config {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public int getQueryCacheCapacity() {
+		return queryCacheCapacity;
+	}
+
+	public void setQueryCacheCapacity(int capacity) {
+		this.queryCacheCapacity = capacity;
 	}
 
 	public DriverConfig getDriver() {
@@ -60,14 +68,6 @@ public class Config {
 
 	public void setMetrics(MetricsConfig metrics) {
 		this.metrics = metrics;
-	}
-
-	public AnalyzerConfig getAnalyzer() {
-		return analyzer;
-	}
-
-	public void setAnalyzer(AnalyzerConfig analyzer) {
-		this.analyzer = analyzer;
 	}
 
 	@Override
@@ -234,62 +234,6 @@ public class Config {
 
 	}
 
-	public static class AnalyzerConfig {
-
-		public static final int DEFAULT_QUEUE_CAPACITY = 10000;
-		public static final int DEFAULT_THREAD_COUNT = 1;
-		public static final Duration DEFAULT_FLUSH_INTERVAL = new Duration(50, TimeUnit.MILLISECONDS);
-		public static final int DEFAULT_BATCH_SIZE = 50;
-		public static final int DEFAULT_CACHE_CAPACITY = 10000;
-
-		private int cacheCapacity = DEFAULT_CACHE_CAPACITY;
-		private int queueCapacity = DEFAULT_QUEUE_CAPACITY;
-		private int batchSize = DEFAULT_BATCH_SIZE;
-		private int threads = DEFAULT_THREAD_COUNT;
-		private Duration flushInterval = DEFAULT_FLUSH_INTERVAL;
-
-		public Duration getFlushInterval() {
-			return flushInterval;
-		}
-
-		public void setFlushInterval(Duration interval) {
-			this.flushInterval = interval;
-		}
-
-		public int getCacheCapacity() {
-			return cacheCapacity;
-		}
-
-		public void setCacheCapacity(int capacity) {
-			this.cacheCapacity = capacity;
-		}
-
-		public int getQueueCapacity() {
-			return queueCapacity;
-		}
-
-		public void setQueueCapacity(int queueCapacity) {
-			this.queueCapacity = queueCapacity;
-		}
-
-		public int getBatchSize() {
-			return batchSize;
-		}
-
-		public void setBatchSize(int batchSize) {
-			this.batchSize = batchSize;
-		}
-
-		public int getThreads() {
-			return threads;
-		}
-
-		public void setThreads(int threads) {
-			this.threads = threads;
-		}
-
-	}
-
 	public static class DriverConfig {
 
 		private String className;
@@ -312,5 +256,4 @@ public class Config {
 		}
 
 	}
-
 }

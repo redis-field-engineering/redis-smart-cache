@@ -2,9 +2,8 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.time.Duration;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ import com.redis.smartcache.core.RuleConfig;
 import com.redis.smartcache.core.RulesetConfig;
 import com.redis.testcontainers.RedisStackContainer;
 
+import io.airlift.units.Duration;
 import io.lettuce.core.Range;
 import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XReadArgs.StreamOffset;
@@ -61,46 +61,69 @@ class ConfigTests {
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "123s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 123);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 123);
 				body.put("rules[0].ttl", "456s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
 			RulesetConfig conf2 = new RulesetConfig();
 			try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, conf2, mapper)) {
 				manager2.start();
-				await().until(() -> conf2.getRules().size() == 1);
-				await().until(() -> conf2.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 456);
+				await().until(() -> conf2.getRules().length == 1);
+				await().until(() -> conf2.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
 			}
 		}
 	}
 
 	@Test
 	void initialStreamConfig() throws Exception {
-		String key = "config";
-		RulesetConfig conf = new RulesetConfig();
-		conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
-		conf.getRules().add(
-				RuleConfig.regex("SELECT \\* FROM customers").ttl(io.airlift.units.Duration.valueOf("30m")).build());
-		conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
 		JavaPropsMapper mapper = Mappers.propsMapper();
+		Map<String, String> properties = new HashMap<>();
+		properties.put("rules.1.tables.1", "customer");
+		properties.put("rules.1.ttl", "1.00h");
+		properties.put("rules.2.regex", "SELECT \\* FROM customers");
+		properties.put("rules.2.ttl", "30.00m");
+		properties.put("rules.3.ttl", "10.00s");
+		properties.put("rules.4.query-ids.1", "ab324499");
+		properties.put("rules.4.ttl", "10.00s");
+		RulesetConfig conf = new RulesetConfig();
+		RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+		RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+		RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+		RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
+		conf.setRules(rule1, rule2, rule3, rule4);
+		String key = "config";
 		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 				StatefulRedisModulesConnection<String, String> connection = client.connect();
 				StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
 			manager.start();
 			List<StreamMessage<String, String>> messages = connection.sync().xrange(key, Range.unbounded());
 			Assertions.assertEquals(1, messages.size());
-			Map<String, String> body = messages.get(0).getBody();
-			Map<String, String> expectedBody = new HashMap<>();
-			expectedBody.put("rules.1.tables.1", "customer");
-			expectedBody.put("rules.1.ttl", "1.00h");
-			expectedBody.put("rules.2.regex", "SELECT \\* FROM customers");
-			expectedBody.put("rules.2.ttl", "30.00m");
-			expectedBody.put("rules.3.ttl", "10.00s");
-			Assertions.assertEquals(expectedBody, body);
+			Assertions.assertEquals(properties, messages.get(0).getBody());
 		}
+	}
+
+	@Test
+	void configMapper() throws IOException {
+		JavaPropsMapper mapper = Mappers.propsMapper();
+		Map<String, String> properties = new HashMap<>();
+		properties.put("rules.1.tables.1", "customer");
+		properties.put("rules.1.ttl", "1.00h");
+		properties.put("rules.2.regex", "SELECT \\* FROM customers");
+		properties.put("rules.2.ttl", "30.00m");
+		properties.put("rules.3.ttl", "10.00s");
+		properties.put("rules.4.query-ids.1", "ab324499");
+		properties.put("rules.4.ttl", "10.00s");
+		RulesetConfig conf = new RulesetConfig();
+		RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+		RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+		RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+		RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
+		conf.setRules(rule1, rule2, rule3, rule4);
+		Assertions.assertEquals(conf, mapper.readMapAs(properties, RulesetConfig.class));
+		Assertions.assertEquals(properties, mapper.writeValueAsMap(conf));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -110,10 +133,10 @@ class ConfigTests {
 		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
 				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
 			RulesetConfig conf = new RulesetConfig();
-			conf.getRules().add(RuleConfig.tables("customer").ttl(io.airlift.units.Duration.valueOf("1h")).build());
-			conf.getRules().add(RuleConfig.regex("SELECT \\* FROM customers")
-					.ttl(io.airlift.units.Duration.valueOf("30m")).build());
-			conf.getRules().add(RuleConfig.passthrough().ttl(io.airlift.units.Duration.valueOf("10s")).build());
+			RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+			RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+			RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+			conf.setRules(rule1, rule2, rule3);
 			JavaPropsMapper mapper = Mappers.propsMapper();
 			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
 				manager.start();
@@ -122,14 +145,14 @@ class ConfigTests {
 				Map<String, String> body = new HashMap<>();
 				body.put("rules[0].ttl", "0s");
 				connection.sync().xadd(key, body);
-				await().until(() -> conf.getRules().size() == 1);
-				await().until(() -> conf.getRules().get(0).getTtl().getValue(TimeUnit.SECONDS) == 0);
+				await().until(() -> conf.getRules().length == 1);
+				await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 0);
 			}
 		}
 	}
 
 	private ConditionFactory await() {
-		return Awaitility.await().timeout(Duration.ofSeconds(1));
+		return Awaitility.await().timeout(java.time.Duration.ofSeconds(1));
 	}
 
 	@Test
@@ -138,7 +161,7 @@ class ConfigTests {
 		EventList eventList = new EventList();
 		config.addPropertyChangeListener(eventList);
 		RuleConfig newRule = RuleConfig.tables("table1").build();
-		config.setRules(Arrays.asList(newRule));
+		config.setRules(newRule);
 		Assertions.assertEquals(1, eventList.getEvents().size());
 		Assertions.assertEquals(RulesetConfig.PROPERTY_RULES, eventList.getEvents().get(0).getPropertyName());
 	}

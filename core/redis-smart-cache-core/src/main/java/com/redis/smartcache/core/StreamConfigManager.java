@@ -93,7 +93,6 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		if (newConfig != null) {
 			BeanUtils.copyProperties(newConfig, config);
 		}
-
 	}
 
 	public boolean isRunning() {

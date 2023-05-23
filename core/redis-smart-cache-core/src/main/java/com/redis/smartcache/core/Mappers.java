@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
@@ -23,8 +22,7 @@ public class Mappers {
 
 	public static JavaPropsMapper propsMapper() {
 		return JavaPropsMapper.builder().serializationInclusion(Include.NON_NULL)
-				.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+				.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).build();
 	}
 
 	public static Properties properties(Config config) throws IOException {

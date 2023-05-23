@@ -41,7 +41,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation group: 'io.airlift', name: 'units', version: airliftVersion
 	implementation 'com.redis:lettucemod:3.5.1'
-	implementation files("/Users/steve.lorello/projects/redis/redis-smart-cache/core/redis-smart-cache-core/build/libs/redis-smart-cache-core-0.2.2-SNAPSHOT.jar")
+	implementation files("/Users/steve.lorello/projects/smart-cache/redis-smart-cache/core/redis-smart-cache-core/build/libs/redis-smart-cache-core-0.2.2-SNAPSHOT.jar")
 }
 
 dependencyManagement {

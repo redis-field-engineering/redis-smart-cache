@@ -10,9 +10,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class RuleConfig implements Cloneable {
+public class RuleConfig implements Cloneable{
 
-    public static final Duration DEFAULT_TTL = new Duration(1, TimeUnit.HOURS);
+    public static final Duration TTL_NO_CACHING = Duration.succinctNanos(0);
+    public static final Duration DEFAULT_TTL = TTL_NO_CACHING;
 
     private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
@@ -20,44 +21,19 @@ public class RuleConfig implements Cloneable {
     private List<String> tablesAny;
     private List<String> tablesAll;
     private String regex;
-
     private List<String> queryIds;
-    private Duration ttl = DEFAULT_TTL;
+    private Duration ttl = TTL_NO_CACHING;
 
     public RuleConfig() {
     }
 
-    private RuleConfig(RuleConfig.Builder builder) {
+    private RuleConfig(Builder builder) {
         this.tables = builder.tables;
         this.tablesAny = builder.tablesAny;
         this.tablesAll = builder.tablesAll;
         this.regex = builder.regex;
         this.queryIds = builder.queryIds;
         this.ttl = builder.ttl;
-    }
-
-    @Override
-    public RuleConfig clone(){
-        RuleConfig res = new RuleConfig();
-        if (tables != null){
-            res.tables = new ArrayList<>(this.tables);
-        }
-
-        if (tablesAll != null){
-            res.tablesAll = new ArrayList<>(this.tablesAll);
-        }
-
-        if (tablesAny != null){
-            res.tablesAny = new ArrayList<>(this.tablesAny);
-        }
-
-        if (queryIds != null){
-            res.queryIds = new ArrayList<>(this.queryIds);
-        }
-
-        res.regex = this.regex;
-        res.ttl = this.ttl;
-        return res;
     }
 
     public void addPropertyChangeListener(PropertyChangeListener listener) {
@@ -151,38 +127,62 @@ public class RuleConfig implements Cloneable {
                 && Objects.equals(tablesAny, other.tablesAny) && Objects.equals(ttl, other.ttl);
     }
 
-    public static RuleConfig.Builder tables(String... tables) {
-        RuleConfig.Builder builder = new RuleConfig.Builder();
+    @Override
+    public RuleConfig clone(){
+        RuleConfig res = new RuleConfig();
+        if (tables != null){
+            res.tables = new ArrayList<>(this.tables);
+        }
+
+        if (tablesAll != null){
+            res.tablesAll = new ArrayList<>(this.tablesAll);
+        }
+
+        if (tablesAny != null){
+            res.tablesAny = new ArrayList<>(this.tablesAny);
+        }
+
+        if (queryIds != null){
+            res.queryIds = new ArrayList<>(this.queryIds);
+        }
+
+        res.regex = this.regex;
+        res.ttl = this.ttl;
+        return res;
+    }
+
+    public static Builder tables(String... tables) {
+        Builder builder = new Builder();
         builder.tables = Arrays.asList(tables);
         return builder;
     }
 
-    public static RuleConfig.Builder tablesAny(String... tables) {
-        RuleConfig.Builder builder = new RuleConfig.Builder();
+    public static Builder tablesAny(String... tables) {
+        Builder builder = new Builder();
         builder.tablesAny = Arrays.asList(tables);
         return builder;
     }
 
-    public static RuleConfig.Builder tablesAll(String... tables) {
-        RuleConfig.Builder builder = new RuleConfig.Builder();
+    public static Builder tablesAll(String... tables) {
+        Builder builder = new Builder();
         builder.tablesAll = Arrays.asList(tables);
         return builder;
     }
 
-    public static RuleConfig.Builder queryIds(String... ids) {
-        RuleConfig.Builder builder = new RuleConfig.Builder();
+    public static Builder queryIds(String... ids) {
+        Builder builder = new Builder();
         builder.queryIds = Arrays.asList(ids);
         return builder;
     }
 
-    public static RuleConfig.Builder regex(String regex) {
-        RuleConfig.Builder builder = new RuleConfig.Builder();
+    public static Builder regex(String regex) {
+        Builder builder = new Builder();
         builder.regex = regex;
         return builder;
     }
 
-    public static RuleConfig.Builder passthrough() {
-        return new RuleConfig.Builder();
+    public static Builder passthrough() {
+        return new Builder();
     }
 
     public static final class Builder {
@@ -194,35 +194,35 @@ public class RuleConfig implements Cloneable {
         private List<String> queryIds;
         private Duration ttl = DEFAULT_TTL;
 
-        public Builder() {
+        private Builder() {
         }
 
-        public RuleConfig.Builder tables(String... tables) {
+        public Builder tables(String... tables) {
             this.tables = Arrays.asList(tables);
             return this;
         }
 
-        public RuleConfig.Builder tablesAny(String... tables) {
+        public Builder tablesAny(String... tables) {
             this.tablesAny = Arrays.asList(tables);
             return this;
         }
 
-        public RuleConfig.Builder tablesAll(String... tables) {
+        public Builder tablesAll(String... tables) {
             this.tablesAll = Arrays.asList(tables);
             return this;
         }
 
-        public RuleConfig.Builder regex(String regex) {
+        public Builder regex(String regex) {
             this.regex = regex;
             return this;
         }
 
-        public RuleConfig.Builder queryIds(String... ids) {
+        public Builder queryIds(String... ids) {
             this.queryIds = Arrays.asList(ids);
             return this;
         }
 
-        public RuleConfig.Builder ttl(Duration ttl) {
+        public Builder ttl(Duration ttl) {
             this.ttl = ttl;
             return this;
         }
