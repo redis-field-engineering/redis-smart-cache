@@ -1,13 +1,10 @@
 package com.redis.smartcache.core;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
-import com.redis.lettucemod.api.StatefulRedisModulesConnection;
-import com.redis.lettucemod.util.RedisModulesUtils;
-import com.redis.smartcache.core.RulesetConfig;
-import com.redis.smartcache.core.RuleConfig;
 
 import io.lettuce.core.AbstractRedisClient;
 
