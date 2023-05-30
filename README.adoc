@@ -108,6 +108,8 @@ image:grafana-dashboard.png[Dashboard,width=1486]
 
 After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
 
+Important: If the Dashboard is not being populated, check your version of Grafana, earlier versions may have issues. When in doubt, peform a fresh pull of grafana by issuing "docker pull grafana/grafana" prior to bring the application up. Version 9.5.2, while 7.x showed the behavior this note was added for (lack of data on the dashboard). 
+
 // end::demoSteps[]
 
 == Installation
