@@ -32,7 +32,7 @@ services:
       - 6379:6379
       
   demo:
-    image: demo
+    image: fieldengineering/demo-redis-smart-cache:early-access
     hostname: smartcache
     container_name: smartcache
     restart: on-failure
