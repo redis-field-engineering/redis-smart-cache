@@ -3,6 +3,7 @@ package com.redis.smartcache.core;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -33,11 +34,10 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 		return Stream.of(ruleset.getRules()).map(QueryRuleSession::rule).collect(Collectors.toList());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void propertyChange(PropertyChangeEvent evt) {
 		if (RulesetConfig.PROPERTY_RULES.equals(evt.getPropertyName())) {
-			updateRules((List<RuleConfig>) evt.getNewValue());
+			updateRules(Arrays.asList((RuleConfig[]) evt.getNewValue()));
 		}
 	}
 

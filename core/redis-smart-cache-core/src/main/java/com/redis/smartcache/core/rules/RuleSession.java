@@ -8,14 +8,18 @@ import com.redis.smartcache.core.rules.Rule.Control;
 
 public class RuleSession<L, R> {
 
-	private final Collection<Rule<L, R>> rules;
+	private final List<Rule<L, R>> rules;
 
 	public RuleSession() {
 		this(new ArrayList<>());
 	}
 
 	public RuleSession(Collection<Rule<L, R>> rules) {
-		this.rules = rules;
+		this.rules = new ArrayList<>(rules);
+	}
+
+	public List<Rule<L, R>> getRules() {
+		return rules;
 	}
 
 	public void fire(L fact, R action) {

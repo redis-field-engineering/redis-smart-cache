@@ -77,21 +77,16 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 		Executors.newSingleThreadExecutor().submit(reader);
 	}
 
-	public void pushUpdatedRules(){
-
-	}
-
 	@SuppressWarnings("unchecked")
 	private void update(StreamMessage<String, String> message) {
-		T newConfig;
 		try {
-			newConfig = (T) mapper.readMapAs(message.getBody(), config.getClass());
-		} catch (IOException e) {
+			T newConfig = (T) mapper.readMapAs(message.getBody(), config.getClass());
+			if (newConfig != null) {
+				BeanUtils.copyProperties(newConfig, config);
+				log.log(Level.INFO, "Updated configuration: {0}", config);
+			}
+		} catch (Exception e) {
 			log.log(Level.SEVERE, "Could not parse config", e);
-			return;
-		}
-		if (newConfig != null) {
-			BeanUtils.copyProperties(newConfig, config);
 		}
 	}
 

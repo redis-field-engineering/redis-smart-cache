@@ -198,4 +198,50 @@ class ConfigTests {
 		}
 	}
 
+	@Test
+	void rulesetEquals() {
+		RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+		RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+		Assertions.assertNotEquals(RulesetConfig.of(rule1.clone(), rule2.clone()), RulesetConfig.of(rule1.clone()));
+		Assertions.assertNotEquals(RulesetConfig.of(rule1.clone(), rule2.clone()),
+				RulesetConfig.of(rule2.clone(), rule1.clone()));
+		Assertions.assertEquals(RulesetConfig.of(rule1.clone(), rule2.clone()),
+				RulesetConfig.of(rule1.clone(), rule2.clone()));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	void ruleSessionUpdate() throws Exception {
+		String key = "updateStreamConfig";
+		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+			RulesetConfig rulesetConfig = new RulesetConfig();
+			QueryRuleSession session = QueryRuleSession.of(rulesetConfig);
+			rulesetConfig.addPropertyChangeListener(session);
+			JavaPropsMapper mapper = Mappers.propsMapper();
+			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, rulesetConfig,
+					mapper)) {
+				manager.start();
+				Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
+				await().until(manager::isRunning);
+				Map<String, String> body = new HashMap<>();
+				body.put("rules[0].ttl", "123s");
+				connection.sync().xadd(key, body);
+				await().until(() -> {
+					Action action = new Action();
+					session.getRules().get(0).getAction().accept(action);
+					return action.getTtl().toSeconds() == 123;
+				});
+				body.put("rules[0].ttl", "456s");
+				connection.sync().xadd(key, body);
+				await().until(() -> {
+					Action action = new Action();
+					session.getRules().get(0).getAction().accept(action);
+					return action.getTtl().toSeconds() == 456;
+				});
+			}
+
+		}
+	}
+
 }
