@@ -8,20 +8,21 @@ import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 
 import io.lettuce.core.AbstractRedisClient;
 
-public class RulesetManager implements AutoCloseable {
+public class RuleSessionManager implements AutoCloseable {
 
 	public static final String KEY_CONFIG = "config";
 
 	private final JavaPropsMapper mapper = Mappers.propsMapper();
 	private final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
+	private final Map<Config, QueryRuleSession> ruleSessions = new HashMap<>();
 	private final ClientManager clientManager;
 
-	public RulesetManager(ClientManager clientManager) {
+	public RuleSessionManager(ClientManager clientManager) {
 		this.clientManager = clientManager;
 	}
 
-	public RulesetConfig getRuleset(Config config) {
-		return configManagers.computeIfAbsent(config, this::createConfigManager).get();
+	public QueryRuleSession getRuleSession(Config config) {
+		return ruleSessions.computeIfAbsent(config, this::createRuleSession);
 	}
 
 	private ConfigManager<RulesetConfig> createConfigManager(Config config) {
@@ -43,6 +44,14 @@ public class RulesetManager implements AutoCloseable {
 			configManager.close();
 		}
 		configManagers.clear();
+	}
+
+	private QueryRuleSession createRuleSession(Config config) {
+		ConfigManager<RulesetConfig> configManager = configManagers.computeIfAbsent(config, this::createConfigManager);
+		RulesetConfig ruleset = configManager.get();
+		QueryRuleSession session = QueryRuleSession.of(ruleset);
+		ruleset.addPropertyChangeListener(session);
+		return session;
 	}
 
 }

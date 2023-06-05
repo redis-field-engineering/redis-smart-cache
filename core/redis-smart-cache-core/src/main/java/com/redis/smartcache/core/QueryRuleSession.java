@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -17,6 +19,8 @@ import com.redis.smartcache.core.rules.Rule;
 import com.redis.smartcache.core.rules.RuleSession;
 
 public class QueryRuleSession extends RuleSession<Query, Action> implements PropertyChangeListener {
+
+	private static final Logger log = Logger.getLogger(QueryRuleSession.class.getName());
 
 	public QueryRuleSession() {
 		super();
@@ -37,12 +41,13 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 	@Override
 	public void propertyChange(PropertyChangeEvent evt) {
 		if (RulesetConfig.PROPERTY_RULES.equals(evt.getPropertyName())) {
-			updateRules(Arrays.asList((RuleConfig[]) evt.getNewValue()));
+			updateRules((RuleConfig[]) evt.getNewValue());
 		}
 	}
 
-	public void updateRules(List<RuleConfig> ruleConfigs) {
-		setRules(ruleConfigs.stream().map(QueryRuleSession::rule).collect(Collectors.toList()));
+	public void updateRules(RuleConfig[] ruleConfigs) {
+		setRules(Stream.of(ruleConfigs).map(QueryRuleSession::rule).collect(Collectors.toList()));
+		log.log(Level.INFO, "Updated rules: {0}", Arrays.toString(ruleConfigs));
 	}
 
 	public Action fire(Query query) {

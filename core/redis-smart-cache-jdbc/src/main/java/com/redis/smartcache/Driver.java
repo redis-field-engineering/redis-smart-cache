@@ -20,15 +20,14 @@ import javax.sql.rowset.RowSetFactory;
 import com.redis.smartcache.core.ClientManager;
 import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Config.DriverConfig;
-import com.redis.smartcache.core.RulesetConfig;
 import com.redis.smartcache.core.EvictingLinkedHashMap;
 import com.redis.smartcache.core.HashingFunctions;
 import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Mappers;
 import com.redis.smartcache.core.MeterRegistryManager;
-import com.redis.smartcache.core.RulesetManager;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
+import com.redis.smartcache.core.RuleSessionManager;
 import com.redis.smartcache.jdbc.RedisResultSetCache;
 import com.redis.smartcache.jdbc.ResultSetCache;
 import com.redis.smartcache.jdbc.RowSetCodec;
@@ -68,7 +67,7 @@ public class Driver implements java.sql.Driver {
 	private static final RowSetFactory ROW_SET_FACTORY = new CachedRowSetFactory();
 
 	private static final ClientManager clientManager = new ClientManager();
-	private static final RulesetManager rulesetManager = new RulesetManager(clientManager);
+	private static final RuleSessionManager ruleSessionManager = new RuleSessionManager(clientManager);
 	private static final MeterRegistryManager registryManager = new MeterRegistryManager(clientManager);
 	private static final Map<Config, Map<String, Query>> queryCaches = new HashMap<>();
 
@@ -123,13 +122,11 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private SmartConnection makeConnection(Config config, Connection backendConnection) {
-		RulesetConfig ruleset = rulesetManager.getRuleset(config);
-		QueryRuleSession session = QueryRuleSession.of(ruleset);
-		ruleset.addPropertyChangeListener(session);
+		QueryRuleSession ruleSession = ruleSessionManager.getRuleSession(config);
 		KeyBuilder keyBuilder = KeyBuilder.of(config).sub(KEYSPACE_CACHE);
 		MeterRegistry registry = registryManager.getRegistry(config);
 		Map<String, Query> queryCache = queryCaches.computeIfAbsent(config, this::createQueryCache);
-		return new SmartConnection(backendConnection, session, registry, ROW_SET_FACTORY, rowSetCache(config),
+		return new SmartConnection(backendConnection, ruleSession, registry, ROW_SET_FACTORY, rowSetCache(config),
 				queryCache, keyBuilder);
 	}
 
@@ -247,7 +244,7 @@ public class Driver implements java.sql.Driver {
 	}
 
 	public static void clear() throws Exception {
-		rulesetManager.close();
+		ruleSessionManager.close();
 		registryManager.close();
 		queryCaches.clear();
 		clientManager.close();
