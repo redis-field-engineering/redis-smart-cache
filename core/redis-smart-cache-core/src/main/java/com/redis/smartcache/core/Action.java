@@ -1,4 +1,4 @@
-package com.redis.smartcache.jdbc;
+package com.redis.smartcache.core;
 
 import java.time.Duration;
 

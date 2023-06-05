@@ -28,7 +28,7 @@ import com.redis.smartcache.core.Mappers;
 import com.redis.smartcache.core.MeterRegistryManager;
 import com.redis.smartcache.core.RulesetManager;
 import com.redis.smartcache.core.Query;
-import com.redis.smartcache.jdbc.QueryRuleSession;
+import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.jdbc.RedisResultSetCache;
 import com.redis.smartcache.jdbc.ResultSetCache;
 import com.redis.smartcache.jdbc.RowSetCodec;

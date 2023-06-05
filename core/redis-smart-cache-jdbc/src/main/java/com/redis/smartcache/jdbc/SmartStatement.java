@@ -7,6 +7,7 @@ import java.sql.Statement;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import com.redis.smartcache.core.Action;
 import com.redis.smartcache.core.Fields;
 
 import com.redis.smartcache.core.Query;

@@ -28,6 +28,8 @@ import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.KeyBuilder;
 
 import com.redis.smartcache.core.Query;
+import com.redis.smartcache.core.QueryRuleSession;
+
 import io.micrometer.core.instrument.MeterRegistry;
 
 public class SmartConnection implements Connection {

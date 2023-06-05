@@ -1,4 +1,4 @@
-package com.redis.smartcache.jdbc;
+package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -9,10 +9,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Predicates;
-import com.redis.smartcache.core.RuleConfig;
-import com.redis.smartcache.core.RulesetConfig;
-import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.rules.CollectionRule;
 import com.redis.smartcache.core.rules.PredicateRule;
 import com.redis.smartcache.core.rules.RegexRule;
@@ -72,7 +68,7 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 		if (rule.getQueryIds() != null) {
 			return new PredicateRule<>(q -> rule.getQueryIds().contains(q.getId()), action);
 		}
-		return new PredicateRule<>(Predicates.alwaysTrue(), action);
+		return new PredicateRule<>(l -> true, action);
 	}
 
 	private static Consumer<Action> action(RuleConfig rule) {

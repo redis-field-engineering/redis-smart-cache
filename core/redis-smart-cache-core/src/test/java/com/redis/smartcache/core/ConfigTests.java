@@ -76,6 +76,26 @@ class ConfigTests {
 	}
 
 	@Test
+	void duplicateConfig() throws Exception {
+		String key = "duplicateStreamConfig";
+		try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+				StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+			Map<String, String> body = new HashMap<>();
+			body.put("rules[0].ttl", "0s");
+			connection.sync().xadd(key, body);
+			RulesetConfig conf = new RulesetConfig();
+			conf.setRules(RuleConfig.passthrough().build());
+			JavaPropsMapper mapper = Mappers.propsMapper();
+			try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+				manager.start();
+				await().until(manager::isRunning);
+				Assertions.assertEquals(1, conf.getRules().length);
+				Assertions.assertEquals(0, conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS));
+			}
+		}
+	}
+
+	@Test
 	void initialStreamConfig() throws Exception {
 		JavaPropsMapper mapper = Mappers.propsMapper();
 		Map<String, String> properties = new HashMap<>();
