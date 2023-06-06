@@ -75,6 +75,7 @@ Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, a
 docker compose up
 ----
 
+// tag::demoSteps[]
 Point your web browser to the http://localhost:3000/d/7B6csWTVk/redis-smart-cache?orgId=1&refresh=5s[Redis Smart Cache Grafana dashboard]. This is available through the Grafana instance running at https://localhost:3000.
 
 Initially, no caching rules are active. You can see this in the *Query Mean Latency* metric (~2 s).
@@ -104,6 +105,8 @@ To commit the new caching rule, press 'c'. Then follow the prompt to confirm the
 The application will immediately begin caching queries. You can observe this from the Smart Cache Grafana dashboard:
 
 image:smart-cache-dashboard-with-caching.png[Dashboard with Caching,width=1486]
+
+// end::demoSteps[]
 
 == Installation
 
