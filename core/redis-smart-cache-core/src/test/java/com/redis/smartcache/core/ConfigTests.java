@@ -230,14 +230,14 @@ class ConfigTests {
 				await().until(() -> {
 					Action action = new Action();
 					session.getRules().get(0).getAction().accept(action);
-					return action.getTtl().toSeconds() == 123;
+					return action.getTtl() == 123000;
 				});
 				body.put("rules[0].ttl", "456s");
 				connection.sync().xadd(key, body);
 				await().until(() -> {
 					Action action = new Action();
 					session.getRules().get(0).getAction().accept(action);
-					return action.getTtl().toSeconds() == 456;
+					return action.getTtl() == 456000;
 				});
 			}
 

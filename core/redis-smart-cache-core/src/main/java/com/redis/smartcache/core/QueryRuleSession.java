@@ -2,7 +2,6 @@ package com.redis.smartcache.core;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -57,7 +56,7 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 	}
 
 	private static Rule<Query, Action> rule(RuleConfig rule) {
-		Consumer<Action> action = action(rule);
+		Consumer<Action> action = a -> a.setTtl(rule.getTtl().toMillis());
 		if (rule.getTables() != null) {
 			return CollectionRule.builder(Query::getTables, action).exact(rule.getTables());
 		}
@@ -74,10 +73,6 @@ public class QueryRuleSession extends RuleSession<Query, Action> implements Prop
 			return new PredicateRule<>(q -> rule.getQueryIds().contains(q.getId()), action);
 		}
 		return new PredicateRule<>(l -> true, action);
-	}
-
-	private static Consumer<Action> action(RuleConfig rule) {
-		return a -> a.setTtl(Duration.ofMillis(rule.getTtl().toMillis()));
 	}
 
 }

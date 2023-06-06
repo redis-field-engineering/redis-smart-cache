@@ -5,6 +5,8 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.sql.rowset.CachedRowSet;
@@ -20,6 +22,8 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.RequiredSearch;
 
 public class SmartStatement implements Statement {
+
+	private static final Logger log = Logger.getLogger(SmartStatement.class.getName());
 
 	public static final String METER_BACKEND = "backend";
 	public static final String METER_BACKEND_RESULTSET = METER_BACKEND + ".resultset";
@@ -53,7 +57,7 @@ public class SmartStatement implements Statement {
 	}
 
 	private boolean isCaching() {
-		return action != null && action.isCaching();
+		return action != null && action.getTtl() > 0;
 	}
 
 	private Tags tags(Query query) {
@@ -151,9 +155,14 @@ public class SmartStatement implements Statement {
 		return resultSet;
 	}
 
-	private CachedRowSet put(ResultSet resultSet) throws SQLException {
+	private ResultSet put(ResultSet resultSet) throws SQLException {
 		CachedRowSet cached = new CachedRowSetImpl();
 		cached.populate(resultSet);
+		if (cached.getRowSetWarnings() != null && cached.getRowSetWarnings().getNextException() != null) {
+			log.log(Level.WARNING, "Error reading ResultSet: {0}", cached.getRowSetWarnings().getMessage());
+			resultSet.beforeFirst();
+			return resultSet;
+		}
 		cached.beforeFirst();
 		connection.getRowSetCache().put(key(), cached, action.getTtl());
 		cached.beforeFirst();

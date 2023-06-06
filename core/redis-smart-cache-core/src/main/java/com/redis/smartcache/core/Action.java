@@ -1,27 +1,15 @@
 package com.redis.smartcache.core;
 
-import java.time.Duration;
-
 public class Action {
 
-	public static final Duration TTL_NO_CACHING = Duration.ZERO;
-	public static final long TTL_NO_EXPIRATION = -1;
+	private long ttl = RuleConfig.DEFAULT_TTL.toMillis();
 
-	private Duration ttl = TTL_NO_CACHING;
-
-	public Duration getTtl() {
+	public long getTtl() {
 		return ttl;
 	}
 
-	public void setTtl(Duration ttl) {
-		if (ttl == null || ttl.isNegative()) {
-			throw new IllegalArgumentException("TTL duration must be greater than 0");
-		}
+	public void setTtl(long ttl) {
 		this.ttl = ttl;
-	}
-
-	public boolean isCaching() {
-		return !TTL_NO_CACHING.equals(ttl);
 	}
 
 }

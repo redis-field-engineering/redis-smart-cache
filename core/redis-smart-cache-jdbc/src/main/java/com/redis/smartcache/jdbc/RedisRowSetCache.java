@@ -1,7 +1,6 @@
 package com.redis.smartcache.jdbc;
 
 import java.sql.SQLException;
-import java.time.Duration;
 
 import javax.sql.RowSet;
 
@@ -25,13 +24,12 @@ public class RedisRowSetCache implements RowSetCache {
 	}
 
 	@Override
-	public void put(String key, RowSet rowSet) throws SQLException {
-		connection.sync().set(key, rowSet);
-	}
-
-	@Override
-	public void put(String key, RowSet rowSet, Duration ttl) throws SQLException {
-		connection.sync().psetex(key, ttl.toMillis(), rowSet);
+	public void put(String key, RowSet rowSet, long ttlMillis) throws SQLException {
+		if (ttlMillis > 0) {
+			connection.sync().psetex(key, ttlMillis, rowSet);
+		} else {
+			connection.sync().set(key, rowSet);
+		}
 	}
 
 	@Override

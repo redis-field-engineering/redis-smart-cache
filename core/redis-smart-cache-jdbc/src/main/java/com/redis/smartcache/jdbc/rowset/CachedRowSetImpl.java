@@ -43,6 +43,7 @@ import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Date;
 import java.sql.NClob;
 import java.sql.Ref;
 import java.sql.ResultSet;
@@ -153,8 +154,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	private String tableName;
 
 	/**
-	 * A <code>Vector</code> object containing the <code>Row</code> objects that
-	 * comprise this <code>CachedRowSetImpl</code> object.
+	 * A list containing the <code>Row</code> objects that comprise this
+	 * <code>CachedRowSetImpl</code> object.
 	 * 
 	 * @serial
 	 */
@@ -317,12 +318,12 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	private boolean callWithCon;
 
 	/**
-	 * The Vector holding the Match Columns
+	 * The list holding the Match Columns
 	 */
 	private List<Integer> iMatchColumns;
 
 	/**
-	 * The Vector that will hold the Match Column names.
+	 * The list that will hold the Match Column names.
 	 */
 	private List<String> strMatchColumns;
 
@@ -380,7 +381,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the <code>rvh</code> field to a new <code>Vector</code> object with a
+	 * Sets the <code>rvh</code> field to a new list with a
 	 * capacity of 100 and sets the <code>cursorPos</code> and <code>numRows</code>
 	 * fields to zero.
 	 */
@@ -410,7 +411,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 		setEscapeProcessing(true);
 
-		// Instantiating the vector for MatchColumns
+		// Instantiating the list for MatchColumns
 
 		iMatchColumns = new ArrayList<>(10);
 		for (int i = 0; i < 10; i++) {
@@ -475,14 +476,6 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 */
 	@Override
 	public void populate(ResultSet data) throws SQLException {
-		int rowsFetched;
-		Row row;
-		int numCols;
-		int i;
-		Map<String, Class<?>> map = getTypeMap();
-		Object obj;
-		int mRows;
-
 		if (data == null) {
 			throw new SQLException("Invalid ResultSet object supplied to populate method");
 		}
@@ -497,40 +490,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 		// release the meta-data so that aren't tempted to use it.
 		resultSetMetaData = null;
-		numCols = rowSetMetaData.getColumnCount();
-		mRows = this.getMaxRows();
-		rowsFetched = 0;
+		int mRows = this.getMaxRows();
+		int rowsFetched = 0;
 
+		Map<String, Class<?>> map = getTypeMap();
+		int columnCount = rowSetMetaData.getColumnCount();
 		while (data.next()) {
-
-			row = new Row(numCols);
-
 			if (rowsFetched > mRows && mRows > 0) {
 				rowsetWarning.setNextWarning(new RowSetWarning(MESSAGE_MAX_ROWS_EXCEEDED));
 			}
-			for (i = 1; i <= numCols; i++) {
-				obj = getValue(rowSetMetaData, i, data, map);
-				/*
-				 * the following block checks for the various types that we have to serialize in
-				 * order to store - right now only structs have been tested
-				 */
-				if (obj instanceof Struct) {
-					obj = new SerialStruct((Struct) obj, map);
-				} else if (obj instanceof SQLData) {
-					obj = new SerialStruct((SQLData) obj, map);
-				} else if (obj instanceof Blob) {
-					obj = new SerialBlob((Blob) obj);
-				} else if (obj instanceof Clob) {
-					obj = new SerialClob((Clob) obj);
-				} else if (obj instanceof java.sql.Array) {
-					if (map != null)
-						obj = new SerialArray((java.sql.Array) obj, map);
-					else
-						obj = new SerialArray((java.sql.Array) obj);
-				}
-
-				row.initColumnObject(i, obj);
-			}
+			Row row = row(data, map, columnCount);
 			rowsFetched++;
 			rvh.add(row);
 		}
@@ -540,7 +509,164 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 		// notify any listeners that the rowset has changed
 		notifyRowSetChanged();
+	}
 
+	private Row row(ResultSet data, Map<String, Class<?>> map, int columnCount) throws SQLException {
+		Row row = new Row(columnCount);
+		for (int i = 1; i <= columnCount; i++) {
+			Object value = getValue(rowSetMetaData, i, data, map);
+			row.initColumnObject(i, checkSerialize(value, map));
+		}
+		return row;
+	}
+
+	/**
+	 * Populates this <code>CachedRowSet</code> object with data from the given
+	 * <code>ResultSet</code> object. While related to the
+	 * <code>populate(ResultSet)</code> method, an additional parameter is provided
+	 * to allow starting position within the <code>ResultSet</code> from where to
+	 * populate the CachedRowSet instance.
+	 *
+	 * This method is an alternative to the method <code>execute</code> for filling
+	 * the rowset with data. The method <code>populate</code> does not require that
+	 * the properties needed by the method <code>execute</code>, such as the
+	 * <code>command</code> property, be set. This is true because the method
+	 * <code>populate</code> is given the <code>ResultSet</code> object from which
+	 * to get data and thus does not need to use the properties required for setting
+	 * up a connection and executing this <code>CachedRowSetImpl</code> object's
+	 * command.
+	 * <P>
+	 * After populating this rowset with data, the method <code>populate</code> sets
+	 * the rowset's metadata and then sends a <code>RowSetChangedEvent</code> object
+	 * to all registered listeners prior to returning.
+	 *
+	 * @param data  the <code>ResultSet</code> object containing the data to be read
+	 *              into this <code>CachedRowSetImpl</code> object
+	 * @param start the integer specifing the position in the <code>ResultSet</code>
+	 *              object to popultate the <code>CachedRowSetImpl</code> object.
+	 * @throws SQLException if an error occurs; or the max row setting is violated
+	 *                      while populating the RowSet.Also id the start position
+	 *                      is negative.
+	 * @see #execute
+	 */
+	@Override
+	public void populate(ResultSet data, int start) throws SQLException {
+
+		if (populatecallcount == 0) {
+			if (start < 0) {
+				throw new SQLException("Start position cannot be negative");
+			}
+			if (getMaxRows() == 0) {
+				data.absolute(start);
+				while (data.next()) {
+					totalRows++;
+				}
+				totalRows++;
+			}
+			startPos = start;
+		}
+		populatecallcount = populatecallcount + 1;
+		resultSet = data;
+		if ((endPos - startPos) >= getMaxRows() && (getMaxRows() > 0)) {
+			endPos = prevEndPos;
+			pagenotend = false;
+			return;
+		}
+
+		if ((maxRowsreached != getMaxRows() || maxRowsreached != totalRows) && pagenotend) {
+			startPrev = start - getPageSize();
+		}
+
+		if (pageSize == 0) {
+			prevEndPos = endPos;
+			endPos = start + getMaxRows();
+		} else {
+			prevEndPos = endPos;
+			endPos = start + getPageSize();
+		}
+
+		if (start == 1) {
+			resultSet.beforeFirst();
+		} else {
+			resultSet.absolute(start - 1);
+		}
+		rvh = new ArrayList<>(pageSize == 0 ? getMaxRows() : getPageSize());
+		if (data == null) {
+			throw new SQLException("Invalid ResultSet object supplied to populate method");
+		}
+
+		// get the meta data for this ResultSet
+		resultSetMetaData = data.getMetaData();
+
+		// set up the metadata
+		rowSetMetaData = new RowSetMetaDataImpl();
+		initMetaData(rowSetMetaData, resultSetMetaData);
+
+		// release the meta-data so that aren't tempted to use it.
+		resultSetMetaData = null;
+		int mRows = this.getMaxRows();
+
+		if (!data.next() && mRows == 0) {
+			endPos = prevEndPos;
+			pagenotend = false;
+			return;
+		}
+
+		data.previous();
+
+		Map<String, Class<?>> map = getTypeMap();
+		int columnCount = rowSetMetaData.getColumnCount();
+		int rowsFetched = 0;
+		while (data.next()) {
+
+			if (pageSize == 0) {
+				if (rowsFetched >= mRows && mRows > 0) {
+					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
+					break;
+				}
+			} else {
+				if ((rowsFetched >= pageSize) || (maxRowsreached >= mRows && mRows > 0)) {
+					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
+					break;
+				}
+			}
+			Row row = row(data, map, columnCount);
+			rowsFetched++;
+			maxRowsreached++;
+			rvh.add(row);
+		}
+		numRows = rowsFetched;
+		// Also rowsFetched should be equal to rvh.size()
+		// notify any listeners that the rowset has changed
+		notifyRowSetChanged();
+
+	}
+
+	/*
+	 * This methods checks for the various types that we have to serialize in order
+	 * to store - right now only structs have been tested
+	 */
+	private Object checkSerialize(Object obj, Map<String, Class<?>> map) throws SQLException {
+
+		if (obj instanceof Struct) {
+			return new SerialStruct((Struct) obj, map);
+		}
+		if (obj instanceof SQLData) {
+			return new SerialStruct((SQLData) obj, map);
+		}
+		if (obj instanceof Blob) {
+			return new SerialBlob((Blob) obj);
+		}
+		if (obj instanceof Clob) {
+			return new SerialClob((Clob) obj);
+		}
+		if (obj instanceof Array) {
+			if (map == null) {
+				return new SerialArray((Array) obj);
+			}
+			return new SerialArray((Array) obj, map);
+		}
+		return obj;
 	}
 
 	private Object getValue(RowSetMetaData metaData, int columnIndex, ResultSet data, Map<String, Class<?>> map)
@@ -553,16 +679,18 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 			return data.getTime(columnIndex);
 		case Types.DATE:
 			return data.getDate(columnIndex);
+		default:
+			/*
+			 * check if the user has set a map. If no map is set then use plain getObject.
+			 * This lets us work with drivers that do not support getObject with a map in
+			 * fairly sensible way
+			 */
+			if (map == null || map.isEmpty()) {
+				return data.getObject(columnIndex);
+			}
+			return data.getObject(columnIndex, map);
 		}
-		/*
-		 * check if the user has set a map. If no map is set then use plain getObject.
-		 * This lets us work with drivers that do not support getObject with a map in
-		 * fairly sensible way
-		 */
-		if (map == null || map.isEmpty()) {
-			return data.getObject(columnIndex);
-		}
-		return data.getObject(columnIndex, map);
+
 	}
 
 	/**
@@ -1065,8 +1193,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	/**
 	 * Returns the specified column of this <code>CachedRowSetImpl</code> object as
 	 * a <code>Collection</code> object. This method makes a copy of the column's
-	 * data and utilitizes the <code>Vector</code> to establish the collection. The
-	 * <code>Vector</code> class implements a growable array objects allowing the
+	 * data and utilitizes the list to establish the collection. The
+	 * list class implements a growable array objects allowing the
 	 * individual components to be accessed using an an integer index similar to
 	 * that of an array.
 	 *
@@ -3356,16 +3484,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 */
 	private boolean isNumeric(int type) {
 		switch (type) {
-		case java.sql.Types.NUMERIC:
-		case java.sql.Types.DECIMAL:
-		case java.sql.Types.BIT:
-		case java.sql.Types.TINYINT:
-		case java.sql.Types.SMALLINT:
-		case java.sql.Types.INTEGER:
-		case java.sql.Types.BIGINT:
-		case java.sql.Types.REAL:
-		case java.sql.Types.DOUBLE:
-		case java.sql.Types.FLOAT:
+		case Types.NUMERIC:
+		case Types.DECIMAL:
+		case Types.BIT:
+		case Types.TINYINT:
+		case Types.SMALLINT:
+		case Types.INTEGER:
+		case Types.BIGINT:
+		case Types.REAL:
+		case Types.DOUBLE:
+		case Types.FLOAT:
 			return true;
 		default:
 			return false;
@@ -3375,16 +3503,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	/**
 	 * Indicates whether the given SQL data type is a string type.
 	 *
-	 * @param type one of the constants from <code>java.sql.Types</code>
+	 * @param type one of the constants from <code>Types</code>
 	 * @return <code>true</code> if the given type is <code>CHAR</code>,'
 	 *         <code>VARCHAR</code>, or <code>LONGVARCHAR</code>; <code>false</code>
 	 *         otherwise
 	 */
 	private boolean isString(int type) {
 		switch (type) {
-		case java.sql.Types.CHAR:
-		case java.sql.Types.VARCHAR:
-		case java.sql.Types.LONGVARCHAR:
+		case Types.CHAR:
+		case Types.VARCHAR:
+		case Types.LONGVARCHAR:
 			return true;
 		default:
 			return false;
@@ -3394,16 +3522,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	/**
 	 * Indicates whether the given SQL data type is a binary type.
 	 *
-	 * @param type one of the constants from <code>java.sql.Types</code>
+	 * @param type one of the constants from <code>Types</code>
 	 * @return <code>true</code> if the given type is <code>BINARY</code>,'
 	 *         <code>VARBINARY</code>, or <code>LONGVARBINARY</code>;
 	 *         <code>false</code> otherwise
 	 */
 	private boolean isBinary(int type) {
 		switch (type) {
-		case java.sql.Types.BINARY:
-		case java.sql.Types.VARBINARY:
-		case java.sql.Types.LONGVARBINARY:
+		case Types.BINARY:
+		case Types.VARBINARY:
+		case Types.LONGVARBINARY:
 			return true;
 		default:
 			return false;
@@ -3415,16 +3543,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * called internally by the conversion methods <code>convertNumeric</code> and
 	 * <code>convertTemporal</code>.
 	 *
-	 * @param type one of the constants from <code>java.sql.Types</code>
+	 * @param type one of the constants from <code>Types</code>
 	 * @return <code>true</code> if the given type is <code>DATE</code>,
 	 *         <code>TIME</code>, or <code>TIMESTAMP</code>; <code>false</code>
 	 *         otherwise
 	 */
 	private boolean isTemporal(int type) {
 		switch (type) {
-		case java.sql.Types.DATE:
-		case java.sql.Types.TIME:
-		case java.sql.Types.TIMESTAMP:
+		case Types.DATE:
+		case Types.TIME:
+		case Types.TIMESTAMP:
 			return true;
 		default:
 			return false;
@@ -3436,14 +3564,14 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * called internally by the conversion methods <code>convertNumeric</code> and
 	 * <code>convertBoolean</code>.
 	 *
-	 * @param type one of the constants from <code>java.sql.Types</code>
+	 * @param type one of the constants from <code>Types</code>
 	 * @return <code>true</code> if the given type is <code>BIT</code>, , or
 	 *         <code>BOOLEAN</code>; <code>false</code> otherwise
 	 */
 	private boolean isBoolean(int type) {
 		switch (type) {
-		case java.sql.Types.BIT:
-		case java.sql.Types.BOOLEAN:
+		case Types.BIT:
+		case Types.BOOLEAN:
 			return true;
 		default:
 			return false;
@@ -3461,19 +3589,18 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                is to be converted to the target type
 	 * @param srcType the data type that is the standard mapping in SQL of the
 	 *                object to be converted; must be one of the constants in
-	 *                <code>java.sql.Types</code>
+	 *                <code>Types</code>
 	 * @param trgType the SQL data type to which to convert the given object; must
-	 *                be one of the following constants in
-	 *                <code>java.sql.Types</code>: <code>NUMERIC</code>,
-	 *                <code>DECIMAL</code>, <code>BIT</code>, <code>TINYINT</code>,
-	 *                <code>SMALLINT</code>, <code>INTEGER</code>,
-	 *                <code>BIGINT</code>, <code>REAL</code>, <code>DOUBLE</code>,
-	 *                <code>FLOAT</code>, <code>VARCHAR</code>,
+	 *                be one of the following constants in <code>Types</code>:
+	 *                <code>NUMERIC</code>, <code>DECIMAL</code>, <code>BIT</code>,
+	 *                <code>TINYINT</code>, <code>SMALLINT</code>,
+	 *                <code>INTEGER</code>, <code>BIGINT</code>, <code>REAL</code>,
+	 *                <code>DOUBLE</code>, <code>FLOAT</code>, <code>VARCHAR</code>,
 	 *                <code>LONGVARCHAR</code>, or <code>CHAR</code>
 	 * @return an <code>Object</code> value.that is the standard object mapping for
 	 *         the target SQL type
 	 * @throws SQLException if the given target type is not one of the string or
-	 *                      numeric types in <code>java.sql.Types</code>
+	 *                      numeric types in <code>Types</code>
 	 */
 	private Object convertNumeric(Object srcObj, int srcType, int trgType) throws SQLException {
 
@@ -3487,28 +3614,28 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 		try {
 			switch (trgType) {
-			case java.sql.Types.BIT:
+			case Types.BIT:
 				Integer i = Integer.valueOf(srcObj.toString().trim());
 				return i.equals(0) ? Boolean.valueOf(false) : Boolean.valueOf(true);
-			case java.sql.Types.TINYINT:
+			case Types.TINYINT:
 				return Byte.valueOf(srcObj.toString().trim());
-			case java.sql.Types.SMALLINT:
+			case Types.SMALLINT:
 				return Short.valueOf(srcObj.toString().trim());
-			case java.sql.Types.INTEGER:
+			case Types.INTEGER:
 				return Integer.valueOf(srcObj.toString().trim());
-			case java.sql.Types.BIGINT:
+			case Types.BIGINT:
 				return Long.valueOf(srcObj.toString().trim());
-			case java.sql.Types.NUMERIC:
-			case java.sql.Types.DECIMAL:
+			case Types.NUMERIC:
+			case Types.DECIMAL:
 				return new BigDecimal(srcObj.toString().trim());
-			case java.sql.Types.REAL:
-			case java.sql.Types.FLOAT:
+			case Types.REAL:
+			case Types.FLOAT:
 				return Float.valueOf(srcObj.toString().trim());
-			case java.sql.Types.DOUBLE:
+			case Types.DOUBLE:
 				return Double.valueOf(srcObj.toString().trim());
-			case java.sql.Types.CHAR:
-			case java.sql.Types.VARCHAR:
-			case java.sql.Types.LONGVARCHAR:
+			case Types.CHAR:
+			case Types.VARCHAR:
+			case Types.LONGVARCHAR:
 				return srcObj.toString();
 			default:
 				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + ": " + trgType);
@@ -3534,17 +3661,17 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * <TR>
 	 * <TD><code>TIMESTAMP</code>
 	 * <TD><code>DATE</code>
-	 * <TD><code>java.sql.Date</code>
+	 * <TD><code>Date</code>
 	 * </TR>
 	 * <TR>
 	 * <TD><code>TIMESTAMP</code>
 	 * <TD><code>TIME</code>
-	 * <TD><code>java.sql.Time</code>
+	 * <TD><code>Time</code>
 	 * </TR>
 	 * <TR>
 	 * <TD><code>TIME</code>
 	 * <TD><code>TIMESTAMP</code>
-	 * <TD><code>java.sql.Timestamp</code>
+	 * <TD><code>Timestamp</code>
 	 * </TR>
 	 * <TR>
 	 * <TD><code>DATE</code>, <code>TIME</code>, or <code>TIMESTAMP</code>
@@ -3560,16 +3687,16 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                is to be converted to the target type
 	 * @param srcType the data type that is the standard mapping in SQL of the
 	 *                object to be converted; must be one of the constants in
-	 *                <code>java.sql.Types</code>
+	 *                <code>Types</code>
 	 * @param trgType the SQL data type to which to convert the given object; must
-	 *                be one of the following constants in
-	 *                <code>java.sql.Types</code>: <code>DATE</code>,
-	 *                <code>TIME</code>, <code>TIMESTAMP</code>, <code>CHAR</code>,
-	 *                <code>VARCHAR</code>, or <code>LONGVARCHAR</code>
+	 *                be one of the following constants in <code>Types</code>:
+	 *                <code>DATE</code>, <code>TIME</code>, <code>TIMESTAMP</code>,
+	 *                <code>CHAR</code>, <code>VARCHAR</code>, or
+	 *                <code>LONGVARCHAR</code>
 	 * @return an <code>Object</code> value.that is the standard object mapping for
 	 *         the target SQL type
 	 * @throws SQLException if the given target type is not one of the string or
-	 *                      temporal types in <code>java.sql.Types</code>
+	 *                      temporal types in <code>Types</code>
 	 */
 	private Object convertTemporal(Object srcObj, int srcType, int trgType) throws SQLException {
 
@@ -3583,27 +3710,27 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 		try {
 			switch (trgType) {
-			case java.sql.Types.DATE:
-				if (srcType == java.sql.Types.TIMESTAMP) {
-					return new java.sql.Date(((java.sql.Timestamp) srcObj).getTime());
+			case Types.DATE:
+				if (srcType == Types.TIMESTAMP) {
+					return new Date(((Timestamp) srcObj).getTime());
 				} else {
 					throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 				}
-			case java.sql.Types.TIMESTAMP:
-				if (srcType == java.sql.Types.TIME) {
-					return new Timestamp(((java.sql.Time) srcObj).getTime());
+			case Types.TIMESTAMP:
+				if (srcType == Types.TIME) {
+					return new Timestamp(((Time) srcObj).getTime());
 				} else {
-					return new Timestamp(((java.sql.Date) srcObj).getTime());
+					return new Timestamp(((Date) srcObj).getTime());
 				}
-			case java.sql.Types.TIME:
-				if (srcType == java.sql.Types.TIMESTAMP) {
-					return new Time(((java.sql.Timestamp) srcObj).getTime());
+			case Types.TIME:
+				if (srcType == Types.TIMESTAMP) {
+					return new Time(((Timestamp) srcObj).getTime());
 				} else {
 					throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 				}
-			case java.sql.Types.CHAR:
-			case java.sql.Types.VARCHAR:
-			case java.sql.Types.LONGVARCHAR:
+			case Types.CHAR:
+			case Types.VARCHAR:
+			case Types.LONGVARCHAR:
 				return srcObj.toString();
 			default:
 				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
@@ -3625,15 +3752,14 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                is to be converted to the target type
 	 * @param srcType the data type that is the standard mapping in SQL of the
 	 *                object to be converted; must be one of the constants in
-	 *                <code>java.sql.Types</code>
+	 *                <code>Types</code>
 	 * @param trgType the SQL data type to which to convert the given object; must
-	 *                be one of the following constants in
-	 *                <code>java.sql.Types</code>: <code>BIT</code>, or
-	 *                <code>BOOLEAN</code>
+	 *                be one of the following constants in <code>Types</code>:
+	 *                <code>BIT</code>, or <code>BOOLEAN</code>
 	 * @return an <code>Object</code> value.that is the standard object mapping for
 	 *         the target SQL type
 	 * @throws SQLException if the given target type is not one of the Boolean types
-	 *                      in <code>java.sql.Types</code>
+	 *                      in <code>Types</code>
 	 */
 	private Object convertBoolean(Object srcObj, int srcType, int trgType) throws SQLException {
 
@@ -3647,10 +3773,10 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 		try {
 			switch (trgType) {
-			case java.sql.Types.BIT:
+			case Types.BIT:
 				Integer i = Integer.valueOf(srcObj.toString().trim());
 				return i.equals(0) ? Boolean.valueOf(false) : Boolean.valueOf(true);
-			case java.sql.Types.BOOLEAN:
+			case Types.BOOLEAN:
 				return Boolean.valueOf(srcObj.toString().trim());
 			default:
 				throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH + trgType);
@@ -3724,7 +3850,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertBoolean(Boolean.valueOf(x), java.sql.Types.BIT, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertBoolean(Boolean.valueOf(x), Types.BIT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3758,7 +3884,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Byte.valueOf(x), java.sql.Types.TINYINT, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(Byte.valueOf(x), Types.TINYINT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3792,8 +3918,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Short.valueOf(x), java.sql.Types.SMALLINT,
-				rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(Short.valueOf(x), Types.SMALLINT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3826,7 +3951,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertNumeric(x, java.sql.Types.INTEGER, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(x, Types.INTEGER, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3860,7 +3985,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Long.valueOf(x), java.sql.Types.BIGINT, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(Long.valueOf(x), Types.BIGINT, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 
@@ -3895,7 +4020,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(Float.valueOf(x), java.sql.Types.REAL, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(Float.valueOf(x), Types.REAL, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3928,8 +4053,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
-		Object obj = convertNumeric(Double.valueOf(x), java.sql.Types.DOUBLE,
-				rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(Double.valueOf(x), Types.DOUBLE, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -3963,7 +4087,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertNumeric(x, java.sql.Types.NUMERIC, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertNumeric(x, Types.NUMERIC, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4063,13 +4187,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>DATE</code> or <code>TIMESTAMP</code>, or (4) this
 	 *                      rowset is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateDate(int columnIndex, java.sql.Date x) throws SQLException {
+	public void updateDate(int columnIndex, Date x) throws SQLException {
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.DATE, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, Types.DATE, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4098,13 +4222,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIME</code> or <code>TIMESTAMP</code>, or (4) this
 	 *                      rowset is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateTime(int columnIndex, java.sql.Time x) throws SQLException {
+	public void updateTime(int columnIndex, Time x) throws SQLException {
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.TIME, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, Types.TIME, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4134,13 +4258,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code>, or (4) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateTimestamp(int columnIndex, java.sql.Timestamp x) throws SQLException {
+	public void updateTimestamp(int columnIndex, Timestamp x) throws SQLException {
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		Object obj = convertTemporal(x, java.sql.Types.TIMESTAMP, rowSetMetaData.getColumnType(columnIndex));
+		Object obj = convertTemporal(x, Types.TIMESTAMP, rowSetMetaData.getColumnType(columnIndex));
 
 		getCurrentRow().setColumnObject(columnIndex, obj);
 	}
@@ -4664,7 +4788,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code>, or (4) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateDate(String columnName, java.sql.Date x) throws SQLException {
+	public void updateDate(String columnName, Date x) throws SQLException {
 		updateDate(getColIdxByName(columnName), x);
 	}
 
@@ -4691,7 +4815,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIMESTAMP</code>, or (4) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateTime(String columnName, java.sql.Time x) throws SQLException {
+	public void updateTime(String columnName, Time x) throws SQLException {
 		updateTime(getColIdxByName(columnName), x);
 	}
 
@@ -4720,7 +4844,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      <code>TIME</code>, or <code>TIMESTAMP</code>, or (4)
 	 *                      this rowset is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateTimestamp(String columnName, java.sql.Timestamp x) throws SQLException {
+	public void updateTimestamp(String columnName, Timestamp x) throws SQLException {
 		updateTimestamp(getColIdxByName(columnName), x);
 	}
 
@@ -5152,7 +5276,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.REF) {
+		if (rowSetMetaData.getColumnType(columnIndex) != Types.REF) {
 			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
@@ -5193,7 +5317,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.BLOB) {
+		if (rowSetMetaData.getColumnType(columnIndex) != Types.BLOB) {
 			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
@@ -5234,7 +5358,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.CLOB) {
+		if (rowSetMetaData.getColumnType(columnIndex) != Types.CLOB) {
 			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
@@ -5268,19 +5392,19 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @see #getArray(String)
 	 */
 	public Array getArray(int columnIndex) throws SQLException {
-		java.sql.Array value;
+		Array value;
 
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.ARRAY) {
+		if (rowSetMetaData.getColumnType(columnIndex) != Types.ARRAY) {
 			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
 		setLastValueNull(false);
-		value = (java.sql.Array) (getCurrentRow().getColumnObject(columnIndex));
+		value = (Array) (getCurrentRow().getColumnObject(columnIndex));
 
 		// check for SQL NULL
 		if (value == null) {
@@ -5388,9 +5512,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Date</code> object,
-	 * using the given <code>Calendar</code> object to construct an appropriate
-	 * millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Date</code> object, using the
+	 * given <code>Calendar</code> object to construct an appropriate millisecond
+	 * value for the date.
 	 *
 	 * @param columnIndex the first column is <code>1</code>, the second is
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
@@ -5406,10 +5530,10 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>DATE</code> or
 	 *                      <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Date getDate(int columnIndex, Calendar cal) throws SQLException {
+	public Date getDate(int columnIndex, Calendar cal) throws SQLException {
 
 		return getValue(columnIndex, null, value -> {
-			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.DATE);
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), Types.DATE);
 
 			// create a default calendar
 			Calendar defaultCal = Calendar.getInstance();
@@ -5428,7 +5552,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 			 * This looks a little odd but it is correct - Calendar.getTime() returns a
 			 * Date...
 			 */
-			return new java.sql.Date(cal.getTime().getTime());
+			return new Date(cal.getTime().getTime());
 		});
 
 	}
@@ -5460,9 +5584,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Date</code> object,
-	 * using the given <code>Calendar</code> object to construct an appropriate
-	 * millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Date</code> object, using the
+	 * given <code>Calendar</code> object to construct an appropriate millisecond
+	 * value for the date.
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
@@ -5476,15 +5600,15 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>DATE</code> or
 	 *                      <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Date getDate(String columnName, Calendar cal) throws SQLException {
+	public Date getDate(String columnName, Calendar cal) throws SQLException {
 		return getDate(getColIdxByName(columnName), cal);
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Time</code> object,
-	 * using the given <code>Calendar</code> object to construct an appropriate
-	 * millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Time</code> object, using the
+	 * given <code>Calendar</code> object to construct an appropriate millisecond
+	 * value for the date.
 	 *
 	 * @param columnIndex the first column is <code>1</code>, the second is
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
@@ -5500,10 +5624,10 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>TIME</code> or
 	 *                      <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Time getTime(int columnIndex, Calendar cal) throws SQLException {
+	public Time getTime(int columnIndex, Calendar cal) throws SQLException {
 		return getValue(columnIndex, null, value -> {
 
-			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIME);
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), Types.TIME);
 
 			// create a default calendar
 			Calendar defaultCal = Calendar.getInstance();
@@ -5518,15 +5642,15 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 			cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
 			cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
 
-			return new java.sql.Time(cal.getTime().getTime());
+			return new Time(cal.getTime().getTime());
 		});
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Time</code> object,
-	 * using the given <code>Calendar</code> object to construct an appropriate
-	 * millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Time</code> object, using the
+	 * given <code>Calendar</code> object to construct an appropriate millisecond
+	 * value for the date.
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
@@ -5540,15 +5664,15 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>TIME</code> or
 	 *                      <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Time getTime(String columnName, Calendar cal) throws SQLException {
+	public Time getTime(String columnName, Calendar cal) throws SQLException {
 		return getTime(getColIdxByName(columnName), cal);
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Timestamp</code>
-	 * object, using the given <code>Calendar</code> object to construct an
-	 * appropriate millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Timestamp</code> object,
+	 * using the given <code>Calendar</code> object to construct an appropriate
+	 * millisecond value for the date.
 	 *
 	 * @param columnIndex the first column is <code>1</code>, the second is
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
@@ -5564,10 +5688,10 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>TIME</code> or
 	 *                      <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
+	public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
 		return getValue(columnIndex, null, value -> {
 
-			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), java.sql.Types.TIMESTAMP);
+			value = convertTemporal(value, rowSetMetaData.getColumnType(columnIndex), Types.TIMESTAMP);
 
 			// create a default calendar
 			Calendar defaultCal = Calendar.getInstance();
@@ -5585,15 +5709,15 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 			cal.set(Calendar.MINUTE, defaultCal.get(Calendar.MINUTE));
 			cal.set(Calendar.SECOND, defaultCal.get(Calendar.SECOND));
 
-			return new java.sql.Timestamp(cal.getTime().getTime());
+			return new Timestamp(cal.getTime().getTime());
 		});
 	}
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>CachedRowSetImpl</code> object as a <code>java.sql.Timestamp</code>
-	 * object, using the given <code>Calendar</code> object to construct an
-	 * appropriate millisecond value for the date.
+	 * <code>CachedRowSetImpl</code> object as a <code>Timestamp</code> object,
+	 * using the given <code>Calendar</code> object to construct an appropriate
+	 * millisecond value for the date.
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
@@ -5607,7 +5731,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                      column does not store an SQL <code>DATE</code>,
 	 *                      <code>TIME</code>, or <code>TIMESTAMP</code> value
 	 */
-	public java.sql.Timestamp getTimestamp(String columnName, Calendar cal) throws SQLException {
+	public Timestamp getTimestamp(String columnName, Calendar cal) throws SQLException {
 		return getTimestamp(getColIdxByName(columnName), cal);
 	}
 
@@ -5850,13 +5974,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *                    <code>2</code>, and so on; must be <code>1</code> or
 	 *                    larger and equal to or less than the number of columns in
 	 *                    this rowset
-	 * @param ref         the new column <code>java.sql.Ref</code> value
+	 * @param ref         the new column <code>Ref</code> value
 	 * @throws SQLException if (1) the given column index is out of bounds, (2) the
 	 *                      cursor is not on one of this rowset's rows or its insert
 	 *                      row, or (3) this rowset is
 	 *                      <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateRef(int columnIndex, java.sql.Ref ref) throws SQLException {
+	public void updateRef(int columnIndex, Ref ref) throws SQLException {
 		// sanity check.
 		checkIndex(columnIndex);
 		// make sure the cursor is on a valid row
@@ -5883,13 +6007,13 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *
 	 * @param columnName a <code>String</code> object that must match the SQL name
 	 *                   of a column in this rowset, ignoring case
-	 * @param ref        the new column <code>java.sql.Ref</code> value
+	 * @param ref        the new column <code>Ref</code> value
 	 * @throws SQLException if (1) the given column name does not match the name of
 	 *                      a column in this rowset, (2) the cursor is not on one of
 	 *                      this rowset's rows or its insert row, or (3) this rowset
 	 *                      is <code>ResultSet.CONCUR_READ_ONLY</code>
 	 */
-	public void updateRef(String columnName, java.sql.Ref ref) throws SQLException {
+	public void updateRef(String columnName, Ref ref) throws SQLException {
 		updateRef(getColIdxByName(columnName), ref);
 	}
 
@@ -5960,8 +6084,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.sql.Blob</code> value.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Blob</code>
+	 * value.
 	 *
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -6000,8 +6124,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.sql.Blob </code> value.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Blob </code>
+	 * value.
 	 *
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -6025,8 +6149,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.sql.Array</code> values.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Array</code>
+	 * values.
 	 *
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -6060,8 +6184,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Sets the designated column in either the current row or the insert row of
-	 * this <code>CachedRowSetImpl</code> object with the given
-	 * <code>java.sql.Array</code> value.
+	 * this <code>CachedRowSetImpl</code> object with the given <code>Array</code>
+	 * value.
 	 *
 	 * This method updates a column value in either the current row or the insert
 	 * row of this rowset, but it does not update the database. If the cursor is on
@@ -6102,7 +6226,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		// make sure the cursor is on a valid row
 		checkCursor();
 
-		if (rowSetMetaData.getColumnType(columnIndex) != java.sql.Types.DATALINK) {
+		if (rowSetMetaData.getColumnType(columnIndex) != Types.DATALINK) {
 			throw new SQLException(MESSAGE_DATA_TYPE_MISMATCH);
 		}
 
@@ -6221,7 +6345,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	/**
 	 * Commits all changes performed by the <code>acceptChanges()</code> methods
 	 *
-	 * @see java.sql.Connection#commit
+	 * @see Connection#commit
 	 */
 	public void commit() throws SQLException {
 		conn.commit();
@@ -6230,7 +6354,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	/**
 	 * Rolls back all changes performed by the <code>acceptChanges()</code> methods
 	 *
-	 * @see java.sql.Connection#rollback
+	 * @see Connection#rollback
 	 */
 	public void rollback() throws SQLException {
 		conn.rollback();
@@ -6240,7 +6364,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * Rolls back all changes performed by the <code>acceptChanges()</code> to the
 	 * last <code>Savepoint</code> transaction marker.
 	 *
-	 * @see java.sql.Connection#rollback(Savepoint)
+	 * @see Connection#rollback(Savepoint)
 	 */
 	public void rollback(Savepoint s) throws SQLException {
 		conn.rollback(s);
@@ -6523,166 +6647,6 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Populates this <code>CachedRowSet</code> object with data from the given
-	 * <code>ResultSet</code> object. While related to the
-	 * <code>populate(ResultSet)</code> method, an additional parameter is provided
-	 * to allow starting position within the <code>ResultSet</code> from where to
-	 * populate the CachedRowSet instance.
-	 *
-	 * This method is an alternative to the method <code>execute</code> for filling
-	 * the rowset with data. The method <code>populate</code> does not require that
-	 * the properties needed by the method <code>execute</code>, such as the
-	 * <code>command</code> property, be set. This is true because the method
-	 * <code>populate</code> is given the <code>ResultSet</code> object from which
-	 * to get data and thus does not need to use the properties required for setting
-	 * up a connection and executing this <code>CachedRowSetImpl</code> object's
-	 * command.
-	 * <P>
-	 * After populating this rowset with data, the method <code>populate</code> sets
-	 * the rowset's metadata and then sends a <code>RowSetChangedEvent</code> object
-	 * to all registered listeners prior to returning.
-	 *
-	 * @param data  the <code>ResultSet</code> object containing the data to be read
-	 *              into this <code>CachedRowSetImpl</code> object
-	 * @param start the integer specifing the position in the <code>ResultSet</code>
-	 *              object to popultate the <code>CachedRowSetImpl</code> object.
-	 * @throws SQLException if an error occurs; or the max row setting is violated
-	 *                      while populating the RowSet.Also id the start position
-	 *                      is negative.
-	 * @see #execute
-	 */
-	@Override
-	public void populate(ResultSet data, int start) throws SQLException {
-
-		int rowsFetched;
-		Row row;
-		int numCols;
-		int i;
-		Map<String, Class<?>> map = getTypeMap();
-		Object obj;
-		int mRows;
-
-		cursorPos = 0;
-		if (populatecallcount == 0) {
-			if (start < 0) {
-				throw new SQLException("Start position cannot be negative");
-			}
-			if (getMaxRows() == 0) {
-				data.absolute(start);
-				while (data.next()) {
-					totalRows++;
-				}
-				totalRows++;
-			}
-			startPos = start;
-		}
-		populatecallcount = populatecallcount + 1;
-		resultSet = data;
-		if ((endPos - startPos) >= getMaxRows() && (getMaxRows() > 0)) {
-			endPos = prevEndPos;
-			pagenotend = false;
-			return;
-		}
-
-		if ((maxRowsreached != getMaxRows() || maxRowsreached != totalRows) && pagenotend) {
-			startPrev = start - getPageSize();
-		}
-
-		if (pageSize == 0) {
-			prevEndPos = endPos;
-			endPos = start + getMaxRows();
-		} else {
-			prevEndPos = endPos;
-			endPos = start + getPageSize();
-		}
-
-		if (start == 1) {
-			resultSet.beforeFirst();
-		} else {
-			resultSet.absolute(start - 1);
-		}
-		rvh = new ArrayList<>(pageSize == 0 ? getMaxRows() : getPageSize());
-		if (data == null) {
-			throw new SQLException("Invalid ResultSet object supplied to populate method");
-		}
-
-		// get the meta data for this ResultSet
-		resultSetMetaData = data.getMetaData();
-
-		// set up the metadata
-		rowSetMetaData = new RowSetMetaDataImpl();
-		initMetaData(rowSetMetaData, resultSetMetaData);
-
-		// release the meta-data so that aren't tempted to use it.
-		resultSetMetaData = null;
-		numCols = rowSetMetaData.getColumnCount();
-		mRows = this.getMaxRows();
-		rowsFetched = 0;
-
-		if (!data.next() && mRows == 0) {
-			endPos = prevEndPos;
-			pagenotend = false;
-			return;
-		}
-
-		data.previous();
-
-		while (data.next()) {
-
-			row = new Row(numCols);
-			if (pageSize == 0) {
-				if (rowsFetched >= mRows && mRows > 0) {
-					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
-					break;
-				}
-			} else {
-				if ((rowsFetched >= pageSize) || (maxRowsreached >= mRows && mRows > 0)) {
-					rowsetWarning.setNextException(new SQLException(MESSAGE_MAX_ROWS_EXCEEDED));
-					break;
-				}
-			}
-
-			for (i = 1; i <= numCols; i++) {
-				/*
-				 * check if the user has set a map. If no map is set then use plain getObject.
-				 * This lets us work with drivers that do not support getObject with a map in
-				 * fairly sensible way
-				 */
-				if (map == null) {
-					obj = data.getObject(i);
-				} else {
-					obj = data.getObject(i, map);
-				}
-				/*
-				 * the following block checks for the various types that we have to serialize in
-				 * order to store - right now only structs have been tested
-				 */
-				if (obj instanceof Struct) {
-					obj = new SerialStruct((Struct) obj, map);
-				} else if (obj instanceof SQLData) {
-					obj = new SerialStruct((SQLData) obj, map);
-				} else if (obj instanceof Blob) {
-					obj = new SerialBlob((Blob) obj);
-				} else if (obj instanceof Clob) {
-					obj = new SerialClob((Clob) obj);
-				} else if (obj instanceof java.sql.Array) {
-					obj = new SerialArray((java.sql.Array) obj, map);
-				}
-
-				row.initColumnObject(i, obj);
-			}
-			rowsFetched++;
-			maxRowsreached++;
-			rvh.add(row);
-		}
-		numRows = rowsFetched;
-		// Also rowsFetched should be equal to rvh.size()
-		// notify any listeners that the rowset has changed
-		notifyRowSetChanged();
-
-	}
-
-	/**
 	 * The nextPage gets the next page, that is a <code>CachedRowSetImpl</code>
 	 * object containing the number of rows specified by page size.
 	 * 
@@ -6827,8 +6791,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>ResultSet</code> object as a java.sql.RowId object in the Java
-	 * programming language.
+	 * <code>ResultSet</code> object as a RowId object in the Java programming
+	 * language.
 	 *
 	 * @param columnIndex the first column is 1, the second 2, ...
 	 * @return the column value if the value is a SQL <code>NULL</code> the value
@@ -6842,8 +6806,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * Retrieves the value of the designated column in the current row of this
-	 * <code>ResultSet</code> object as a java.sql.RowId object in the Java
-	 * programming language.
+	 * <code>ResultSet</code> object as a RowId object in the Java programming
+	 * language.
 	 *
 	 * @param columnName the name of the column
 	 * @return the column value if the value is a SQL <code>NULL</code> the value
@@ -6940,7 +6904,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/*
 	 * o This method is used for updating SQL <code>NCLOB</code> type that maps to
-	 * <code>java.sql.Types.NCLOB</code>
+	 * <code>Types.NCLOB</code>
 	 * 
 	 * @param columnIndex the first column is 1, the second 2, ...
 	 * 
@@ -6956,7 +6920,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
 	/**
 	 * This method is used for updating SQL <code>NCLOB</code> type that maps to
-	 * <code>java.sql.Types.NCLOB</code>
+	 * <code>Types.NCLOB</code>
 	 * 
 	 * @param columnName name of the column
 	 * @param nClob      the value for the column to be updated
@@ -6997,7 +6961,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 		throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
 	}
 
-	public <T> T unwrap(java.lang.Class<T> iface) throws java.sql.SQLException {
+	public <T> T unwrap(java.lang.Class<T> iface) throws SQLException {
 		return null;
 	}
 
@@ -7006,9 +6970,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.SQLXML</code>
-	 * object. The driver converts this to an SQL <code>XML</code> value when it
-	 * sends it to the database.
+	 * Sets the designated parameter to the given <code>SQLXML</code> object. The
+	 * driver converts this to an SQL <code>XML</code> value when it sends it to the
+	 * database.
 	 * 
 	 * @param parameterIndex index of the first parameter is 1, the second is 2, ...
 	 * @param xmlObject      a <code>SQLXML</code> object that maps an SQL
@@ -7022,9 +6986,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.SQLXML</code>
-	 * object. The driver converts this to an <code>SQL XML</code> value when it
-	 * sends it to the database.
+	 * Sets the designated parameter to the given <code>SQLXML</code> object. The
+	 * driver converts this to an <code>SQL XML</code> value when it sends it to the
+	 * database.
 	 * 
 	 * @param parameterName the name of the parameter
 	 * @param xmlObject     a <code>SQLXML</code> object that maps an
@@ -7038,9 +7002,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.RowId</code>
-	 * object. The driver converts this to a SQL <code>ROWID</code> value when it
-	 * sends it to the database
+	 * Sets the designated parameter to the given <code>RowId</code> object. The
+	 * driver converts this to a SQL <code>ROWID</code> value when it sends it to
+	 * the database
 	 *
 	 * @param parameterIndex the first parameter is 1, the second is 2, ...
 	 * @param x              the parameter value
@@ -7054,9 +7018,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.RowId</code>
-	 * object. The driver converts this to a SQL <code>ROWID</code> when it sends it
-	 * to the database.
+	 * Sets the designated parameter to the given <code>RowId</code> object. The
+	 * driver converts this to a SQL <code>ROWID</code> when it sends it to the
+	 * database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -7101,9 +7065,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to a <code>java.sql.NClob</code> object. The
-	 * object implements the <code>java.sql.NClob</code> interface. This
-	 * <code>NClob</code> object maps to a SQL <code>NCLOB</code>.
+	 * Sets the designated parameter to a <code>NClob</code> object. The object
+	 * implements the <code>NClob</code> interface. This <code>NClob</code> object
+	 * maps to a SQL <code>NCLOB</code>.
 	 * 
 	 * @param parameterName the name of the column to be set
 	 * @param value         the parameter value
@@ -7152,11 +7116,11 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Updates the designated column with a <code>java.sql.SQLXML</code> value. The
-	 * updater methods are used to update column values in the current row or the
-	 * insert row. The updater methods do not update the underlying database;
-	 * instead the <code>updateRow</code> or <code>insertRow</code> methods are
-	 * called to update the database.
+	 * Updates the designated column with a <code>SQLXML</code> value. The updater
+	 * methods are used to update column values in the current row or the insert
+	 * row. The updater methods do not update the underlying database; instead the
+	 * <code>updateRow</code> or <code>insertRow</code> methods are called to update
+	 * the database.
 	 * 
 	 * @param columnIndex the first column is 1, the second 2, ...
 	 * @param xmlObject   the value for the column to be updated
@@ -7168,11 +7132,11 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Updates the designated column with a <code>java.sql.SQLXML</code> value. The
-	 * updater methods are used to update column values in the current row or the
-	 * insert row. The updater methods do not update the underlying database;
-	 * instead the <code>updateRow</code> or <code>insertRow</code> methods are
-	 * called to update the database.
+	 * Updates the designated column with a <code>SQLXML</code> value. The updater
+	 * methods are used to update column values in the current row or the insert
+	 * row. The updater methods do not update the underlying database; instead the
+	 * <code>updateRow</code> or <code>insertRow</code> methods are called to update
+	 * the database.
 	 *
 	 * @param columnName the name of the column
 	 * @param xmlObject  the column value
@@ -8233,9 +8197,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to a <code>java.sql.NClob</code> object. The
-	 * driver converts this to a SQL <code>NCLOB</code> value when it sends it to
-	 * the database.
+	 * Sets the designated parameter to a <code>NClob</code> object. The driver
+	 * converts this to a SQL <code>NCLOB</code> value when it sends it to the
+	 * database.
 	 * 
 	 * @param parameterIndex of the first parameter is 1, the second is 2, ...
 	 * @param value          the parameter value
@@ -8356,8 +8320,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Timestamp</code>
-	 * value, using the given <code>Calendar</code> object. The driver uses the
+	 * Sets the designated parameter to the given <code>Timestamp</code> value,
+	 * using the given <code>Calendar</code> object. The driver uses the
 	 * <code>Calendar</code> object to construct an SQL <code>TIMESTAMP</code>
 	 * value, which the driver then sends to the database. With a a
 	 * <code>Calendar</code> object, the driver can calculate the timestamp taking
@@ -8379,7 +8343,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setTimestamp(String parameterName, java.sql.Timestamp x, Calendar cal) throws SQLException {
+	public void setTimestamp(String parameterName, Timestamp x, Calendar cal) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
@@ -8415,9 +8379,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Clob</code> object.
-	 * The driver converts this to an SQL <code>CLOB</code> value when it sends it
-	 * to the database.
+	 * Sets the designated parameter to the given <code>Clob</code> object. The
+	 * driver converts this to an SQL <code>CLOB</code> value when it sends it to
+	 * the database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             a <code>Clob</code> object that maps an SQL
@@ -8466,10 +8430,10 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Date</code> value
-	 * using the default time zone of the virtual machine that is running the
-	 * application. The driver converts this to an SQL <code>DATE</code> value when
-	 * it sends it to the database.
+	 * Sets the designated parameter to the given <code>Date</code> value using the
+	 * default time zone of the virtual machine that is running the application. The
+	 * driver converts this to an SQL <code>DATE</code> value when it sends it to
+	 * the database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -8483,19 +8447,18 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setDate(String parameterName, java.sql.Date x) throws SQLException {
+	public void setDate(String parameterName, Date x) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Date</code> value,
-	 * using the given <code>Calendar</code> object. The driver uses the
-	 * <code>Calendar</code> object to construct an SQL <code>DATE</code> value,
-	 * which the driver then sends to the database. With a a <code>Calendar</code>
-	 * object, the driver can calculate the date taking into account a custom
-	 * timezone. If no <code>Calendar</code> object is specified, the driver uses
-	 * the default timezone, which is that of the virtual machine running the
-	 * application.
+	 * Sets the designated parameter to the given <code>Date</code> value, using the
+	 * given <code>Calendar</code> object. The driver uses the <code>Calendar</code>
+	 * object to construct an SQL <code>DATE</code> value, which the driver then
+	 * sends to the database. With a a <code>Calendar</code> object, the driver can
+	 * calculate the date taking into account a custom timezone. If no
+	 * <code>Calendar</code> object is specified, the driver uses the default
+	 * timezone, which is that of the virtual machine running the application.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -8511,14 +8474,14 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setDate(String parameterName, java.sql.Date x, Calendar cal) throws SQLException {
+	public void setDate(String parameterName, Date x, Calendar cal) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Time</code> value.
-	 * The driver converts this to an SQL <code>TIME</code> value when it sends it
-	 * to the database.
+	 * Sets the designated parameter to the given <code>Time</code> value. The
+	 * driver converts this to an SQL <code>TIME</code> value when it sends it to
+	 * the database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -8532,19 +8495,18 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setTime(String parameterName, java.sql.Time x) throws SQLException {
+	public void setTime(String parameterName, Time x) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Time</code> value,
-	 * using the given <code>Calendar</code> object. The driver uses the
-	 * <code>Calendar</code> object to construct an SQL <code>TIME</code> value,
-	 * which the driver then sends to the database. With a a <code>Calendar</code>
-	 * object, the driver can calculate the time taking into account a custom
-	 * timezone. If no <code>Calendar</code> object is specified, the driver uses
-	 * the default timezone, which is that of the virtual machine running the
-	 * application.
+	 * Sets the designated parameter to the given <code>Time</code> value, using the
+	 * given <code>Calendar</code> object. The driver uses the <code>Calendar</code>
+	 * object to construct an SQL <code>TIME</code> value, which the driver then
+	 * sends to the database. With a a <code>Calendar</code> object, the driver can
+	 * calculate the time taking into account a custom timezone. If no
+	 * <code>Calendar</code> object is specified, the driver uses the default
+	 * timezone, which is that of the virtual machine running the application.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -8560,7 +8522,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setTime(String parameterName, java.sql.Time x, Calendar cal) throws SQLException {
+	public void setTime(String parameterName, Time x, Calendar cal) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
@@ -8732,9 +8694,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Blob</code> object.
-	 * The driver converts this to an SQL <code>BLOB</code> value when it sends it
-	 * to the database.
+	 * Sets the designated parameter to the given <code>Blob</code> object. The
+	 * driver converts this to an SQL <code>BLOB</code> value when it sends it to
+	 * the database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             a <code>Blob</code> object that maps an SQL
@@ -8805,12 +8767,12 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the object containing the input parameter value
-	 * @param targetSqlType the SQL type (as defined in java.sql.Types) to be sent
-	 *                      to the database. The scale argument may further qualify
-	 *                      this type.
-	 * @param scale         for java.sql.Types.DECIMAL or java.sql.Types.NUMERIC
-	 *                      types, this is the number of digits after the decimal
-	 *                      point. For all other types, this value will be ignored.
+	 * @param targetSqlType the SQL type (as defined in Types) to be sent to the
+	 *                      database. The scale argument may further qualify this
+	 *                      type.
+	 * @param scale         for Types.DECIMAL or Types.NUMERIC types, this is the
+	 *                      number of digits after the decimal point. For all other
+	 *                      types, this value will be ignored.
 	 * @exception SQLException                    if a database access error occurs
 	 *                                            or this method is called on a
 	 *                                            closed
@@ -8847,8 +8809,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the object containing the input parameter value
-	 * @param targetSqlType the SQL type (as defined in java.sql.Types) to be sent
-	 *                      to the database
+	 * @param targetSqlType the SQL type (as defined in Types) to be sent to the
+	 *                      database
 	 * @exception SQLException                    if a database access error occurs
 	 *                                            or this method is called on a
 	 *                                            closed
@@ -9160,9 +9122,9 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	}
 
 	/**
-	 * Sets the designated parameter to the given <code>java.sql.Timestamp</code>
-	 * value. The driver converts this to an SQL <code>TIMESTAMP</code> value when
-	 * it sends it to the database.
+	 * Sets the designated parameter to the given <code>Timestamp</code> value. The
+	 * driver converts this to an SQL <code>TIMESTAMP</code> value when it sends it
+	 * to the database.
 	 *
 	 * @param parameterName the name of the parameter
 	 * @param x             the parameter value
@@ -9176,7 +9138,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * @since 1.4
 	 */
 	@Override
-	public void setTimestamp(String parameterName, java.sql.Timestamp x) throws SQLException {
+	public void setTimestamp(String parameterName, Timestamp x) throws SQLException {
 		throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
 	}
 
@@ -9187,7 +9149,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 * <B>Note:</B> You must specify the parameter's SQL type.
 	 *
 	 * @param parameterName the name of the parameter
-	 * @param sqlType       the SQL type code defined in <code>java.sql.Types</code>
+	 * @param sqlType       the SQL type code defined in <code>Types</code>
 	 * @exception SQLException                    if a database access error occurs
 	 *                                            or this method is called on a
 	 *                                            closed
@@ -9221,7 +9183,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 	 *
 	 *
 	 * @param parameterName the name of the parameter
-	 * @param sqlType       a value from <code>java.sql.Types</code>
+	 * @param sqlType       a value from <code>Types</code>
 	 * @param typeName      the fully-qualified name of an SQL user-defined type;
 	 *                      ignored if the parameter is not a user-defined type or
 	 *                      SQL <code>REF</code> value
