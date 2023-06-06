@@ -69,46 +69,41 @@ git clone {project-url}.git
 cd {project-name}
 ----
 
-Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and {product-name} example app instance:
+Next, use Docker Compose to launch containers for MySQL, Grafana, Redis Stack, and a {product-name} example app instance:
 [source,console]
 ----
 docker compose up
 ----
 
-// tag::demoSteps[]
-Log into Grafana by pointing your browser to http://localhost:3000.
+Point your web browser to the http://localhost:3000/d/7B6csWTVk/redis-smart-cache?orgId=1&refresh=5s[Redis Smart Cache Grafana dashboard]. This is available through the Grafana instance running at https://localhost:3000.
 
-Use the following credentials:
+Initially, no caching rules are active. You can see this in the *Query Mean Latency* metric (~2 s).
 
-* Username: `admin`
+image:smart-cache-dashboard-no-caching.png[Dashboard without caching,width=1486]
 
-* Password: `admin`
+To add a caching rule, start the Smart Cache CLI by opening a new terminal window and running `demo-cli`.
 
-In the Grafana UI, click http://localhost:3000/datasources/new?utm_source=grafana_gettingstarted[Add your first datasource].
+----
+./demo-cli
+----
 
-In the filter box, enter `Redis` and click on the first entry (*Redis data source*).
+Select *List application queries*:
 
-In the wizard that shows up, enter `redis://redis:6379` for the Redis address and click `Save & test`.
+image:cli-view-queries.png[View application queries,width=1486]
 
-image:grafana-redis-datasource.png[Redis Datasource,width=742]
+Then press *[Enter]* to select a query to cache:
 
-Now import the demo dashboard by clicking `Dashboards/Import` in the sidebar.
+image:cli-select-query.png[Select query,width=1486]
 
-image:grafana-import-dashboard.png[Import Dashboard,width=380]
+Once the query is displayed, enter a time-to-live (TTL) of 300s:
 
-Next, in the `Import via grafana.com` field enter this id: `18441`.
+image:cli-set-ttl.png[Set TTL,width=1486]
 
-At the bottom of the page, select the Redis datasource that you just created and click `Import`.
+To commit the new caching rule, press 'c'. Then follow the prompt to confirm the configuration change.
 
-image:grafana-import-dashboard-datasource.png[Import Dashboard Data Source,width=725]
+The application will immediately begin caching queries. You can observe this from the Smart Cache Grafana dashboard:
 
-You should see the following dashboard:
-
-image:grafana-dashboard.png[Dashboard,width=1486]
-
-After a few minutes, the Redis cache will be populated, yielding dramatically improved response times.
-
-// end::demoSteps[]
+image:smart-cache-dashboard-with-caching.png[Dashboard with Caching,width=1486]
 
 == Installation
 

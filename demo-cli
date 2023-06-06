@@ -1,0 +1,3 @@
+#!/bin/bash
+
+docker exec -e "TERM=xterm-256color" -it redis-server-with-cache-cli /usr/local/bin/smart-cache-cli
