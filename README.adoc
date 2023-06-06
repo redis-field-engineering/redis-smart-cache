@@ -79,7 +79,7 @@ Point your web browser to the http://localhost:3000/d/7B6csWTVk/redis-smart-cach
 
 Initially, no caching rules are active. You can see this in the *Query Mean Latency* metric (~2 s).
 
-image:smart-cache-grafana-dashboard-no-caching.png[Dashboard without caching,width=1486]
+image:smart-cache-dashboard-no-caching.png[Dashboard without caching,width=1486]
 
 To add a caching rule, start the Smart Cache CLI by opening a new terminal window and running
 
@@ -103,7 +103,7 @@ To commit the new caching rule, press 'c'. Then follow the prompt to confirm the
 
 The application will immediately begin caching queries. You can observe this from the Smart Cache Grafana dashboard:
 
-image:smart-cache-grafana-dashboard-with-caching.png[Dashboard with Caching,width=1486]
+image:smart-cache-dashboard-with-caching.png[Dashboard with Caching,width=1486]
 
 == Installation
 
