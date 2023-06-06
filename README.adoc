@@ -81,7 +81,7 @@ Initially, no caching rules are active. You can see this in the *Query Mean Late
 
 image:smart-cache-dashboard-no-caching.png[Dashboard without caching,width=1486]
 
-To add a caching rule, start the Smart Cache CLI by opening a new terminal window and running
+To add a caching rule, start the Smart Cache CLI by opening a new terminal window and running `demo-cli`.
 
 ----
 ./demo-cli
@@ -91,11 +91,11 @@ Select *List application queries*:
 
 image:cli-view-queries.png[View application queries,width=1486]
 
-Then press *[Enter]
+Then press *[Enter]* to select a query to cache:
 
 image:cli-select-query.png[Select query,width=1486]
 
-Finally, enter a time-to-live (TTL) of 300s:
+Once the query is displayed, enter a time-to-live (TTL) of 300s:
 
 image:cli-set-ttl.png[Set TTL,width=1486]
 
