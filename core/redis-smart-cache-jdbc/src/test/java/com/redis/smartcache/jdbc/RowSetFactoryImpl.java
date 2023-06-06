@@ -1,4 +1,4 @@
-package com.redis.smartcache.jdbc.rowset;
+package com.redis.smartcache.jdbc;
 
 import java.sql.SQLException;
 
@@ -9,7 +9,9 @@ import javax.sql.rowset.JoinRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.WebRowSet;
 
-public class CachedRowSetFactory implements RowSetFactory {
+import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
+
+public class RowSetFactoryImpl implements RowSetFactory {
 
 	private static final String NOT_IMPLEMENTED = "Not implemented";
 

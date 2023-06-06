@@ -15,7 +15,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.sql.RowSet;
-import javax.sql.rowset.RowSetFactory;
 
 import com.redis.smartcache.core.ClientManager;
 import com.redis.smartcache.core.Config;
@@ -28,11 +27,10 @@ import com.redis.smartcache.core.MeterRegistryManager;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RuleSessionManager;
-import com.redis.smartcache.jdbc.RedisResultSetCache;
-import com.redis.smartcache.jdbc.ResultSetCache;
+import com.redis.smartcache.jdbc.RedisRowSetCache;
+import com.redis.smartcache.jdbc.RowSetCache;
 import com.redis.smartcache.jdbc.RowSetCodec;
 import com.redis.smartcache.jdbc.SmartConnection;
-import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.codec.RedisCodec;
@@ -64,7 +62,6 @@ public class Driver implements java.sql.Driver {
 	public static final String KEYSPACE_CACHE = "cache";
 	private static final String JDBC_URL_REGEX = "jdbc\\:(rediss?(\\-(socket|sentinel))?\\:\\/\\/.*)";
 	private static final Pattern JDBC_URL_PATTERN = Pattern.compile(JDBC_URL_REGEX);
-	private static final RowSetFactory ROW_SET_FACTORY = new CachedRowSetFactory();
 
 	private static final ClientManager clientManager = new ClientManager();
 	private static final RuleSessionManager ruleSessionManager = new RuleSessionManager(clientManager);
@@ -122,18 +119,17 @@ public class Driver implements java.sql.Driver {
 	}
 
 	private SmartConnection makeConnection(Config config, Connection backendConnection) {
-		QueryRuleSession ruleSession = ruleSessionManager.getRuleSession(config);
+		QueryRuleSession session = ruleSessionManager.getRuleSession(config);
 		KeyBuilder keyBuilder = KeyBuilder.of(config).sub(KEYSPACE_CACHE);
 		MeterRegistry registry = registryManager.getRegistry(config);
 		Map<String, Query> queryCache = queryCaches.computeIfAbsent(config, this::createQueryCache);
-		return new SmartConnection(backendConnection, ruleSession, registry, ROW_SET_FACTORY, rowSetCache(config),
-				queryCache, keyBuilder);
+		return new SmartConnection(backendConnection, session, registry, rowSetCache(config), queryCache, keyBuilder);
 	}
 
-	private ResultSetCache rowSetCache(Config config) {
+	private RowSetCache rowSetCache(Config config) {
 		AbstractRedisClient client = clientManager.getClient(config);
 		RedisCodec<String, RowSet> codec = resultSetCodec(config);
-		return new RedisResultSetCache(ROW_SET_FACTORY, client, codec);
+		return new RedisRowSetCache(client, codec);
 	}
 
 	private Map<String, Query> createQueryCache(Config config) {
@@ -142,7 +138,7 @@ public class Driver implements java.sql.Driver {
 
 	private static RedisCodec<String, RowSet> resultSetCodec(Config config) {
 		int bufferSize = Math.toIntExact(config.getRedis().getCodecBufferCapacity().toBytes());
-		return new RowSetCodec(ROW_SET_FACTORY, bufferSize);
+		return new RowSetCodec(bufferSize);
 	}
 
 	private Connection backendConnection(DriverConfig config, Properties info) throws SQLException {

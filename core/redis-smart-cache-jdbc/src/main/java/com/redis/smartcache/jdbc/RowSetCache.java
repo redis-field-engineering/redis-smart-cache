@@ -1,18 +1,21 @@
 package com.redis.smartcache.jdbc;
 
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 
-public interface ResultSetCache extends AutoCloseable {
+import javax.sql.RowSet;
+
+public interface RowSetCache extends AutoCloseable {
 
 	/**
 	 * 
 	 * @param key the unique key to get the ResultSet for.
 	 * @return RowSet that was retrieved from cache or null if none
 	 */
-	ResultSet get(String key);
+	RowSet get(String key);
 
-	ResultSet put(String key, Duration ttl, ResultSet resultSet) throws SQLException;
+	void put(String key, RowSet rowSet) throws SQLException;
+
+	void put(String key, RowSet rowSet, Duration ttl) throws SQLException;
 
 }

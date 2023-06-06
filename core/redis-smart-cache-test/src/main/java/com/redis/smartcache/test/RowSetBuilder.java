@@ -30,6 +30,8 @@ public class RowSetBuilder {
 	public static final int DEFAULT_COLUMN_COUNT = 10;
 
 	private final Random random = new Random();
+	private final RowSetFactory rowSetFactory;
+
 	private int leftLimit = 48; // numeral '0'
 	private int rightLimit = 122; // letter 'z'
 	private int displaySize = 100;
@@ -42,7 +44,6 @@ public class RowSetBuilder {
 	private String schemaName = "myschema";
 	private String tableName = "mytable";
 
-	private final RowSetFactory rowSetFactory;
 	private List<JDBCType> types = Arrays.asList(SUPPORTED_TYPES);
 	private int columnCount = DEFAULT_COLUMN_COUNT;
 	private List<JDBCType> columnTypes = new ArrayList<>();

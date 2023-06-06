@@ -13,7 +13,6 @@ import org.openjdk.jmh.annotations.State;
 
 import com.redis.smartcache.jdbc.RowSetCodec;
 import com.redis.smartcache.jdbc.codec.SerializedResultSetCodec;
-import com.redis.smartcache.jdbc.rowset.CachedRowSetFactory;
 import com.redis.smartcache.test.RowSetBuilder;
 
 @State(Scope.Benchmark)
@@ -34,13 +33,13 @@ public class CodecExecutionPlan {
 
 	@Setup(Level.Trial)
 	public void setUpTrial() {
-		this.codec = new RowSetCodec(new CachedRowSetFactory(), BYTE_BUFFER_CAPACITY);
+		this.codec = new RowSetCodec(BYTE_BUFFER_CAPACITY);
 		this.serializedCodec = new SerializedResultSetCodec(BYTE_BUFFER_CAPACITY);
 	}
 
 	@Setup(Level.Invocation)
 	public void setUpInvocation() throws SQLException {
-		RowSetBuilder rowSetBuilder = RowSetBuilder.of(new CachedRowSetFactory()).rowCount(rows).columnCount(columns);
+		RowSetBuilder rowSetBuilder = RowSetBuilder.of(new RowSetFactoryImpl()).rowCount(rows).columnCount(columns);
 		this.rowSet = rowSetBuilder.build();
 		rowSet.beforeFirst();
 		this.byteBuffer = codec.encodeValue(rowSet);

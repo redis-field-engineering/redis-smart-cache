@@ -10,7 +10,6 @@ import java.sql.Types;
 import javax.sql.RowSet;
 import javax.sql.RowSetMetaData;
 import javax.sql.rowset.CachedRowSet;
-import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetMetaDataImpl;
 
 import com.redis.smartcache.jdbc.codec.BigDecimalColumnCodec;
@@ -26,6 +25,7 @@ import com.redis.smartcache.jdbc.codec.LongColumnCodec;
 import com.redis.smartcache.jdbc.codec.StringColumnCodec;
 import com.redis.smartcache.jdbc.codec.TimeColumnCodec;
 import com.redis.smartcache.jdbc.codec.TimestampColumnCodec;
+import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
 
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
@@ -38,11 +38,9 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 	public static final String EMPTY_STRING = "";
 
-	private final RowSetFactory rowSetFactory;
 	private final int maxByteBufferCapacity;
 
-	public RowSetCodec(RowSetFactory rowSetFactory, int maxByteBufferCapacity) {
-		this.rowSetFactory = rowSetFactory;
+	public RowSetCodec(int maxByteBufferCapacity) {
 		this.maxByteBufferCapacity = maxByteBufferCapacity;
 	}
 
@@ -66,7 +64,7 @@ public class RowSetCodec implements RedisCodec<String, RowSet> {
 	}
 
 	public CachedRowSet decodeRowSet(ByteBuf byteBuf) throws SQLException {
-		CachedRowSet rowSet = rowSetFactory.createCachedRowSet();
+		CachedRowSet rowSet = new CachedRowSetImpl();
 		RowSetMetaData metaData = decodeMetaData(byteBuf);
 		rowSet.setMetaData(metaData);
 		int columnCount = metaData.getColumnCount();

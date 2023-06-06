@@ -22,11 +22,8 @@ import java.util.concurrent.Executor;
 import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 
-import javax.sql.rowset.RowSetFactory;
-
 import com.redis.smartcache.Driver;
 import com.redis.smartcache.core.KeyBuilder;
-
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 
@@ -38,28 +35,21 @@ public class SmartConnection implements Connection {
 
 	private final UnaryOperator<String> hashFunction = Driver::crc32;
 	private final SQLParser parser = new SQLParser();
-	private final RowSetFactory rowSetFactory;
 	private final Connection connection;
-	private final ResultSetCache rowSetCache;
+	private final RowSetCache rowSetCache;
 	private final MeterRegistry meterRegistry;
 	private final QueryRuleSession session;
 	private final KeyBuilder keyBuilder;
 	private final Map<String, Query> queryCache;
 
 	public SmartConnection(Connection connection, QueryRuleSession session, MeterRegistry meterRegistry,
-			RowSetFactory rowSetFactory, ResultSetCache rowSetCache, Map<String, Query> queryCache,
-			KeyBuilder keyBuilder) {
+			RowSetCache rowSetCache, Map<String, Query> queryCache, KeyBuilder keyBuilder) {
 		this.connection = connection;
 		this.session = session;
 		this.meterRegistry = meterRegistry;
-		this.rowSetFactory = rowSetFactory;
 		this.rowSetCache = rowSetCache;
 		this.queryCache = queryCache;
 		this.keyBuilder = keyBuilder;
-	}
-
-	public RowSetFactory getRowSetFactory() {
-		return rowSetFactory;
 	}
 
 	public KeyBuilder getKeyBuilder() {
@@ -74,7 +64,7 @@ public class SmartConnection implements Connection {
 		return session;
 	}
 
-	public ResultSetCache getRowSetCache() {
+	public RowSetCache getRowSetCache() {
 		return rowSetCache;
 	}
 

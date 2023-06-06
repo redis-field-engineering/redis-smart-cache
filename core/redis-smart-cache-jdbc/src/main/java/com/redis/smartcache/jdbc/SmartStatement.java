@@ -7,10 +7,13 @@ import java.sql.Statement;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import javax.sql.rowset.CachedRowSet;
+
 import com.redis.smartcache.core.Action;
 import com.redis.smartcache.core.Fields;
-
 import com.redis.smartcache.core.Query;
+import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -122,14 +125,14 @@ public class SmartStatement implements Statement {
 
 	protected ResultSet executeQuery(Callable<ResultSet> callable) throws SQLException {
 		return time(Fields.METER_QUERY, () -> {
-			populateFromCache();
+			getFromCache();
 			return getResultSet(() -> executeBackend(callable));
 		});
 	}
 
 	protected boolean execute(Callable<Boolean> callable) throws SQLException {
 		return time(Fields.METER_QUERY, () -> {
-			populateFromCache();
+			getFromCache();
 			if (hasResultSet()) {
 				return true;
 			}
@@ -143,9 +146,18 @@ public class SmartStatement implements Statement {
 		}
 		resultSet = time(METER_BACKEND_RESULTSET, callable);
 		if (isCaching()) {
-			resultSet = time(METER_CACHE_PUT, () -> connection.getRowSetCache().put(key(), action.getTtl(), resultSet));
+			resultSet = time(METER_CACHE_PUT, () -> put(resultSet));
 		}
 		return resultSet;
+	}
+
+	private CachedRowSet put(ResultSet resultSet) throws SQLException {
+		CachedRowSet cached = new CachedRowSetImpl();
+		cached.populate(resultSet);
+		cached.beforeFirst();
+		connection.getRowSetCache().put(key(), cached, action.getTtl());
+		cached.beforeFirst();
+		return cached;
 	}
 
 	private <T> T executeBackend(Callable<T> callable) throws Exception {
@@ -158,7 +170,7 @@ public class SmartStatement implements Statement {
 	 * @return cached result-set for the given query
 	 * @throws SQLException
 	 */
-	private void populateFromCache() throws SQLException {
+	private void getFromCache() throws SQLException {
 		if (!isCaching()) {
 			return;
 		}
