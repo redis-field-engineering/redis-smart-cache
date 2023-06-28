@@ -72,25 +72,26 @@ public final class Util {
     }
 
     public static RuleConfig createRule(RuleType ruleType, String match, Duration ttl){
-        RuleConfig.Builder builder = new RuleConfig.Builder().ttl(ttl);
+        RuleConfig rule = new RuleConfig();
         switch (ruleType){
             case QUERY_IDS:
-                builder.queryIds(match);
+                rule.setQueryIds(List.of(match));
                 break;
             case TABLES_ANY:
-                builder.tablesAny(match);
+                rule.setTablesAny(List.of(match));
                 break;
             case TABLES:
-                builder.tables(match);
+                rule.setTables(List.of(match));
                 break;
             case TABLES_ALL:
-                builder.tablesAll(match);
+                rule.setTablesAll(List.of(match));
                 break;
             case REGEX:
-                builder.regex(match);
+                rule.setRegex(match);
                 break;
         }
 
-        return builder.build();
+        rule.setTtl(ttl);
+        return rule;
     }
 }

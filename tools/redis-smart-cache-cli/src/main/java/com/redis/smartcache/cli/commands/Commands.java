@@ -308,6 +308,12 @@ public class Commands extends AbstractShellComponent {
                 if(confirmed){
                     List<RuleConfig> rulesToCommit = rules.stream().filter(rule->rule.getStatus() != RuleInfo.Status.Delete).map(RuleInfo::getRule).collect(Collectors.toList());
                     client.commitRules(rulesToCommit);
+                    try{
+                        Thread.sleep(250);
+                    } catch (Exception e){
+                        //ignored
+                    }
+
                     rules = client.getRules().stream().map(x->new RuleInfo(x, RuleInfo.Status.Current)).collect(Collectors.toList());
                 }
 
@@ -374,7 +380,9 @@ public class Commands extends AbstractShellComponent {
             if(!component.isEscapeMode() && res.isPresent()){
                 Optional<Duration> duration = getTtl(String.format("Create rule to cache table:%s", res.get().getName()));
                 duration.ifPresent(ttl->{
-                    RuleConfig newRule = new RuleConfig.Builder().ttl(ttl).tablesAny(res.get().getName()).build();
+                    RuleConfig newRule = new RuleConfig();
+                    newRule.setTtl(ttl);
+                    newRule.setTablesAny(Arrays.asList(res.get().getName().split(",")));
                     Optional<Boolean> confirmed = getConfirmation(new RuleInfo(newRule, RuleInfo.Status.New));
                     confirmed.ifPresent(c->{
                         if(c){
@@ -468,7 +476,8 @@ public class Commands extends AbstractShellComponent {
                     pendingRules.get(duration.get()).getQueryIds().add(result.getQueryId());
                     rule = pendingRules.get(duration.get());
                 }else{
-                    rule = new RuleConfig.Builder().queryIds(result.getQueryId()).ttl(duration.get()).build();
+                    rule = new RuleConfig();
+                    rule.setQueryIds(List.of(result.getQueryId()));
                     pendingRules.put(duration.get(),rule);
                 }
                 queries.get(context.getCursorRow()).getItem().setPendingRule(rule);

@@ -7,6 +7,8 @@ import com.redis.lettucemod.search.*;
 import com.redis.smartcache.cli.structures.QueryInfo;
 import com.redis.smartcache.cli.structures.TableInfo;
 import com.redis.smartcache.core.*;
+import com.redis.smartcache.core.rules.Rule;
+import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.internal.Futures;
 
@@ -14,6 +16,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static com.redis.smartcache.core.RuleSessionManager.KEY_CONFIG;
 
 //@Service
 public class RedisServiceImpl implements RedisService{
@@ -23,10 +27,22 @@ public class RedisServiceImpl implements RedisService{
 
     StatefulRedisModulesConnection<String, String> connection;
 
+    StreamConfigManager<RulesetConfig> configManager;
+
+    private final JavaPropsMapper mapper = Mappers.propsMapper();
+
     public RedisServiceImpl(RedisConfig config){
         conf = config.conf();
         manager = config.abstractRedisClient();
         connection = config.modClient();
+        RulesetConfig ruleset = conf.getRuleset();
+        String key = KeyBuilder.of(conf).build(KEY_CONFIG);
+        configManager = new StreamConfigManager<>(manager.getClient(conf), key, ruleset, mapper);
+        try{
+            configManager.start();
+        } catch (IOException e){
+            throw new IllegalStateException("Could not start Redis Service", e);
+        }
     }
 
 
@@ -35,10 +51,9 @@ public class RedisServiceImpl implements RedisService{
     }
 
     public List<RuleConfig> getRules(){
-        RulesetManager rulesetManager = new RulesetManager(manager);
+        RulesetConfig ruleset = conf.getRuleset();
 
-        RulesetConfig ruleSetConfig = rulesetManager.getRuleset(conf);
-        return ruleSetConfig.getRules();
+        return Arrays.asList(ruleset.getRules());
     }
 
     static String configKeyName(String applicationName){
@@ -84,7 +99,7 @@ public class RedisServiceImpl implements RedisService{
                 listArgs.add((String)props.get(o));
             }
 
-            String key = KeyBuilder.of(conf).build(RulesetManager.KEY_CONFIG);
+            String key = KeyBuilder.of(conf).build(KEY_CONFIG);
             connection.sync().xadd(key,listArgs.toArray());
         } catch (IOException ignored){
 
