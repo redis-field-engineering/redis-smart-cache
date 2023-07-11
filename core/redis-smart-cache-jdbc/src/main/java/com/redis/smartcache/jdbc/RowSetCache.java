@@ -1,7 +1,5 @@
 package com.redis.smartcache.jdbc;
 
-import java.sql.SQLException;
-
 import javax.sql.RowSet;
 
 public interface RowSetCache extends AutoCloseable {
@@ -13,6 +11,6 @@ public interface RowSetCache extends AutoCloseable {
 	 */
 	RowSet get(String key);
 
-	void put(String key, RowSet rowSet, long ttlMillis) throws SQLException;
+	void put(String key, RowSet rowSet, long ttlMillis);
 
 }
