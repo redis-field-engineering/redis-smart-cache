@@ -83,7 +83,7 @@ public class StreamConfigManager<T> implements ConfigManager<T> {
 			T newConfig = (T) mapper.readMapAs(message.getBody(), config.getClass());
 			if (newConfig != null) {
 				BeanUtils.copyProperties(newConfig, config);
-				log.log(Level.INFO, "Updated configuration: {0}", config);
+				log.log(Level.INFO, "Updated configuration id {0}: {1}", new Object[] { message.getId(), config });
 			}
 		} catch (Exception e) {
 			log.log(Level.SEVERE, "Could not parse config", e);
