@@ -1,6 +1,6 @@
 config {
     info {
-        description = 'Transparent SQL caching proxy'
+        description = 'Redis Smart Cache'
         inceptionYear = '2022'
         tags = ['redis', 'caching', 'jdbc']
         
