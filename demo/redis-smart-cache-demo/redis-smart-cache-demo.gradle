@@ -19,7 +19,6 @@ publishing {
   publications {
     bootJava(MavenPublication) {
       artifact bootJar
-      artifactId bootJar.baseName
     }
   }
 }
