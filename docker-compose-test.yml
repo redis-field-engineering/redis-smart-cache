@@ -15,17 +15,21 @@ services:
       - MYSQL_DATABASE=smartcache
 
   grafana:
-    image: grafana/grafana
+    image: smartcache/grafana
+    build:
+      context: ./docker/grafana
+      dockerfile: ./Dockerfile
     hostname: grafana
     container_name: grafana
     ports:
       - 3000:3000
-    environment:
-      - GF_INSTALL_PLUGINS=redis-app
 
   redis:
-    image: redis/redis-stack-server
+    image: redis-server-with-cache-cli
+    build:
+      context: ./docker/redis
+      dockerfile: ./Dockerfile
     hostname: redis
-    container_name: redis
+    container_name: redis-server-with-cache-cli
     ports:
       - 6379:6379
