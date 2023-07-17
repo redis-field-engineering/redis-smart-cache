@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.redis.smartcache.core.config.RulesetConfig;
 import com.redis.smartcache.core.rules.CollectionRule;
 import com.redis.smartcache.core.rules.PredicateRule;
 import com.redis.smartcache.core.rules.RegexRule;

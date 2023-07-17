@@ -22,8 +22,8 @@ import com.redis.lettucemod.api.sync.RedisModulesCommands;
 import com.redis.lettucemod.search.Document;
 import com.redis.lettucemod.search.SearchResults;
 import com.redis.lettucemod.util.RedisModulesUtils;
-import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Fields;
+import com.redis.smartcache.core.config.Config;
 
 @SuppressWarnings("unchecked")
 class MySQLTests extends AbstractIntegrationTests {

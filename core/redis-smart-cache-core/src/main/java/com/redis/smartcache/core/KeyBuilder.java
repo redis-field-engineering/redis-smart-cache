@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.redis.smartcache.core.config.Config;
+
 public class KeyBuilder {
 
 	public static final String DEFAULT_SEPARATOR = ":";

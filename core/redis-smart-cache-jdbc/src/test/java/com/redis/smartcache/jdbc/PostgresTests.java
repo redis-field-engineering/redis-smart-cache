@@ -20,9 +20,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import com.redis.smartcache.Driver;
-import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.KeyBuilder;
 import com.redis.smartcache.core.Mappers;
+import com.redis.smartcache.core.config.Config;
 
 @SuppressWarnings("unchecked")
 class PostgresTests extends AbstractIntegrationTests {

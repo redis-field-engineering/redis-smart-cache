@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
+import com.redis.smartcache.core.config.Config;
+import com.redis.smartcache.core.config.RulesetConfig;
 
 import io.lettuce.core.AbstractRedisClient;
 

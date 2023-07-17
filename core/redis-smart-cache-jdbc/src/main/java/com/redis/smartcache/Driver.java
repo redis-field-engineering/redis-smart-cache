@@ -17,8 +17,6 @@ import java.util.regex.Pattern;
 import javax.sql.RowSet;
 
 import com.redis.smartcache.core.ClientManager;
-import com.redis.smartcache.core.Config;
-import com.redis.smartcache.core.Config.DriverConfig;
 import com.redis.smartcache.core.EvictingLinkedHashMap;
 import com.redis.smartcache.core.HashingFunctions;
 import com.redis.smartcache.core.KeyBuilder;
@@ -27,6 +25,8 @@ import com.redis.smartcache.core.MeterRegistryManager;
 import com.redis.smartcache.core.Query;
 import com.redis.smartcache.core.QueryRuleSession;
 import com.redis.smartcache.core.RuleSessionManager;
+import com.redis.smartcache.core.config.Config;
+import com.redis.smartcache.core.config.DriverConfig;
 import com.redis.smartcache.jdbc.RedisRowSetCache;
 import com.redis.smartcache.jdbc.RowSetCache;
 import com.redis.smartcache.jdbc.RowSetCodec;

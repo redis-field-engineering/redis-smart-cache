@@ -1,8 +1,10 @@
-package com.redis.smartcache.core;
+package com.redis.smartcache.core.config;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.util.Arrays;
+
+import com.redis.smartcache.core.RuleConfig;
 
 public class RulesetConfig {
 

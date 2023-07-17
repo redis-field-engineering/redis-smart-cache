@@ -7,7 +7,8 @@ import java.util.logging.Logger;
 
 import com.redis.lettucemod.util.ClientBuilder;
 import com.redis.lettucemod.util.RedisURIBuilder;
-import com.redis.smartcache.core.Config.RedisConfig;
+import com.redis.smartcache.core.config.Config;
+import com.redis.smartcache.core.config.RedisConfig;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisURI;

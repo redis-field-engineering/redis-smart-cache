@@ -19,6 +19,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.lettucemod.RedisModulesClient;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
+import com.redis.smartcache.core.config.Config;
+import com.redis.smartcache.core.config.RulesetConfig;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.Duration;

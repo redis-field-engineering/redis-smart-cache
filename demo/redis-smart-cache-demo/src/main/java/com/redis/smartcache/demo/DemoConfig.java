@@ -3,7 +3,7 @@ package com.redis.smartcache.demo;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import com.redis.smartcache.core.Config;
+import com.redis.smartcache.core.config.Config;
 
 @Configuration
 @ConfigurationProperties(prefix = "")

@@ -11,6 +11,7 @@ import com.redis.micrometer.RediSearchMeterRegistry;
 import com.redis.micrometer.RediSearchRegistryConfig;
 import com.redis.micrometer.RedisRegistryConfig;
 import com.redis.micrometer.RedisTimeSeriesMeterRegistry;
+import com.redis.smartcache.core.config.Config;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.micrometer.core.instrument.Clock;

@@ -12,8 +12,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.redis.smartcache.Driver;
-import com.redis.smartcache.core.Config;
 import com.redis.smartcache.core.Mappers;
+import com.redis.smartcache.core.config.Config;
 import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.DataSize;
