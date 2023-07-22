@@ -11,27 +11,26 @@ import com.redis.smartcache.core.config.Config;
 
 public class Mappers {
 
-	public static final String PROPERTY_PREFIX = "smartcache";
-	public static final String PROPERTY_PREFIX_DRIVER = PROPERTY_PREFIX + ".driver";
-	public static final String PROPERTY_PREFIX_REDIS = PROPERTY_PREFIX + ".redis";
+    public static final String PROPERTY_PREFIX = "smartcache";
 
-	private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
-	private static final JavaPropsMapper PROPS_MAPPER = propsMapper();
+    private static final JavaPropsSchema PROPS_SCHEMA = JavaPropsSchema.emptySchema().withPrefix(PROPERTY_PREFIX);
 
-	private Mappers() {
-	}
+    private static final JavaPropsMapper PROPS_MAPPER = propsMapper();
 
-	public static JavaPropsMapper propsMapper() {
-		return JavaPropsMapper.builder().serializationInclusion(Include.NON_NULL)
-				.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).build();
-	}
+    private Mappers() {
+    }
 
-	public static Properties properties(Config config) throws IOException {
-		return PROPS_MAPPER.writeValueAsProperties(config, PROPS_SCHEMA);
-	}
+    public static JavaPropsMapper propsMapper() {
+        return JavaPropsMapper.builder().serializationInclusion(Include.NON_NULL)
+                .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE).build();
+    }
 
-	public static Config config(Properties properties) throws IOException {
-		return PROPS_MAPPER.readPropertiesAs(properties, PROPS_SCHEMA, Config.class);
-	}
+    public static Properties properties(Config config) throws IOException {
+        return PROPS_MAPPER.writeValueAsProperties(config, PROPS_SCHEMA);
+    }
+
+    public static Config config(Properties properties) throws IOException {
+        return PROPS_MAPPER.readPropertiesAs(properties, PROPS_SCHEMA, Config.class);
+    }
 
 }

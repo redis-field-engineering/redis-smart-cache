@@ -28,7 +28,7 @@ public class RuleSessionManager implements AutoCloseable {
 	}
 
 	private ConfigManager<RulesetConfig> createConfigManager(Config config) {
-		AbstractRedisClient client = clientManager.getClient(config);
+		AbstractRedisClient client = clientManager.getClient(config.getRedis());
 		String key = KeyBuilder.of(config).build(KEY_CONFIG);
 		RulesetConfig ruleset = config.getRuleset();
 		StreamConfigManager<RulesetConfig> configManager = new StreamConfigManager<>(client, key, ruleset, mapper);

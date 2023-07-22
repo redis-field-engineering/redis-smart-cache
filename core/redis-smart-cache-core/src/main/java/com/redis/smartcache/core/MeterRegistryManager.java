@@ -25,174 +25,171 @@ import io.micrometer.jmx.JmxMeterRegistry;
 
 public class MeterRegistryManager implements AutoCloseable {
 
-	private static final Logger log = Logger.getLogger(MeterRegistryManager.class.getName());
+    private static final Logger log = Logger.getLogger(MeterRegistryManager.class.getName());
 
-	public static final String KEYSPACE_METRICS = "metrics";
+    public static final String KEYSPACE_METRICS = "metrics";
 
-	private final ClientManager clientManager;
-	private final Map<Config, MeterRegistry> registries = new HashMap<>();
+    private final ClientManager clientManager;
 
-	public MeterRegistryManager(ClientManager clientManager) {
-		this.clientManager = clientManager;
-	}
+    private final Map<Config, MeterRegistry> registries = new HashMap<>();
 
-	public MeterRegistry getRegistry(Config config) {
-		return registries.computeIfAbsent(config, this::meterRegistry);
-	}
+    public MeterRegistryManager(ClientManager clientManager) {
+        this.clientManager = clientManager;
+    }
 
-	private MeterRegistry meterRegistry(Config config) {
-		switch (config.getMetrics().getRegistry()) {
-		case JMX:
-			return jmxMeterRegistry(config);
-		case REDIS:
-			return redisMeterRegistry(config);
-		default:
-			return simpleMeterRegistry(config);
-		}
-	}
+    public MeterRegistry getRegistry(Config config) {
+        return registries.computeIfAbsent(config, this::createMeterRegistry);
+    }
 
-	private SimpleMeterRegistry simpleMeterRegistry(Config config) {
-		Duration step = step(config);
-		return new SimpleMeterRegistry(new SimpleConfig() {
+    private MeterRegistry createMeterRegistry(Config config) {
+        switch (config.getMetrics().getRegistry()) {
+            case JMX:
+                return jmxMeterRegistry(config);
+            case REDIS:
+                return redisMeterRegistry(config);
+            default:
+                return simpleMeterRegistry(config);
+        }
+    }
 
-			@Override
-			public String get(String key) {
-				return null;
-			}
+    private SimpleMeterRegistry simpleMeterRegistry(Config config) {
+        Duration step = step(config);
+        return new SimpleMeterRegistry(new SimpleConfig() {
 
-			@Override
-			public Duration step() {
-				return step;
-			}
+            @Override
+            public String get(String key) {
+                return null;
+            }
 
-		}, Clock.SYSTEM);
-	}
+            @Override
+            public Duration step() {
+                return step;
+            }
 
-	private JmxMeterRegistry jmxMeterRegistry(Config config) {
-		Duration step = step(config);
-		return new JmxMeterRegistry(new JmxConfig() {
+        }, Clock.SYSTEM);
+    }
 
-			@Override
-			public String get(String key) {
-				return null;
-			}
+    private JmxMeterRegistry jmxMeterRegistry(Config config) {
+        Duration step = step(config);
+        return new JmxMeterRegistry(new JmxConfig() {
 
-			@Override
-			public Duration step() {
-				return step;
-			}
+            @Override
+            public String get(String key) {
+                return null;
+            }
 
-			@Override
-			public String domain() {
-				return config.getName();
-			}
+            @Override
+            public Duration step() {
+                return step;
+            }
 
-		}, Clock.SYSTEM);
-	}
+            @Override
+            public String domain() {
+                return config.getName();
+            }
 
-	private Duration duration(io.airlift.units.Duration duration) {
-		return Duration.ofMillis(duration.toMillis());
-	}
+        }, Clock.SYSTEM);
+    }
 
-	private Duration step(Config config) {
-		return duration(config.getMetrics().getStep());
-	}
+    private Duration step(Config config) {
+        return Duration.ofMillis(config.getMetrics().getStep().toMillis());
+    }
 
-	private MeterRegistry redisMeterRegistry(Config config) {
-		AbstractRedisClient client = clientManager.getClient(config);
-		StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
-		try {
-			connection.sync().ftList();
-		} catch (Exception e) {
-			// Looks like we don't have Redis Modules
-			log.info("No RediSearch found, downgrading to simple meter registry");
-			return simpleMeterRegistry(config);
-		}
-		log.fine("Creating meter registry");
-		Duration step = step(config);
-		KeyBuilder keyBuilder = KeyBuilder.of(config);
-		String tsKeyspace = keyBuilder.build(KEYSPACE_METRICS);
-		RedisTimeSeriesMeterRegistry tsRegistry = new RedisTimeSeriesMeterRegistry(new RedisRegistryConfig() {
+    private MeterRegistry redisMeterRegistry(Config config) {
+        AbstractRedisClient client = clientManager.getClient(config.getRedis());
+        StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
+        try {
+            connection.sync().ftList();
+        } catch (Exception e) {
+            // Looks like we don't have Redis Modules
+            log.info("No RediSearch found, downgrading to simple meter registry");
+            return simpleMeterRegistry(config);
+        }
+        log.fine("Creating meter registry");
+        Duration step = step(config);
+        KeyBuilder keyBuilder = KeyBuilder.of(config);
+        String tsKeyspace = keyBuilder.build(KEYSPACE_METRICS);
+        RedisTimeSeriesMeterRegistry tsRegistry = new RedisTimeSeriesMeterRegistry(new RedisRegistryConfig() {
 
-			@Override
-			public String get(String key) {
-				return null;
-			}
+            @Override
+            public String get(String key) {
+                return null;
+            }
 
-			@Override
-			public String keyspace() {
-				return tsKeyspace;
-			}
+            @Override
+            public String keyspace() {
+                return tsKeyspace;
+            }
 
-			@Override
-			public String keySeparator() {
-				return keyBuilder.separator();
-			}
+            @Override
+            public String keySeparator() {
+                return keyBuilder.separator();
+            }
 
-			@Override
-			public Duration step() {
-				return step;
-			}
+            @Override
+            public Duration step() {
+                return step;
+            }
 
-			@Override
-			public boolean enabled() {
-				return config.getMetrics().isEnabled();
-			}
+            @Override
+            public boolean enabled() {
+                return config.getMetrics().isEnabled();
+            }
 
-		}, Clock.SYSTEM, client);
-		tsRegistry.config().meterFilter(MeterFilter.ignoreTags(Fields.TAG_SQL, Fields.TAG_TABLE));
-		RediSearchMeterRegistry searchRegistry = new RediSearchMeterRegistry(new RediSearchRegistryConfig() {
+        }, Clock.SYSTEM, client);
+        tsRegistry.config().meterFilter(MeterFilter.ignoreTags(Fields.TAG_SQL, Fields.TAG_TABLE));
+        RediSearchMeterRegistry searchRegistry = new RediSearchMeterRegistry(new RediSearchRegistryConfig() {
 
-			@Override
-			public String get(String key) {
-				return null;
-			}
+            @Override
+            public String get(String key) {
+                return null;
+            }
 
-			@Override
-			public String keyspace() {
-				return keyBuilder.keyspace().orElse(null);
-			}
+            @Override
+            public String keyspace() {
+                return keyBuilder.keyspace().orElse(null);
+            }
 
-			@Override
-			public String keySeparator() {
-				return keyBuilder.separator();
-			}
+            @Override
+            public String keySeparator() {
+                return keyBuilder.separator();
+            }
 
-			@Override
-			public Duration step() {
-				return step;
-			}
+            @Override
+            public Duration step() {
+                return step;
+            }
 
-			@Override
-			public String[] nonKeyTags() {
-				return new String[] { Fields.TAG_SQL, Fields.TAG_TABLE, Fields.TAG_TYPE };
-			}
+            @Override
+            public String[] nonKeyTags() {
+                return new String[] { Fields.TAG_SQL, Fields.TAG_TABLE, Fields.TAG_TYPE };
+            }
 
-			@Override
-			public String indexPrefix() {
-				return keyBuilder.keyspace().orElse(null);
-			}
+            @Override
+            public String indexPrefix() {
+                return keyBuilder.keyspace().orElse(null);
+            }
 
-			@Override
-			public String indexSuffix() {
-				return "idx";
-			}
+            @Override
+            public String indexSuffix() {
+                return "idx";
+            }
 
-			@Override
-			public boolean enabled() {
-				return config.getMetrics().isEnabled();
-			}
+            @Override
+            public boolean enabled() {
+                return config.getMetrics().isEnabled();
+            }
 
-		}, Clock.SYSTEM, client);
-		searchRegistry.config().meterFilter(MeterFilter.acceptNameStartsWith(Fields.METER_QUERY))
-				.meterFilter(MeterFilter.deny());
-		return new CompositeMeterRegistry().add(tsRegistry).add(searchRegistry);
-	}
+        }, Clock.SYSTEM, client);
+        searchRegistry.config().meterFilter(MeterFilter.acceptNameStartsWith(Fields.METER_QUERY))
+                .meterFilter(MeterFilter.deny());
+        return new CompositeMeterRegistry().add(tsRegistry).add(searchRegistry);
+    }
 
-	@Override
-	public void close() throws Exception {
-		registries.values().forEach(MeterRegistry::close);
-		registries.clear();
-	}
+    @Override
+    public void close() throws Exception {
+        registries.values().forEach(MeterRegistry::close);
+        registries.clear();
+    }
 
 }

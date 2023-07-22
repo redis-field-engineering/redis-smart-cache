@@ -2,15 +2,9 @@ package com.redis.smartcache.core.config;
 
 import java.util.Objects;
 
-import com.redis.smartcache.core.KeyBuilder;
-
-import io.airlift.units.DataSize;
-import io.airlift.units.DataSize.Unit;
 import io.lettuce.core.SslVerifyMode;
 
 public class RedisConfig {
-
-	public static final DataSize DEFAULT_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
 	private String uri;
 	private boolean cluster;
@@ -18,32 +12,6 @@ public class RedisConfig {
 	private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
 	private String username;
 	private char[] password;
-	private DataSize codecBufferCapacity = DEFAULT_BUFFER_CAPACITY;
-	private String keySeparator = KeyBuilder.DEFAULT_SEPARATOR;
-
-	/**
-	 * 
-	 * @return max byte buffer capacity in bytes
-	 */
-	public DataSize getCodecBufferCapacity() {
-		return codecBufferCapacity;
-	}
-
-	public void setCodecBufferCapacity(DataSize size) {
-		this.codecBufferCapacity = size;
-	}
-
-	public void setCodecBufferSizeInBytes(long size) {
-		this.codecBufferCapacity = DataSize.ofBytes(size);
-	}
-
-	public String getKeySeparator() {
-		return keySeparator;
-	}
-
-	public void setKeySeparator(String keySeparator) {
-		this.keySeparator = keySeparator;
-	}
 
 	public boolean isTls() {
 		return tls;

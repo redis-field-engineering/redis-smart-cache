@@ -12,6 +12,7 @@ public class Config {
 
 	private DriverConfig driver = new DriverConfig();
 	private RedisConfig redis = new RedisConfig();
+	private CacheConfig cache = new CacheConfig();
 	private RulesetConfig ruleset = new RulesetConfig();
 	private MetricsConfig metrics = new MetricsConfig();
 
@@ -55,6 +56,14 @@ public class Config {
 		this.redis = redis;
 	}
 
+	public CacheConfig getCache() {
+		return cache;
+	}
+
+	public void setCache(CacheConfig cache) {
+		this.cache = cache;
+	}
+
 	public MetricsConfig getMetrics() {
 		return metrics;
 	}
@@ -65,7 +74,7 @@ public class Config {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(redis.getUri(), name);
+		return Objects.hash(redis);
 	}
 
 	@Override
@@ -77,7 +86,7 @@ public class Config {
 		if (getClass() != obj.getClass())
 			return false;
 		Config other = (Config) obj;
-		return Objects.equals(redis.getUri(), other.redis.getUri()) && Objects.equals(name, other.name);
+		return Objects.equals(redis, other.redis);
 	}
 
 }

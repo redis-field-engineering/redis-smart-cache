@@ -92,7 +92,7 @@ public class KeyBuilder {
 	}
 
 	public static KeyBuilder of(Config config) {
-		return KeyBuilder.of(config.getName()).withSeparator(config.getRedis().getKeySeparator());
+		return KeyBuilder.of(config.getName()).withSeparator(config.getCache().getKeySeparator());
 	}
 
 }
