@@ -46,10 +46,8 @@ projects {
 }
 
 enforce {
-    mergeStrategy = 'append'
     rule(enforcer.rules.EnforceBytecodeVersion) { r ->
         // search only on compile and runtime classpaths
-        enabled = false
         r.configurations.addAll(['compileClasspath', 'runtimeClasspath'])
         r.maxJdkVersion = '1.8'
     }
@@ -59,6 +57,7 @@ enforce {
     }
     rule(enforcer.rules.ForceDependencies) { r ->
         r.dependencies.addAll "org.checkerframework:checker-qual:$checkerVersion",
+            "org.testcontainers:testcontainers:$testcontainersVersion",
             "com.redis:lettucemod:$lettucemodVersion"
     }
 }
