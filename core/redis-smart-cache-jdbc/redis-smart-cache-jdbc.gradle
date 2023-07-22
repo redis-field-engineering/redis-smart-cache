@@ -6,7 +6,7 @@ dependencies {
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
     testImplementation project(':redis-smart-cache-test')
     testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion    
-    testImplementation 'org.slf4j:slf4j-simple'
+    testImplementation 'org.slf4j:slf4j-jdk14'
     testImplementation 'org.postgresql:postgresql'
     testImplementation 'com.oracle.database.jdbc:ojdbc8'
     testImplementation 'com.mysql:mysql-connector-j'
