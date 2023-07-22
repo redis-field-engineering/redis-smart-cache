@@ -6,19 +6,19 @@ import java.util.concurrent.TimeoutException;
 
 public interface ConfigManager<T> extends AutoCloseable {
 
-	/**
-	 * 
-	 * @return the config object, or null if none
-	 */
-	T get();
+    /**
+     * 
+     * @return the config object, or null if none
+     */
+    T get();
 
-	void start() throws IOException;
+    void start() throws IOException;
 
-	@Override
-	default void close() throws Exception {
-		stop();
-	}
+    @Override
+    default void close() throws Exception {
+        stop();
+    }
 
-	void stop() throws InterruptedException, ExecutionException, TimeoutException;
+    void stop() throws InterruptedException, ExecutionException, TimeoutException;
 
 }
