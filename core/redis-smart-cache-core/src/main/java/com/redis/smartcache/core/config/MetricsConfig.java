@@ -6,37 +6,40 @@ import io.airlift.units.Duration;
 
 public class MetricsConfig {
 
-	public static final Duration DEFAULT_STEP = new Duration(60, TimeUnit.SECONDS);
+    public static final Duration DEFAULT_STEP = new Duration(60, TimeUnit.SECONDS);
 
-	private boolean enabled = true;
-	private MetricsRegistry registry = MetricsRegistry.REDIS;
-	private Duration step = DEFAULT_STEP;
+    private boolean enabled = true;
 
-	/**
-	 * 
-	 * @return metrics publishing interval
-	 */
-	public Duration getStep() {
-		return step;
-	}
+    private MetricsRegistry registry = MetricsRegistry.REDIS;
 
-	public void setStep(Duration duration) {
-		this.step = duration;
-	}
+    private Duration step = DEFAULT_STEP;
 
-	public boolean isEnabled() {
-		return enabled;
-	}
+    /**
+     * 
+     * @return metrics publishing interval
+     */
+    public Duration getStep() {
+        return step;
+    }
 
-	public void setEnabled(boolean enabled) {
-		this.enabled = enabled;
-	}
+    public void setStep(Duration duration) {
+        this.step = duration;
+    }
 
-	public MetricsRegistry getRegistry() {
-		return registry;
-	}
+    public boolean isEnabled() {
+        return enabled;
+    }
 
-	public void setRegistry(MetricsRegistry registry) {
-		this.registry = registry;
-	}
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public MetricsRegistry getRegistry() {
+        return registry;
+    }
+
+    public void setRegistry(MetricsRegistry registry) {
+        this.registry = registry;
+    }
+
 }

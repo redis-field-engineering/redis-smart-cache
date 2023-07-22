@@ -12,48 +12,51 @@ import io.lettuce.core.AbstractRedisClient;
 
 public class RuleSessionManager implements AutoCloseable {
 
-	public static final String KEY_CONFIG = "config";
+    public static final String KEY_CONFIG = "config";
 
-	private final JavaPropsMapper mapper = Mappers.propsMapper();
-	private final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
-	private final Map<Config, QueryRuleSession> ruleSessions = new HashMap<>();
-	private final ClientManager clientManager;
+    private final JavaPropsMapper mapper = Mappers.propsMapper();
 
-	public RuleSessionManager(ClientManager clientManager) {
-		this.clientManager = clientManager;
-	}
+    private final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
 
-	public QueryRuleSession getRuleSession(Config config) {
-		return ruleSessions.computeIfAbsent(config, this::createRuleSession);
-	}
+    private final Map<Config, QueryRuleSession> ruleSessions = new HashMap<>();
 
-	private ConfigManager<RulesetConfig> createConfigManager(Config config) {
-		AbstractRedisClient client = clientManager.getClient(config.getRedis());
-		String key = KeyBuilder.of(config).build(KEY_CONFIG);
-		RulesetConfig ruleset = config.getRuleset();
-		StreamConfigManager<RulesetConfig> configManager = new StreamConfigManager<>(client, key, ruleset, mapper);
-		try {
-			configManager.start();
-		} catch (IOException e) {
-			throw new IllegalStateException("Could not start config manager", e);
-		}
-		return configManager;
-	}
+    private final ClientManager clientManager;
 
-	@Override
-	public void close() throws Exception {
-		for (ConfigManager<RulesetConfig> configManager : configManagers.values()) {
-			configManager.close();
-		}
-		configManagers.clear();
-	}
+    public RuleSessionManager(ClientManager clientManager) {
+        this.clientManager = clientManager;
+    }
 
-	private QueryRuleSession createRuleSession(Config config) {
-		ConfigManager<RulesetConfig> configManager = configManagers.computeIfAbsent(config, this::createConfigManager);
-		RulesetConfig ruleset = configManager.get();
-		QueryRuleSession session = QueryRuleSession.of(ruleset);
-		ruleset.addPropertyChangeListener(session);
-		return session;
-	}
+    public QueryRuleSession getRuleSession(Config config) {
+        return ruleSessions.computeIfAbsent(config, this::createRuleSession);
+    }
+
+    private ConfigManager<RulesetConfig> createConfigManager(Config config) {
+        AbstractRedisClient client = clientManager.getClient(config.getRedis());
+        String key = KeyBuilder.of(config).build(KEY_CONFIG);
+        RulesetConfig ruleset = config.getRuleset();
+        StreamConfigManager<RulesetConfig> configManager = new StreamConfigManager<>(client, key, ruleset, mapper);
+        try {
+            configManager.start();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not start config manager", e);
+        }
+        return configManager;
+    }
+
+    @Override
+    public void close() throws Exception {
+        for (ConfigManager<RulesetConfig> configManager : configManagers.values()) {
+            configManager.close();
+        }
+        configManagers.clear();
+    }
+
+    private QueryRuleSession createRuleSession(Config config) {
+        ConfigManager<RulesetConfig> configManager = configManagers.computeIfAbsent(config, this::createConfigManager);
+        RulesetConfig ruleset = configManager.get();
+        QueryRuleSession session = QueryRuleSession.of(ruleset);
+        ruleset.addPropertyChangeListener(session);
+        return session;
+    }
 
 }

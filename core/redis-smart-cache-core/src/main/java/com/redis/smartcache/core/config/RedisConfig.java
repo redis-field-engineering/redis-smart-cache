@@ -6,76 +6,81 @@ import io.lettuce.core.SslVerifyMode;
 
 public class RedisConfig {
 
-	private String uri;
-	private boolean cluster;
-	private boolean tls;
-	private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
-	private String username;
-	private char[] password;
+    private String uri;
 
-	public boolean isTls() {
-		return tls;
-	}
+    private boolean cluster;
 
-	public void setTls(boolean tls) {
-		this.tls = tls;
-	}
+    private boolean tls;
 
-	public SslVerifyMode getTlsVerify() {
-		return tlsVerify;
-	}
+    private SslVerifyMode tlsVerify = SslVerifyMode.NONE;
 
-	public void setTlsVerify(SslVerifyMode tlsVerify) {
-		this.tlsVerify = tlsVerify;
-	}
+    private String username;
 
-	public String getUri() {
-		return uri;
-	}
+    private char[] password;
 
-	public void setUri(String uri) {
-		this.uri = uri;
-	}
+    public boolean isTls() {
+        return tls;
+    }
 
-	public boolean isCluster() {
-		return cluster;
-	}
+    public void setTls(boolean tls) {
+        this.tls = tls;
+    }
 
-	public void setCluster(boolean cluster) {
-		this.cluster = cluster;
-	}
+    public SslVerifyMode getTlsVerify() {
+        return tlsVerify;
+    }
 
-	public String getUsername() {
-		return username;
-	}
+    public void setTlsVerify(SslVerifyMode tlsVerify) {
+        this.tlsVerify = tlsVerify;
+    }
 
-	public void setUsername(String username) {
-		this.username = username;
-	}
+    public String getUri() {
+        return uri;
+    }
 
-	public char[] getPassword() {
-		return password;
-	}
+    public void setUri(String uri) {
+        this.uri = uri;
+    }
 
-	public void setPassword(char[] password) {
-		this.password = password;
-	}
+    public boolean isCluster() {
+        return cluster;
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(uri);
-	}
+    public void setCluster(boolean cluster) {
+        this.cluster = cluster;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		RedisConfig other = (RedisConfig) obj;
-		return Objects.equals(uri, other.uri);
-	}
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public char[] getPassword() {
+        return password;
+    }
+
+    public void setPassword(char[] password) {
+        this.password = password;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(uri);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        RedisConfig other = (RedisConfig) obj;
+        return Objects.equals(uri, other.uri);
+    }
 
 }

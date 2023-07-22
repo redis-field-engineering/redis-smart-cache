@@ -6,18 +6,18 @@ import java.util.function.Predicate;
 
 public interface Rule<L, R> {
 
-	public enum Control {
-		STOP, CONTINUE
-	}
+    public enum Control {
+        STOP, CONTINUE
+    }
 
-	static <L> Function<L, Control> stop() {
-		return l -> Control.STOP;
-	}
+    static <L> Function<L, Control> stop() {
+        return l -> Control.STOP;
+    }
 
-	Predicate<L> getCondition();
+    Predicate<L> getCondition();
 
-	Consumer<R> getAction();
+    Consumer<R> getAction();
 
-	Function<L, Control> getControl();
+    Function<L, Control> getControl();
 
 }

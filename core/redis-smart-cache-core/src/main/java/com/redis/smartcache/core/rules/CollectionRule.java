@@ -11,124 +11,126 @@ import java.util.function.Predicate;
 
 public class CollectionRule<T, L, R> extends AbstractRule<L, R> {
 
-	private final Predicate<L> condition;
+    private final Predicate<L> condition;
 
-	public CollectionRule(Function<L, Collection<T>> extractor, Predicate<Collection<T>> predicate,
-			Consumer<R> action) {
-		this(extractor, predicate, action, Rule.stop());
-	}
+    public CollectionRule(Function<L, Collection<T>> extractor, Predicate<Collection<T>> predicate, Consumer<R> action) {
+        this(extractor, predicate, action, Rule.stop());
+    }
 
-	public CollectionRule(Function<L, Collection<T>> extractor, Predicate<Collection<T>> predicate, Consumer<R> action,
-			Function<L, Control> control) {
-		super(action, control);
-		this.condition = l -> predicate.test(extractor.apply(l));
-	}
+    public CollectionRule(Function<L, Collection<T>> extractor, Predicate<Collection<T>> predicate, Consumer<R> action,
+            Function<L, Control> control) {
+        super(action, control);
+        this.condition = l -> predicate.test(extractor.apply(l));
+    }
 
-	@Override
-	public Predicate<L> getCondition() {
-		return condition;
-	}
+    @Override
+    public Predicate<L> getCondition() {
+        return condition;
+    }
 
-	public static <T, L, R> Builder<T, L, R> builder(Function<L, Collection<T>> extractor, Consumer<R> action) {
-		return new Builder<>(extractor, action);
-	}
+    public static <T, L, R> Builder<T, L, R> builder(Function<L, Collection<T>> extractor, Consumer<R> action) {
+        return new Builder<>(extractor, action);
+    }
 
-	public static class Builder<T, L, R> {
+    public static class Builder<T, L, R> {
 
-		private final Function<L, Collection<T>> extractor;
-		private final Consumer<R> action;
-		private Function<L, Control> control = f -> Control.STOP;
+        private final Function<L, Collection<T>> extractor;
 
-		public Builder(Function<L, Collection<T>> extractor, Consumer<R> action) {
-			this.extractor = extractor;
-			this.action = action;
-		}
+        private final Consumer<R> action;
 
-		public Builder<T, L, R> control(Function<L, Control> control) {
-			this.control = control;
-			return this;
-		}
+        private Function<L, Control> control = f -> Control.STOP;
 
-		public Builder<T, L, R> control(Control control) {
-			return control(f -> control);
-		}
+        public Builder(Function<L, Collection<T>> extractor, Consumer<R> action) {
+            this.extractor = extractor;
+            this.action = action;
+        }
 
-		public CollectionRule<T, L, R> any(List<T> tableNames) {
-			return new CollectionRule<>(extractor, new ContainsAnyPredicate<>(tableNames), action, control);
-		}
+        public Builder<T, L, R> control(Function<L, Control> control) {
+            this.control = control;
+            return this;
+        }
 
-		public CollectionRule<T, L, R> all(List<T> tableNames) {
-			return new CollectionRule<>(extractor, new ContainsAllPredicate<>(tableNames), action, control);
-		}
+        public Builder<T, L, R> control(Control control) {
+            return control(f -> control);
+        }
 
-		public CollectionRule<T, L, R> exact(List<T> tableNames) {
-			return new CollectionRule<>(extractor, new EqualsPredicate<>(tableNames), action, control);
-		}
-	}
+        public CollectionRule<T, L, R> any(List<T> tableNames) {
+            return new CollectionRule<>(extractor, new ContainsAnyPredicate<>(tableNames), action, control);
+        }
 
-	public static class EqualsPredicate<T> implements Predicate<Collection<T>> {
+        public CollectionRule<T, L, R> all(List<T> tableNames) {
+            return new CollectionRule<>(extractor, new ContainsAllPredicate<>(tableNames), action, control);
+        }
 
-		private final Set<T> expected;
+        public CollectionRule<T, L, R> exact(List<T> tableNames) {
+            return new CollectionRule<>(extractor, new EqualsPredicate<>(tableNames), action, control);
+        }
 
-		@SuppressWarnings("unchecked")
-		public EqualsPredicate(T... expected) {
-			this(Arrays.asList(expected));
-		}
+    }
 
-		public EqualsPredicate(Collection<T> expected) {
-			this.expected = new HashSet<>(expected);
-		}
+    public static class EqualsPredicate<T> implements Predicate<Collection<T>> {
 
-		@Override
-		public boolean test(Collection<T> t) {
-			return expected.equals(t);
-		}
+        private final Set<T> expected;
 
-	}
+        @SuppressWarnings("unchecked")
+        public EqualsPredicate(T... expected) {
+            this(Arrays.asList(expected));
+        }
 
-	public static class ContainsAnyPredicate<T> implements Predicate<Collection<T>> {
+        public EqualsPredicate(Collection<T> expected) {
+            this.expected = new HashSet<>(expected);
+        }
 
-		private final Set<T> expected;
+        @Override
+        public boolean test(Collection<T> t) {
+            return expected.equals(t);
+        }
 
-		@SuppressWarnings("unchecked")
-		public ContainsAnyPredicate(T... expected) {
-			this(Arrays.asList(expected));
-		}
+    }
 
-		public ContainsAnyPredicate(List<T> expected) {
-			this.expected = new HashSet<>(expected);
-		}
+    public static class ContainsAnyPredicate<T> implements Predicate<Collection<T>> {
 
-		@Override
-		public boolean test(Collection<T> t) {
-			for (T value : t) {
-				if (expected.contains(value)) {
-					return true;
-				}
-			}
-			return false;
-		}
+        private final Set<T> expected;
 
-	}
+        @SuppressWarnings("unchecked")
+        public ContainsAnyPredicate(T... expected) {
+            this(Arrays.asList(expected));
+        }
 
-	public static class ContainsAllPredicate<T> implements Predicate<Collection<T>> {
+        public ContainsAnyPredicate(List<T> expected) {
+            this.expected = new HashSet<>(expected);
+        }
 
-		private final Set<T> expected;
+        @Override
+        public boolean test(Collection<T> t) {
+            for (T value : t) {
+                if (expected.contains(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-		@SuppressWarnings("unchecked")
-		public ContainsAllPredicate(T... expected) {
-			this(Arrays.asList(expected));
-		}
+    }
 
-		public ContainsAllPredicate(Collection<T> expected) {
-			this.expected = new HashSet<>(expected);
-		}
+    public static class ContainsAllPredicate<T> implements Predicate<Collection<T>> {
 
-		@Override
-		public boolean test(Collection<T> t) {
-			return t.containsAll(expected);
-		}
+        private final Set<T> expected;
 
-	}
+        @SuppressWarnings("unchecked")
+        public ContainsAllPredicate(T... expected) {
+            this(Arrays.asList(expected));
+        }
+
+        public ContainsAllPredicate(Collection<T> expected) {
+            this.expected = new HashSet<>(expected);
+        }
+
+        @Override
+        public boolean test(Collection<T> t) {
+            return t.containsAll(expected);
+        }
+
+    }
 
 }

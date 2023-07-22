@@ -4,89 +4,95 @@ import java.util.Objects;
 
 public class Config {
 
-	public static final String DEFAULT_NAME = "smartcache";
-	public static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
+    public static final String DEFAULT_NAME = "smartcache";
 
-	private String name = DEFAULT_NAME;
-	private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
+    public static final int DEFAULT_QUERY_CACHE_CAPACITY = 10000;
 
-	private DriverConfig driver = new DriverConfig();
-	private RedisConfig redis = new RedisConfig();
-	private CacheConfig cache = new CacheConfig();
-	private RulesetConfig ruleset = new RulesetConfig();
-	private MetricsConfig metrics = new MetricsConfig();
+    private String name = DEFAULT_NAME;
 
-	public String getName() {
-		return name;
-	}
+    private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    private DriverConfig driver = new DriverConfig();
 
-	public int getQueryCacheCapacity() {
-		return queryCacheCapacity;
-	}
+    private RedisConfig redis = new RedisConfig();
 
-	public void setQueryCacheCapacity(int capacity) {
-		this.queryCacheCapacity = capacity;
-	}
+    private CacheConfig cache = new CacheConfig();
 
-	public DriverConfig getDriver() {
-		return driver;
-	}
+    private RulesetConfig ruleset = new RulesetConfig();
 
-	public void setDriver(DriverConfig driver) {
-		this.driver = driver;
-	}
+    private MetricsConfig metrics = new MetricsConfig();
 
-	public RulesetConfig getRuleset() {
-		return ruleset;
-	}
+    public String getName() {
+        return name;
+    }
 
-	public void setRuleset(RulesetConfig ruleset) {
-		this.ruleset = ruleset;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	public RedisConfig getRedis() {
-		return redis;
-	}
+    public int getQueryCacheCapacity() {
+        return queryCacheCapacity;
+    }
 
-	public void setRedis(RedisConfig redis) {
-		this.redis = redis;
-	}
+    public void setQueryCacheCapacity(int capacity) {
+        this.queryCacheCapacity = capacity;
+    }
 
-	public CacheConfig getCache() {
-		return cache;
-	}
+    public DriverConfig getDriver() {
+        return driver;
+    }
 
-	public void setCache(CacheConfig cache) {
-		this.cache = cache;
-	}
+    public void setDriver(DriverConfig driver) {
+        this.driver = driver;
+    }
 
-	public MetricsConfig getMetrics() {
-		return metrics;
-	}
+    public RulesetConfig getRuleset() {
+        return ruleset;
+    }
 
-	public void setMetrics(MetricsConfig metrics) {
-		this.metrics = metrics;
-	}
+    public void setRuleset(RulesetConfig ruleset) {
+        this.ruleset = ruleset;
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(redis);
-	}
+    public RedisConfig getRedis() {
+        return redis;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Config other = (Config) obj;
-		return Objects.equals(redis, other.redis);
-	}
+    public void setRedis(RedisConfig redis) {
+        this.redis = redis;
+    }
+
+    public CacheConfig getCache() {
+        return cache;
+    }
+
+    public void setCache(CacheConfig cache) {
+        this.cache = cache;
+    }
+
+    public MetricsConfig getMetrics() {
+        return metrics;
+    }
+
+    public void setMetrics(MetricsConfig metrics) {
+        this.metrics = metrics;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(redis);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Config other = (Config) obj;
+        return Objects.equals(redis, other.redis);
+    }
 
 }

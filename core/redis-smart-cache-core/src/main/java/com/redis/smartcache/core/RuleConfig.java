@@ -11,222 +11,234 @@ import io.airlift.units.Duration;
 
 public class RuleConfig implements Cloneable {
 
-	public static final Duration TTL_NO_CACHING = Duration.succinctNanos(0);
-	public static final Duration DEFAULT_TTL = TTL_NO_CACHING;
+    public static final Duration TTL_NO_CACHING = Duration.succinctNanos(0);
 
-	private final PropertyChangeSupport support = new PropertyChangeSupport(this);
+    public static final Duration DEFAULT_TTL = TTL_NO_CACHING;
 
-	private List<String> tables;
-	private List<String> tablesAny;
-	private List<String> tablesAll;
-	private String regex;
-	private List<String> queryIds;
-	private Duration ttl = TTL_NO_CACHING;
+    private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
-	public RuleConfig() {
-	}
+    private List<String> tables;
 
-	public RuleConfig(RuleConfig source) {
-		if (source.tables != null) {
-			this.tables = new ArrayList<>(source.tables);
-		}
-		if (source.tablesAll != null) {
-			this.tablesAll = new ArrayList<>(source.tablesAll);
-		}
-		if (tablesAny != null) {
-			this.tablesAny = new ArrayList<>(source.tablesAny);
-		}
-		if (queryIds != null) {
-			this.queryIds = new ArrayList<>(source.queryIds);
-		}
-		this.regex = source.regex;
-		this.ttl = source.ttl;
-	}
+    private List<String> tablesAny;
 
-	private RuleConfig(Builder builder) {
-		this.tables = builder.tables;
-		this.tablesAny = builder.tablesAny;
-		this.tablesAll = builder.tablesAll;
-		this.regex = builder.regex;
-		this.queryIds = builder.queryIds;
-		this.ttl = builder.ttl;
-	}
+    private List<String> tablesAll;
 
-	public void addPropertyChangeListener(PropertyChangeListener listener) {
-		support.addPropertyChangeListener(listener);
-	}
+    private String regex;
 
-	public void removePropertyChangeListener(PropertyChangeListener listener) {
-		support.removePropertyChangeListener(listener);
-	}
+    private List<String> queryIds;
 
-	public List<String> getQueryIds() {
-		return queryIds;
-	}
+    private Duration ttl = TTL_NO_CACHING;
 
-	public void setQueryIds(List<String> queryIds) {
-		support.firePropertyChange("queryIds", this.queryIds, queryIds);
-		this.queryIds = queryIds;
-	}
+    public RuleConfig() {
+    }
 
-	public String getRegex() {
-		return regex;
-	}
+    public RuleConfig(RuleConfig source) {
+        if (source.tables != null) {
+            this.tables = new ArrayList<>(source.tables);
+        }
+        if (source.tablesAll != null) {
+            this.tablesAll = new ArrayList<>(source.tablesAll);
+        }
+        if (tablesAny != null) {
+            this.tablesAny = new ArrayList<>(source.tablesAny);
+        }
+        if (queryIds != null) {
+            this.queryIds = new ArrayList<>(source.queryIds);
+        }
+        this.regex = source.regex;
+        this.ttl = source.ttl;
+    }
 
-	public void setRegex(String regex) {
-		support.firePropertyChange("regex", this.regex, regex);
-		this.regex = regex;
-	}
+    private RuleConfig(Builder builder) {
+        this.tables = builder.tables;
+        this.tablesAny = builder.tablesAny;
+        this.tablesAll = builder.tablesAll;
+        this.regex = builder.regex;
+        this.queryIds = builder.queryIds;
+        this.ttl = builder.ttl;
+    }
 
-	public List<String> getTables() {
-		return tables;
-	}
+    public void addPropertyChangeListener(PropertyChangeListener listener) {
+        support.addPropertyChangeListener(listener);
+    }
 
-	public void setTables(List<String> tables) {
-		support.firePropertyChange("tables", this.tables, tables);
-		this.tables = tables;
-	}
+    public void removePropertyChangeListener(PropertyChangeListener listener) {
+        support.removePropertyChangeListener(listener);
+    }
 
-	public List<String> getTablesAny() {
-		return tablesAny;
-	}
+    public List<String> getQueryIds() {
+        return queryIds;
+    }
 
-	public void setTablesAny(List<String> tablesAny) {
-		support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
-		this.tablesAny = tablesAny;
-	}
+    public void setQueryIds(List<String> queryIds) {
+        support.firePropertyChange("queryIds", this.queryIds, queryIds);
+        this.queryIds = queryIds;
+    }
 
-	public List<String> getTablesAll() {
-		return tablesAll;
-	}
+    public String getRegex() {
+        return regex;
+    }
 
-	public void setTablesAll(List<String> tablesAll) {
-		support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
-		this.tablesAll = tablesAll;
-	}
+    public void setRegex(String regex) {
+        support.firePropertyChange("regex", this.regex, regex);
+        this.regex = regex;
+    }
 
-	/**
-	 *
-	 * @return Key expiration duration. Use a duration of zero for no caching
-	 */
-	public Duration getTtl() {
-		return ttl;
-	}
+    public List<String> getTables() {
+        return tables;
+    }
 
-	public void setTtl(Duration ttl) {
-		support.firePropertyChange("ttl", this.ttl, ttl);
-		this.ttl = ttl;
-	}
+    public void setTables(List<String> tables) {
+        support.firePropertyChange("tables", this.tables, tables);
+        this.tables = tables;
+    }
 
-	@Override
-	public String toString() {
-		return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll + ", regex="
-				+ regex + ", queryIds=" + queryIds + ", ttl=" + ttl + "]";
-	}
+    public List<String> getTablesAny() {
+        return tablesAny;
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(queryIds, regex, tables, tablesAll, tablesAny, ttl);
-	}
+    public void setTablesAny(List<String> tablesAny) {
+        support.firePropertyChange("tablesAny", this.tablesAny, tablesAny);
+        this.tablesAny = tablesAny;
+    }
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		RuleConfig other = (RuleConfig) obj;
-		return Objects.equals(queryIds, other.queryIds) && Objects.equals(regex, other.regex)
-				&& Objects.equals(tables, other.tables) && Objects.equals(tablesAll, other.tablesAll)
-				&& Objects.equals(tablesAny, other.tablesAny) && Objects.equals(ttl, other.ttl);
-	}
+    public List<String> getTablesAll() {
+        return tablesAll;
+    }
 
-	@Override
-	public RuleConfig clone() {
-		return new RuleConfig(this);
-	}
+    public void setTablesAll(List<String> tablesAll) {
+        support.firePropertyChange("tablesAll", this.tablesAll, tablesAll);
+        this.tablesAll = tablesAll;
+    }
 
-	public static Builder tables(String... tables) {
-		Builder builder = new Builder();
-		builder.tables = Arrays.asList(tables);
-		return builder;
-	}
+    /**
+     *
+     * @return Key expiration duration. Use a duration of zero for no caching
+     */
+    public Duration getTtl() {
+        return ttl;
+    }
 
-	public static Builder tablesAny(String... tables) {
-		Builder builder = new Builder();
-		builder.tablesAny = Arrays.asList(tables);
-		return builder;
-	}
+    public void setTtl(Duration ttl) {
+        support.firePropertyChange("ttl", this.ttl, ttl);
+        this.ttl = ttl;
+    }
 
-	public static Builder tablesAll(String... tables) {
-		Builder builder = new Builder();
-		builder.tablesAll = Arrays.asList(tables);
-		return builder;
-	}
+    @Override
+    public String toString() {
+        return "RuleConfig [tables=" + tables + ", tablesAny=" + tablesAny + ", tablesAll=" + tablesAll + ", regex=" + regex
+                + ", queryIds=" + queryIds + ", ttl=" + ttl + "]";
+    }
 
-	public static Builder queryIds(String... ids) {
-		Builder builder = new Builder();
-		builder.queryIds = Arrays.asList(ids);
-		return builder;
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(queryIds, regex, tables, tablesAll, tablesAny, ttl);
+    }
 
-	public static Builder regex(String regex) {
-		Builder builder = new Builder();
-		builder.regex = regex;
-		return builder;
-	}
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        RuleConfig other = (RuleConfig) obj;
+        return Objects.equals(queryIds, other.queryIds) && Objects.equals(regex, other.regex)
+                && Objects.equals(tables, other.tables) && Objects.equals(tablesAll, other.tablesAll)
+                && Objects.equals(tablesAny, other.tablesAny) && Objects.equals(ttl, other.ttl);
+    }
 
-	public static Builder passthrough() {
-		return new Builder();
-	}
+    @Override
+    public RuleConfig clone() {
+        return new RuleConfig(this);
+    }
 
-	public static final class Builder {
+    public static Builder tables(String... tables) {
+        Builder builder = new Builder();
+        builder.tables = Arrays.asList(tables);
+        return builder;
+    }
 
-		private List<String> tables;
-		private List<String> tablesAny;
-		private List<String> tablesAll;
-		private String regex;
-		private List<String> queryIds;
-		private Duration ttl = DEFAULT_TTL;
+    public static Builder tablesAny(String... tables) {
+        Builder builder = new Builder();
+        builder.tablesAny = Arrays.asList(tables);
+        return builder;
+    }
 
-		private Builder() {
-		}
+    public static Builder tablesAll(String... tables) {
+        Builder builder = new Builder();
+        builder.tablesAll = Arrays.asList(tables);
+        return builder;
+    }
 
-		public Builder tables(String... tables) {
-			this.tables = Arrays.asList(tables);
-			return this;
-		}
+    public static Builder queryIds(String... ids) {
+        Builder builder = new Builder();
+        builder.queryIds = Arrays.asList(ids);
+        return builder;
+    }
 
-		public Builder tablesAny(String... tables) {
-			this.tablesAny = Arrays.asList(tables);
-			return this;
-		}
+    public static Builder regex(String regex) {
+        Builder builder = new Builder();
+        builder.regex = regex;
+        return builder;
+    }
 
-		public Builder tablesAll(String... tables) {
-			this.tablesAll = Arrays.asList(tables);
-			return this;
-		}
+    public static Builder passthrough() {
+        return new Builder();
+    }
 
-		public Builder regex(String regex) {
-			this.regex = regex;
-			return this;
-		}
+    public static final class Builder {
 
-		public Builder queryIds(String... ids) {
-			this.queryIds = Arrays.asList(ids);
-			return this;
-		}
+        private List<String> tables;
 
-		public Builder ttl(Duration ttl) {
-			this.ttl = ttl;
-			return this;
-		}
+        private List<String> tablesAny;
 
-		public RuleConfig build() {
-			return new RuleConfig(this);
-		}
-	}
+        private List<String> tablesAll;
+
+        private String regex;
+
+        private List<String> queryIds;
+
+        private Duration ttl = DEFAULT_TTL;
+
+        private Builder() {
+        }
+
+        public Builder tables(String... tables) {
+            this.tables = Arrays.asList(tables);
+            return this;
+        }
+
+        public Builder tablesAny(String... tables) {
+            this.tablesAny = Arrays.asList(tables);
+            return this;
+        }
+
+        public Builder tablesAll(String... tables) {
+            this.tablesAll = Arrays.asList(tables);
+            return this;
+        }
+
+        public Builder regex(String regex) {
+            this.regex = regex;
+            return this;
+        }
+
+        public Builder queryIds(String... ids) {
+            this.queryIds = Arrays.asList(ids);
+            return this;
+        }
+
+        public Builder ttl(Duration ttl) {
+            this.ttl = ttl;
+            return this;
+        }
+
+        public RuleConfig build() {
+            return new RuleConfig(this);
+        }
+
+    }
 
 }
