@@ -4,20 +4,22 @@ import java.util.Map.Entry;
 
 public class CallableParameter {
 
-	private final String key;
-	private final Object value;
+    private final String key;
 
-	public CallableParameter(String key, Object value) {
-		this.key = key;
-		this.value = value;
-	}
+    private final Object value;
 
-	public CallableParameter(Entry<String, Object> entry) {
-		this(entry.getKey(), entry.getValue());
-	}
+    public CallableParameter(String key, Object value) {
+        this.key = key;
+        this.value = value;
+    }
 
-	@Override
-	public String toString() {
-		return key + "=" + value;
-	}
+    public CallableParameter(Entry<String, Object> entry) {
+        this(entry.getKey(), entry.getValue());
+    }
+
+    @Override
+    public String toString() {
+        return key + "=" + value;
+    }
+
 }

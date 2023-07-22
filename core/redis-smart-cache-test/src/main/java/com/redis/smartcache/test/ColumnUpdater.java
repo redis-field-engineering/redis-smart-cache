@@ -5,6 +5,6 @@ import java.sql.SQLException;
 
 public interface ColumnUpdater {
 
-	void update(ResultSet rowSet, int columnIndex) throws SQLException;
+    void update(ResultSet rowSet, int columnIndex) throws SQLException;
 
 }

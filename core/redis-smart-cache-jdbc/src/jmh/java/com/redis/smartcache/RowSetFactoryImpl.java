@@ -13,31 +13,31 @@ import com.redis.smartcache.jdbc.rowset.CachedRowSetImpl;
 
 public class RowSetFactoryImpl implements RowSetFactory {
 
-	private static final String NOT_IMPLEMENTED = "Not implemented";
+    private static final String NOT_IMPLEMENTED = "Not implemented";
 
-	@Override
-	public CachedRowSet createCachedRowSet() throws SQLException {
-		return new CachedRowSetImpl();
-	}
+    @Override
+    public CachedRowSet createCachedRowSet() throws SQLException {
+        return new CachedRowSetImpl();
+    }
 
-	@Override
-	public FilteredRowSet createFilteredRowSet() throws SQLException {
-		throw new UnsupportedOperationException(NOT_IMPLEMENTED);
-	}
+    @Override
+    public FilteredRowSet createFilteredRowSet() throws SQLException {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
 
-	@Override
-	public JdbcRowSet createJdbcRowSet() throws SQLException {
-		throw new UnsupportedOperationException(NOT_IMPLEMENTED);
-	}
+    @Override
+    public JdbcRowSet createJdbcRowSet() throws SQLException {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
 
-	@Override
-	public JoinRowSet createJoinRowSet() throws SQLException {
-		throw new UnsupportedOperationException(NOT_IMPLEMENTED);
-	}
+    @Override
+    public JoinRowSet createJoinRowSet() throws SQLException {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
 
-	@Override
-	public WebRowSet createWebRowSet() throws SQLException {
-		throw new UnsupportedOperationException(NOT_IMPLEMENTED);
-	}
+    @Override
+    public WebRowSet createWebRowSet() throws SQLException {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
 
 }

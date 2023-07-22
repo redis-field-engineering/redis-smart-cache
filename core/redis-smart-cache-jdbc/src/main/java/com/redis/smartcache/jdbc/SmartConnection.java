@@ -31,345 +31,351 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 public class SmartConnection implements Connection {
 
-	private static final Logger log = Logger.getLogger(SmartConnection.class.getName());
+    private static final Logger log = Logger.getLogger(SmartConnection.class.getName());
 
-	private final UnaryOperator<String> hashFunction = Driver::crc32;
-	private final SQLParser parser = new SQLParser();
-	private final Connection connection;
-	private final RowSetCache rowSetCache;
-	private final MeterRegistry meterRegistry;
-	private final QueryRuleSession session;
-	private final KeyBuilder keyBuilder;
-	private final Map<String, Query> queryCache;
+    private final UnaryOperator<String> hashFunction = Driver::crc32;
 
-	public SmartConnection(Connection connection, QueryRuleSession session, MeterRegistry meterRegistry,
-			RowSetCache rowSetCache, Map<String, Query> queryCache, KeyBuilder keyBuilder) {
-		this.connection = connection;
-		this.session = session;
-		this.meterRegistry = meterRegistry;
-		this.rowSetCache = rowSetCache;
-		this.queryCache = queryCache;
-		this.keyBuilder = keyBuilder;
-	}
+    private final SQLParser parser = new SQLParser();
 
-	public KeyBuilder getKeyBuilder() {
-		return keyBuilder;
-	}
+    private final Connection connection;
 
-	public MeterRegistry getMeterRegistry() {
-		return meterRegistry;
-	}
+    private final RowSetCache rowSetCache;
 
-	public QueryRuleSession getRuleSession() {
-		return session;
-	}
+    private final MeterRegistry meterRegistry;
 
-	public RowSetCache getRowSetCache() {
-		return rowSetCache;
-	}
+    private final QueryRuleSession session;
 
-	public String hash(String string) {
-		return hashFunction.apply(string);
-	}
+    private final KeyBuilder keyBuilder;
 
-	@Override
-	public void close() throws SQLException {
-		log.fine("Closing backend connection");
-		connection.close();
-		log.fine("Closing RowSet cache");
-		try {
-			rowSetCache.close();
-		} catch (Exception e) {
-			throw new SQLException("Could not close RowSet cache", e);
-		}
-		log.fine("Closed connection");
-	}
+    private final Map<String, Query> queryCache;
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		return connection.unwrap(iface);
-	}
+    public SmartConnection(Connection connection, QueryRuleSession session, MeterRegistry meterRegistry,
+            RowSetCache rowSetCache, Map<String, Query> queryCache, KeyBuilder keyBuilder) {
+        this.connection = connection;
+        this.session = session;
+        this.meterRegistry = meterRegistry;
+        this.rowSetCache = rowSetCache;
+        this.queryCache = queryCache;
+        this.keyBuilder = keyBuilder;
+    }
 
-	@Override
-	public boolean isWrapperFor(Class<?> iface) throws SQLException {
-		return connection.isWrapperFor(iface);
-	}
+    public KeyBuilder getKeyBuilder() {
+        return keyBuilder;
+    }
 
-	@Override
-	public Statement createStatement() throws SQLException {
-		Statement statement = connection.createStatement();
-		return new SmartStatement(this, statement);
-	}
+    public MeterRegistry getMeterRegistry() {
+        return meterRegistry;
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    public QueryRuleSession getRuleSession() {
+        return session;
+    }
 
-	@Override
-	public CallableStatement prepareCall(String sql) throws SQLException {
-		CallableStatement statement = connection.prepareCall(sql);
-		return new SmartCallableStatement(this, statement, sql);
-	}
+    public RowSetCache getRowSetCache() {
+        return rowSetCache;
+    }
 
-	@Override
-	public String nativeSQL(String sql) throws SQLException {
-		return connection.nativeSQL(sql);
-	}
+    public String hash(String string) {
+        return hashFunction.apply(string);
+    }
 
-	@Override
-	public void setAutoCommit(boolean autoCommit) throws SQLException {
-		connection.setAutoCommit(autoCommit);
-	}
+    @Override
+    public void close() throws SQLException {
+        log.fine("Closing backend connection");
+        connection.close();
+        log.fine("Closing RowSet cache");
+        try {
+            rowSetCache.close();
+        } catch (Exception e) {
+            throw new SQLException("Could not close RowSet cache", e);
+        }
+        log.fine("Closed connection");
+    }
 
-	@Override
-	public boolean getAutoCommit() throws SQLException {
-		return connection.getAutoCommit();
-	}
+    @Override
+    public <T> T unwrap(Class<T> iface) throws SQLException {
+        return connection.unwrap(iface);
+    }
 
-	@Override
-	public void commit() throws SQLException {
-		connection.commit();
-	}
+    @Override
+    public boolean isWrapperFor(Class<?> iface) throws SQLException {
+        return connection.isWrapperFor(iface);
+    }
 
-	@Override
-	public void rollback() throws SQLException {
-		connection.rollback();
-	}
+    @Override
+    public Statement createStatement() throws SQLException {
+        Statement statement = connection.createStatement();
+        return new SmartStatement(this, statement);
+    }
 
-	@Override
-	public boolean isClosed() throws SQLException {
-		return connection.isClosed();
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public DatabaseMetaData getMetaData() throws SQLException {
-		return connection.getMetaData();
-	}
+    @Override
+    public CallableStatement prepareCall(String sql) throws SQLException {
+        CallableStatement statement = connection.prepareCall(sql);
+        return new SmartCallableStatement(this, statement, sql);
+    }
 
-	@Override
-	public void setReadOnly(boolean readOnly) throws SQLException {
-		connection.setReadOnly(readOnly);
-	}
+    @Override
+    public String nativeSQL(String sql) throws SQLException {
+        return connection.nativeSQL(sql);
+    }
 
-	@Override
-	public boolean isReadOnly() throws SQLException {
-		return connection.isReadOnly();
-	}
+    @Override
+    public void setAutoCommit(boolean autoCommit) throws SQLException {
+        connection.setAutoCommit(autoCommit);
+    }
 
-	@Override
-	public void setCatalog(String catalog) throws SQLException {
-		connection.setCatalog(catalog);
-	}
+    @Override
+    public boolean getAutoCommit() throws SQLException {
+        return connection.getAutoCommit();
+    }
 
-	@Override
-	public String getCatalog() throws SQLException {
-		return connection.getCatalog();
-	}
+    @Override
+    public void commit() throws SQLException {
+        connection.commit();
+    }
 
-	@Override
-	public void setTransactionIsolation(int level) throws SQLException {
-		connection.setTransactionIsolation(level);
-	}
+    @Override
+    public void rollback() throws SQLException {
+        connection.rollback();
+    }
 
-	@Override
-	public int getTransactionIsolation() throws SQLException {
-		return connection.getTransactionIsolation();
-	}
+    @Override
+    public boolean isClosed() throws SQLException {
+        return connection.isClosed();
+    }
 
-	@Override
-	public SQLWarning getWarnings() throws SQLException {
-		return connection.getWarnings();
-	}
+    @Override
+    public DatabaseMetaData getMetaData() throws SQLException {
+        return connection.getMetaData();
+    }
 
-	@Override
-	public void clearWarnings() throws SQLException {
-		connection.clearWarnings();
-	}
+    @Override
+    public void setReadOnly(boolean readOnly) throws SQLException {
+        connection.setReadOnly(readOnly);
+    }
 
-	@Override
-	public Statement createStatement(int rsType, int rsConcurrency) throws SQLException {
-		Statement statement = connection.createStatement(rsType, rsConcurrency);
-		return new SmartStatement(this, statement);
-	}
+    @Override
+    public boolean isReadOnly() throws SQLException {
+        return connection.isReadOnly();
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int rsType, int rsConcurrency) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql, rsType, rsConcurrency);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    @Override
+    public void setCatalog(String catalog) throws SQLException {
+        connection.setCatalog(catalog);
+    }
 
-	@Override
-	public CallableStatement prepareCall(String sql, int rsType, int rsConcurrency) throws SQLException {
-		CallableStatement statement = connection.prepareCall(sql, rsType, rsConcurrency);
-		return new SmartCallableStatement(this, statement, sql);
-	}
+    @Override
+    public String getCatalog() throws SQLException {
+        return connection.getCatalog();
+    }
 
-	@Override
-	public Map<String, Class<?>> getTypeMap() throws SQLException {
-		return connection.getTypeMap();
-	}
+    @Override
+    public void setTransactionIsolation(int level) throws SQLException {
+        connection.setTransactionIsolation(level);
+    }
 
-	@Override
-	public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
-		connection.setTypeMap(map);
-	}
+    @Override
+    public int getTransactionIsolation() throws SQLException {
+        return connection.getTransactionIsolation();
+    }
 
-	@Override
-	public void setHoldability(int holdability) throws SQLException {
-		connection.setHoldability(holdability);
-	}
+    @Override
+    public SQLWarning getWarnings() throws SQLException {
+        return connection.getWarnings();
+    }
 
-	@Override
-	public int getHoldability() throws SQLException {
-		return connection.getHoldability();
-	}
+    @Override
+    public void clearWarnings() throws SQLException {
+        connection.clearWarnings();
+    }
 
-	@Override
-	public Savepoint setSavepoint() throws SQLException {
-		return connection.setSavepoint();
-	}
+    @Override
+    public Statement createStatement(int rsType, int rsConcurrency) throws SQLException {
+        Statement statement = connection.createStatement(rsType, rsConcurrency);
+        return new SmartStatement(this, statement);
+    }
 
-	@Override
-	public Savepoint setSavepoint(String name) throws SQLException {
-		return connection.setSavepoint(name);
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql, int rsType, int rsConcurrency) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql, rsType, rsConcurrency);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public void rollback(Savepoint savepoint) throws SQLException {
-		connection.rollback(savepoint);
-	}
+    @Override
+    public CallableStatement prepareCall(String sql, int rsType, int rsConcurrency) throws SQLException {
+        CallableStatement statement = connection.prepareCall(sql, rsType, rsConcurrency);
+        return new SmartCallableStatement(this, statement, sql);
+    }
 
-	@Override
-	public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-		connection.releaseSavepoint(savepoint);
-	}
+    @Override
+    public Map<String, Class<?>> getTypeMap() throws SQLException {
+        return connection.getTypeMap();
+    }
 
-	@Override
-	public Statement createStatement(int rsType, int rsConcurrency, int rsHoldability) throws SQLException {
-		Statement statement = connection.createStatement(rsType, rsConcurrency, rsHoldability);
-		return new SmartStatement(this, statement);
-	}
+    @Override
+    public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+        connection.setTypeMap(map);
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int rsType, int rsConcurrency, int rsHoldability)
-			throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql, rsType, rsConcurrency, rsHoldability);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    @Override
+    public void setHoldability(int holdability) throws SQLException {
+        connection.setHoldability(holdability);
+    }
 
-	@Override
-	public CallableStatement prepareCall(String sql, int rsType, int rsConcurrency, int rsHoldability)
-			throws SQLException {
-		CallableStatement statement = connection.prepareCall(sql, rsType, rsConcurrency, rsHoldability);
-		return new SmartCallableStatement(this, statement, sql);
-	}
+    @Override
+    public int getHoldability() throws SQLException {
+        return connection.getHoldability();
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql, autoGeneratedKeys);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    @Override
+    public Savepoint setSavepoint() throws SQLException {
+        return connection.setSavepoint();
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql, columnIndexes);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    @Override
+    public Savepoint setSavepoint(String name) throws SQLException {
+        return connection.setSavepoint(name);
+    }
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement(sql, columnNames);
-		return new SmartPreparedStatement(this, statement, sql);
-	}
+    @Override
+    public void rollback(Savepoint savepoint) throws SQLException {
+        connection.rollback(savepoint);
+    }
 
-	@Override
-	public Clob createClob() throws SQLException {
-		return connection.createClob();
-	}
+    @Override
+    public void releaseSavepoint(Savepoint savepoint) throws SQLException {
+        connection.releaseSavepoint(savepoint);
+    }
 
-	@Override
-	public Blob createBlob() throws SQLException {
-		return connection.createBlob();
-	}
+    @Override
+    public Statement createStatement(int rsType, int rsConcurrency, int rsHoldability) throws SQLException {
+        Statement statement = connection.createStatement(rsType, rsConcurrency, rsHoldability);
+        return new SmartStatement(this, statement);
+    }
 
-	@Override
-	public NClob createNClob() throws SQLException {
-		return connection.createNClob();
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql, int rsType, int rsConcurrency, int rsHoldability)
+            throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql, rsType, rsConcurrency, rsHoldability);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public SQLXML createSQLXML() throws SQLException {
-		return connection.createSQLXML();
-	}
+    @Override
+    public CallableStatement prepareCall(String sql, int rsType, int rsConcurrency, int rsHoldability) throws SQLException {
+        CallableStatement statement = connection.prepareCall(sql, rsType, rsConcurrency, rsHoldability);
+        return new SmartCallableStatement(this, statement, sql);
+    }
 
-	@Override
-	public boolean isValid(int timeout) throws SQLException {
-		return connection.isValid(timeout);
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql, autoGeneratedKeys);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public void setClientInfo(String name, String value) throws SQLClientInfoException {
-		connection.setClientInfo(name, value);
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql, columnIndexes);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public void setClientInfo(Properties properties) throws SQLClientInfoException {
-		connection.setClientInfo(properties);
-	}
+    @Override
+    public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql, columnNames);
+        return new SmartPreparedStatement(this, statement, sql);
+    }
 
-	@Override
-	public String getClientInfo(String name) throws SQLException {
-		return connection.getClientInfo(name);
-	}
+    @Override
+    public Clob createClob() throws SQLException {
+        return connection.createClob();
+    }
 
-	@Override
-	public Properties getClientInfo() throws SQLException {
-		return connection.getClientInfo();
-	}
+    @Override
+    public Blob createBlob() throws SQLException {
+        return connection.createBlob();
+    }
 
-	@Override
-	public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-		return connection.createArrayOf(typeName, elements);
-	}
+    @Override
+    public NClob createNClob() throws SQLException {
+        return connection.createNClob();
+    }
 
-	@Override
-	public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-		return connection.createStruct(typeName, attributes);
-	}
+    @Override
+    public SQLXML createSQLXML() throws SQLException {
+        return connection.createSQLXML();
+    }
 
-	@Override
-	public void setSchema(String schema) throws SQLException {
-		connection.setSchema(schema);
-	}
+    @Override
+    public boolean isValid(int timeout) throws SQLException {
+        return connection.isValid(timeout);
+    }
 
-	@Override
-	public String getSchema() throws SQLException {
-		return connection.getSchema();
-	}
+    @Override
+    public void setClientInfo(String name, String value) throws SQLClientInfoException {
+        connection.setClientInfo(name, value);
+    }
 
-	@Override
-	public void abort(Executor executor) throws SQLException {
-		connection.abort(executor);
-	}
+    @Override
+    public void setClientInfo(Properties properties) throws SQLClientInfoException {
+        connection.setClientInfo(properties);
+    }
 
-	@Override
-	public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
-		connection.setNetworkTimeout(executor, milliseconds);
-	}
+    @Override
+    public String getClientInfo(String name) throws SQLException {
+        return connection.getClientInfo(name);
+    }
 
-	@Override
-	public int getNetworkTimeout() throws SQLException {
-		return connection.getNetworkTimeout();
-	}
+    @Override
+    public Properties getClientInfo() throws SQLException {
+        return connection.getClientInfo();
+    }
 
-	public Set<String> tableNames(String sql) {
-		return parser.extractTableNames(sql);
-	}
+    @Override
+    public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
+        return connection.createArrayOf(typeName, elements);
+    }
 
-	public Map<String, Query> getQueryCache() {
-		return queryCache;
-	}
+    @Override
+    public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+        return connection.createStruct(typeName, attributes);
+    }
+
+    @Override
+    public void setSchema(String schema) throws SQLException {
+        connection.setSchema(schema);
+    }
+
+    @Override
+    public String getSchema() throws SQLException {
+        return connection.getSchema();
+    }
+
+    @Override
+    public void abort(Executor executor) throws SQLException {
+        connection.abort(executor);
+    }
+
+    @Override
+    public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
+        connection.setNetworkTimeout(executor, milliseconds);
+    }
+
+    @Override
+    public int getNetworkTimeout() throws SQLException {
+        return connection.getNetworkTimeout();
+    }
+
+    public Set<String> tableNames(String sql) {
+        return parser.extractTableNames(sql);
+    }
+
+    public Map<String, Query> getQueryCache() {
+        return queryCache;
+    }
 
 }

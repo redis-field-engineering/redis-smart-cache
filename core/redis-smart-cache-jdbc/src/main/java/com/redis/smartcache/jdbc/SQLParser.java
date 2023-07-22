@@ -17,56 +17,60 @@ import io.trino.sql.tree.Table;
 
 public class SQLParser {
 
-	private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
-	private static final Set<String> EMPTY_TABLE_NAMES = Collections.emptySet();
-	private final SqlParser parser = new SqlParser();
+    private static final ParsingOptions PARSING_OPTIONS = new ParsingOptions();
 
-	public Set<String> extractTableNames(String sql) {
-		try {
-			Statement statement = parser.createStatement(sql, PARSING_OPTIONS);
-			Stream<Table> tables = tables(statement);
-			return tableNames(tables);
-		} catch (ParsingException e) {
-			// This statement cannot be parsed. Only rules like regex will trigger
-			return EMPTY_TABLE_NAMES;
-		}
-	}
+    private static final Set<String> EMPTY_TABLE_NAMES = Collections.emptySet();
 
-	private Stream<Table> tables(Statement statement) throws ParsingException {
-		return statement.accept(DepthFirstVisitor.by(new TableVisitor()), null);
-	}
+    private final SqlParser parser = new SqlParser();
 
-	private Set<String> tableNames(Stream<Table> tables) {
-		return tables.map(Table::getName).map(QualifiedName::toString).collect(Collectors.toSet());
-	}
+    public Set<String> extractTableNames(String sql) {
+        try {
+            Statement statement = parser.createStatement(sql, PARSING_OPTIONS);
+            Stream<Table> tables = tables(statement);
+            return tableNames(tables);
+        } catch (ParsingException e) {
+            // This statement cannot be parsed. Only rules like regex will trigger
+            return EMPTY_TABLE_NAMES;
+        }
+    }
 
-	static class DepthFirstVisitor<R, C> extends AstVisitor<Stream<R>, C> {
+    private Stream<Table> tables(Statement statement) throws ParsingException {
+        return statement.accept(DepthFirstVisitor.by(new TableVisitor()), null);
+    }
 
-		private final AstVisitor<R, C> visitor;
+    private Set<String> tableNames(Stream<Table> tables) {
+        return tables.map(Table::getName).map(QualifiedName::toString).collect(Collectors.toSet());
+    }
 
-		public DepthFirstVisitor(AstVisitor<R, C> visitor) {
-			this.visitor = visitor;
-		}
+    static class DepthFirstVisitor<R, C> extends AstVisitor<Stream<R>, C> {
 
-		public static <R, C> DepthFirstVisitor<R, C> by(AstVisitor<R, C> visitor) {
-			return new DepthFirstVisitor<>(visitor);
-		}
+        private final AstVisitor<R, C> visitor;
 
-		@Override
-		public final Stream<R> visitNode(Node node, C context) {
-			Stream<R> nodeResult = Stream.of(visitor.process(node, context));
-			Stream<R> childrenResult = node.getChildren().stream().flatMap(child -> process(child, context));
+        public DepthFirstVisitor(AstVisitor<R, C> visitor) {
+            this.visitor = visitor;
+        }
 
-			return Stream.concat(nodeResult, childrenResult).filter(Objects::nonNull);
-		}
-	}
+        public static <R, C> DepthFirstVisitor<R, C> by(AstVisitor<R, C> visitor) {
+            return new DepthFirstVisitor<>(visitor);
+        }
 
-	static class TableVisitor extends AstVisitor<Table, Object> {
+        @Override
+        public final Stream<R> visitNode(Node node, C context) {
+            Stream<R> nodeResult = Stream.of(visitor.process(node, context));
+            Stream<R> childrenResult = node.getChildren().stream().flatMap(child -> process(child, context));
 
-		@Override
-		protected Table visitTable(Table node, Object context) {
-			return node;
-		}
-	}
+            return Stream.concat(nodeResult, childrenResult).filter(Objects::nonNull);
+        }
+
+    }
+
+    static class TableVisitor extends AstVisitor<Table, Object> {
+
+        @Override
+        protected Table visitTable(Table node, Object context) {
+            return node;
+        }
+
+    }
 
 }
