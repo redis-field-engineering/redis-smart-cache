@@ -10,6 +10,8 @@ public class Config {
 
     private String name = DEFAULT_NAME;
 
+    private String id;
+
     private int queryCacheCapacity = DEFAULT_QUERY_CACHE_CAPACITY;
 
     private DriverConfig driver = new DriverConfig();
@@ -22,6 +24,22 @@ public class Config {
 
     private MetricsConfig metrics = new MetricsConfig();
 
+    /**
+     * 
+     * @return ID that uniquely identifies this application instance.
+     */
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    /**
+     * 
+     * @return Name of this application. Should be the same across application instances.
+     */
     public String getName() {
         return name;
     }

@@ -37,7 +37,6 @@ public class StreamPoller implements Runnable {
         while (!stop) {
             connection.sync().xread(xreadArgs, offset).forEach(consumer);
         }
-        connection.close();
         this.state = State.STOPPED;
     }
 

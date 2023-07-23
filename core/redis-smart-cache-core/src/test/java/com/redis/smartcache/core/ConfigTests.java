@@ -25,6 +25,7 @@ import com.redis.testcontainers.RedisStackContainer;
 
 import io.airlift.units.Duration;
 import io.lettuce.core.Range;
+import io.lettuce.core.ScoredValue;
 import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XReadArgs.StreamOffset;
 
@@ -49,50 +50,50 @@ class ConfigTests {
     @SuppressWarnings("unchecked")
     @Test
     void updateStreamConfig() throws Exception {
-        String key = "updateStreamConfig";
         try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
                 StatefulRedisModulesConnection<String, String> connection = client.connect()) {
-            RulesetConfig conf = new RulesetConfig();
             JavaPropsMapper mapper = Mappers.propsMapper();
-            try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+            Config config = new Config();
+            try (StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
                 manager.start();
+                String key = manager.key();
                 Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
                 await().until(manager::isRunning);
                 Map<String, String> body = new HashMap<>();
                 body.put("rules[0].ttl", "123s");
                 connection.sync().xadd(key, body);
-                await().until(() -> conf.getRules().length == 1);
-                await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 123);
+                await().until(() -> config.getRuleset().getRules().length == 1);
+                await().until(() -> config.getRuleset().getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 123);
                 body.put("rules[0].ttl", "456s");
                 connection.sync().xadd(key, body);
-                await().until(() -> conf.getRules().length == 1);
-                await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
+                await().until(() -> config.getRuleset().getRules().length == 1);
+                await().until(() -> config.getRuleset().getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
             }
-            RulesetConfig conf2 = new RulesetConfig();
-            try (StreamConfigManager<RulesetConfig> manager2 = new StreamConfigManager<>(client, key, conf2, mapper)) {
+            Config config2 = new Config();
+            try (StreamConfigManager manager2 = new StreamConfigManager(client, config2, mapper)) {
                 manager2.start();
-                await().until(() -> conf2.getRules().length == 1);
-                await().until(() -> conf2.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
+                await().until(() -> config2.getRuleset().getRules().length == 1);
+                await().until(() -> config2.getRuleset().getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 456);
             }
         }
     }
 
     @Test
     void duplicateConfig() throws Exception {
-        String key = "duplicateStreamConfig";
+        String key = "smartcache:config";
         try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
                 StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+            Config config = new Config();
             Map<String, String> body = new HashMap<>();
             body.put("rules[0].ttl", "0s");
             connection.sync().xadd(key, body);
-            RulesetConfig conf = new RulesetConfig();
-            conf.setRules(RuleConfig.passthrough().build());
+            config.getRuleset().setRules(RuleConfig.passthrough().build());
             JavaPropsMapper mapper = Mappers.propsMapper();
-            try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+            try (StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
                 manager.start();
                 await().until(manager::isRunning);
-                Assertions.assertEquals(1, conf.getRules().length);
-                Assertions.assertEquals(0, conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS));
+                Assertions.assertEquals(1, config.getRuleset().getRules().length);
+                Assertions.assertEquals(0, config.getRuleset().getRules()[0].getTtl().getValue(TimeUnit.SECONDS));
             }
         }
     }
@@ -100,27 +101,27 @@ class ConfigTests {
     @Test
     void initialStreamConfig() throws Exception {
         JavaPropsMapper mapper = Mappers.propsMapper();
-        Map<String, String> properties = new HashMap<>();
-        properties.put("rules.1.tables.1", "customer");
-        properties.put("rules.1.ttl", "1.00h");
-        properties.put("rules.2.regex", "SELECT \\* FROM customers");
-        properties.put("rules.2.ttl", "30.00m");
-        properties.put("rules.3.ttl", "10.00s");
-        properties.put("rules.4.query-ids.1", "ab324499");
-        properties.put("rules.4.ttl", "10.00s");
-        RulesetConfig conf = new RulesetConfig();
+        Config config = new Config();
         RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
         RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
         RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
         RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
-        conf.setRules(rule1, rule2, rule3, rule4);
-        String key = "config";
+        config.getRuleset().setRules(rule1, rule2, rule3, rule4);
         try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
                 StatefulRedisModulesConnection<String, String> connection = client.connect();
-                StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+                StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
             manager.start();
+            String key = manager.key();
             List<StreamMessage<String, String>> messages = connection.sync().xrange(key, Range.unbounded());
             Assertions.assertEquals(1, messages.size());
+            Map<String, String> properties = new HashMap<>();
+            properties.put("rules.1.tables.1", "customer");
+            properties.put("rules.1.ttl", "1.00h");
+            properties.put("rules.2.regex", "SELECT \\* FROM customers");
+            properties.put("rules.2.ttl", "30.00m");
+            properties.put("rules.3.ttl", "10.00s");
+            properties.put("rules.4.query-ids.1", "ab324499");
+            properties.put("rules.4.ttl", "10.00s");
             Assertions.assertEquals(properties, messages.get(0).getBody());
         }
     }
@@ -149,24 +150,24 @@ class ConfigTests {
     @SuppressWarnings("unchecked")
     @Test
     void disableCaching() throws Exception {
-        String key = "disableCaching";
         try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
                 StatefulRedisModulesConnection<String, String> connection = client.connect()) {
-            RulesetConfig conf = new RulesetConfig();
+            Config config = new Config();
             RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
             RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
             RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
-            conf.setRules(rule1, rule2, rule3);
+            config.getRuleset().setRules(rule1, rule2, rule3);
             JavaPropsMapper mapper = Mappers.propsMapper();
-            try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, conf, mapper)) {
+            try (StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
                 manager.start();
+                String key = manager.key();
                 Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
                 await().until(manager::isRunning);
                 Map<String, String> body = new HashMap<>();
                 body.put("rules[0].ttl", "0s");
                 connection.sync().xadd(key, body);
-                await().until(() -> conf.getRules().length == 1);
-                await().until(() -> conf.getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 0);
+                await().until(() -> config.getRuleset().getRules().length == 1);
+                await().until(() -> config.getRuleset().getRules()[0].getTtl().getValue(TimeUnit.SECONDS) == 0);
             }
         }
     }
@@ -214,15 +215,15 @@ class ConfigTests {
     @SuppressWarnings("unchecked")
     @Test
     void ruleSessionUpdate() throws Exception {
-        String key = "updateStreamConfig";
         try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
                 StatefulRedisModulesConnection<String, String> connection = client.connect()) {
-            RulesetConfig rulesetConfig = new RulesetConfig();
-            QueryRuleSession session = QueryRuleSession.of(rulesetConfig);
-            rulesetConfig.addPropertyChangeListener(session);
+            Config config = new Config();
+            QueryRuleSession session = QueryRuleSession.of(config.getRuleset());
+            config.getRuleset().addPropertyChangeListener(session);
             JavaPropsMapper mapper = Mappers.propsMapper();
-            try (StreamConfigManager<RulesetConfig> manager = new StreamConfigManager<>(client, key, rulesetConfig, mapper)) {
+            try (StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
                 manager.start();
+                String key = manager.key();
                 Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(key)));
                 await().until(manager::isRunning);
                 Map<String, String> body = new HashMap<>();
@@ -243,6 +244,50 @@ class ConfigTests {
             }
 
         }
+    }
+
+    @Test
+    void configUpdateAck() throws Exception {
+        Config config = new Config();
+        assertConfigUpdateAck(config);
+    }
+
+    @Test
+    void configUpdateAckWithID() throws Exception {
+        String id = "myAppId";
+        Config config = new Config();
+        config.setId(id);
+        assertConfigUpdateAck(config);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertConfigUpdateAck(Config config) throws Exception {
+        try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+                StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+            JavaPropsMapper mapper = Mappers.propsMapper();
+            try (StreamConfigManager manager = new StreamConfigManager(client, config, mapper)) {
+                manager.start();
+                Assertions.assertNotNull(connection.sync().xread(StreamOffset.latest(manager.key())));
+                String id = config.getId() == null ? manager.clientId() : config.getId();
+                await().until(manager::isRunning);
+                Map<String, String> body = new HashMap<>();
+                body.put("rules[0].ttl", "123s");
+                assertMessageIdEquals(connection, manager.ackKey(), connection.sync().xadd(manager.key(), body), id);
+                body.put("rules[0].ttl", "456s");
+                assertMessageIdEquals(connection, manager.ackKey(), connection.sync().xadd(manager.key(), body), id);
+            }
+        }
+    }
+
+    private void assertMessageIdEquals(StatefulRedisModulesConnection<String, String> connection, String ackKey,
+            String messageId, String appInstanceId) {
+        Awaitility.await().until(() -> !connection.sync().zrangeWithScores(ackKey, 0, -1).isEmpty());
+        List<ScoredValue<String>> scoredValues = connection.sync().zrangeWithScores(ackKey, 0, -1);
+        Assertions.assertEquals(1, scoredValues.size());
+        double score = scoredValues.get(0).getScore();
+        Assertions.assertEquals(messageId, (long) score + "-0");
+        Assertions.assertEquals(appInstanceId, scoredValues.get(0).getValue());
+
     }
 
 }

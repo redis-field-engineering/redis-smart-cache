@@ -13,11 +13,11 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.beans.BeanUtils;
-
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.util.RedisModulesUtils;
+import com.redis.smartcache.core.config.Config;
+import com.redis.smartcache.core.config.RulesetConfig;
 
 import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.Limit;
@@ -26,7 +26,7 @@ import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XReadArgs;
 import io.lettuce.core.XReadArgs.StreamOffset;
 
-public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<StreamMessage<String, String>> {
+public class StreamConfigManager implements ConfigManager<RulesetConfig>, Consumer<StreamMessage<String, String>> {
 
     private static final Logger log = Logger.getLogger(StreamConfigManager.class.getName());
 
@@ -36,11 +36,9 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
 
     private final AbstractRedisClient client;
 
-    private final String key;
-
     private final JavaPropsMapper mapper;
 
-    private final T config;
+    private final Config config;
 
     private Duration block = DEFAULT_BLOCK;
 
@@ -50,10 +48,11 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
 
     private ExecutorService executor;
 
-    public StreamConfigManager(AbstractRedisClient client, String key, T config, JavaPropsMapper mapper) {
-        this.client = client;
-        this.key = key;
+    private StatefulRedisModulesConnection<String, String> connection;
+
+    public StreamConfigManager(AbstractRedisClient client, Config config, JavaPropsMapper mapper) {
         this.config = config;
+        this.client = client;
         this.mapper = mapper;
     }
 
@@ -71,11 +70,12 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
 
     @Override
     public void start() throws IOException {
-        StatefulRedisModulesConnection<String, String> connection = RedisModulesUtils.connection(client);
+        String key = key();
+        connection = RedisModulesUtils.connection(client);
         List<StreamMessage<String, String>> messages = connection.sync().xrevrange(key, Range.create("-", "+"),
                 Limit.create(0, 1));
         if (messages.isEmpty()) {
-            Map<String, String> map = mapper.writeValueAsMap(config);
+            Map<String, String> map = mapper.writeValueAsMap(config.getRuleset());
             if (!map.isEmpty()) {
                 connection.sync().xadd(key, map);
             }
@@ -87,18 +87,55 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
         executor.submit(poller);
     }
 
-    @SuppressWarnings("unchecked")
+    public String key() {
+        return keyBuilder().build();
+    }
+
+    private KeyBuilder keyBuilder() {
+        return KeyBuilder.of(config).withKeyspace("config");
+    }
+
     @Override
     public void accept(StreamMessage<String, String> message) {
         try {
-            T newConfig = (T) mapper.readMapAs(message.getBody(), config.getClass());
+            RulesetConfig newConfig = mapper.readMapAs(message.getBody(), RulesetConfig.class);
             if (newConfig != null) {
-                BeanUtils.copyProperties(newConfig, config);
-                log.log(Level.INFO, "Updated configuration id {0}: {1}", new Object[] { message.getId(), config });
+                config.getRuleset().setRules(newConfig.getRules());
+                double score = score(message);
+                String appInstanceId = appInstanceId();
+                String ackKey = ackKey();
+                connection.sync().zadd(ackKey, score, appInstanceId);
+                log.log(Level.INFO, "Updated configuration id {0}: {1}", new Object[] { message.getId(), config.getRuleset() });
             }
         } catch (Exception e) {
             log.log(Level.SEVERE, "Could not parse config", e);
         }
+    }
+
+    private String appInstanceId() {
+        if (config.getId() == null) {
+            return clientId();
+        }
+        return config.getId();
+    }
+
+    public String clientId() {
+        return String.valueOf(connection.sync().clientId());
+    }
+
+    public String ackKey() {
+        return keyBuilder().build("ack");
+    }
+
+    private double score(StreamMessage<String, String> message) {
+        String id = message.getId();
+        int offsetPosition = id.indexOf("-");
+        if (offsetPosition == -1) {
+            return Long.parseLong(id);
+        }
+        long millis = Long.parseLong(id.substring(0, offsetPosition));
+        double sequence = Long.parseLong(id.substring(offsetPosition + 1));
+        return millis + sequence / 1000;
     }
 
     public boolean isRunning() {
@@ -115,8 +152,8 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
     }
 
     @Override
-    public T get() {
-        return config;
+    public RulesetConfig get() {
+        return config.getRuleset();
     }
 
     @Override
@@ -125,6 +162,8 @@ public class StreamConfigManager<T> implements ConfigManager<T>, Consumer<Stream
         poller = null;
         executor.shutdown();
         executor = null;
+        connection.close();
+        connection = null;
     }
 
 }

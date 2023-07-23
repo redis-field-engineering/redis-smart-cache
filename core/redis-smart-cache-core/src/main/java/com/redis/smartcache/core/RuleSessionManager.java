@@ -12,8 +12,6 @@ import io.lettuce.core.AbstractRedisClient;
 
 public class RuleSessionManager implements AutoCloseable {
 
-    public static final String KEY_CONFIG = "config";
-
     private final JavaPropsMapper mapper = Mappers.propsMapper();
 
     private final Map<Config, ConfigManager<RulesetConfig>> configManagers = new HashMap<>();
@@ -32,9 +30,7 @@ public class RuleSessionManager implements AutoCloseable {
 
     private ConfigManager<RulesetConfig> createConfigManager(Config config) {
         AbstractRedisClient client = clientManager.getClient(config.getRedis());
-        String key = KeyBuilder.of(config).build(KEY_CONFIG);
-        RulesetConfig ruleset = config.getRuleset();
-        StreamConfigManager<RulesetConfig> configManager = new StreamConfigManager<>(client, key, ruleset, mapper);
+        StreamConfigManager configManager = new StreamConfigManager(client, config, mapper);
         try {
             configManager.start();
         } catch (IOException e) {
