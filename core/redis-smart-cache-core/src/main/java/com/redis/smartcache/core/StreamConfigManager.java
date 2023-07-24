@@ -92,7 +92,7 @@ public class StreamConfigManager implements ConfigManager<RulesetConfig>, Consum
     }
 
     private KeyBuilder keyBuilder() {
-        return KeyBuilder.of(config).withKeyspace("config");
+        return KeyBuilder.of(config).sub("config");
     }
 
     @Override
