@@ -1,5 +1,6 @@
 package com.redis.smartcache.jdbc;
 
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,7 +48,7 @@ public class RedisRowSetCache implements RowSetCache {
             } catch (RedisException e) {
                 String message = e.getMessage();
                 if (message != null && message.startsWith(ERROR_OOM)) {
-                    log.log(Level.SEVERE, "Redis server out of memory. Puts disabled until memory is available.", e);
+                    log.log(Level.SEVERE, MessageFormat.format("Redis OOM. Puts disabled for {0} ms.", oomRetryInterval), e);
                     nextOOMCheck = System.currentTimeMillis() + oomRetryInterval;
                 } else {
                     log.log(Level.SEVERE, "Could not put rowset in cache", e);
