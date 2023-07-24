@@ -12,7 +12,7 @@ public class CacheConfig {
 
     public static final DataSize DEFAULT_BUFFER_CAPACITY = DataSize.of(10, Unit.MEGABYTE);
 
-    private static final Duration DEFAULT_OOM_RETRY_INTERVAL = new Duration(10, TimeUnit.SECONDS);
+    private static final Duration DEFAULT_OOM_RETRY_INTERVAL = new Duration(1, TimeUnit.MINUTES);
 
     private DataSize codecBufferCapacity = DEFAULT_BUFFER_CAPACITY;
 
