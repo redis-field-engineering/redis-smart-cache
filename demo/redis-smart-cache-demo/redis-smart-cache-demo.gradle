@@ -15,14 +15,6 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
-publishing {
-  publications {
-    bootJava(MavenPublication) {
-      artifact bootJar
-    }
-  }
-}
-
 tasks.bootJar.dependsOn ':redis-smart-cache-jdbc:shadowJar'
 
 bootJar {
