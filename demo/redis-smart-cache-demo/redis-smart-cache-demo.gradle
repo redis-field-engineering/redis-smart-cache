@@ -40,3 +40,9 @@ asciidoctor {
     'project-name': project.name,
     'project-title': config.info.description
 }
+
+config {
+    publishing {
+        enabled = false
+    }
+}
