@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionFactory;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -35,6 +36,14 @@ class ConfigTests {
     @Container
     private final RedisStackContainer redis = new RedisStackContainer(
             RedisStackContainer.DEFAULT_IMAGE_NAME.withTag(RedisStackContainer.DEFAULT_TAG));
+
+    @BeforeEach
+    void flushAll() {
+        try (RedisModulesClient client = RedisModulesClient.create(redis.getRedisURI());
+                StatefulRedisModulesConnection<String, String> connection = client.connect()) {
+            connection.sync().flushall();
+        }
+    }
 
     @Test
     void keyBuilder() {
