@@ -13,10 +13,10 @@ project:
   authors:
     - Julien Ruaux
   license: MIT
-  inceptionYear: 2022
+  inceptionYear: '2022'
   java:
     groupId: com.redis
-    version: 17
+    version: '17'
     multiProject: true
   tags:
     - 'redis'
@@ -65,8 +65,9 @@ deploy:
       version: 1.7.0
     nexus2:
       maven-central:
-        active: RELEASE
+        active: ALWAYS
         url: https://s01.oss.sonatype.org/service/local
+        snapshotUrl: https://s01.oss.sonatype.org/content/repositories/snapshots/
         closeRepository: true
         releaseRepository: true
         stagingRepositories:
@@ -113,5 +114,5 @@ files:
   artifacts:
     - path: VERSION
       extraProperties:
-        skipChecksum: true
-        skipSigning: true
+        skipChecksum: 'true'
+        skipSigning: 'true'
