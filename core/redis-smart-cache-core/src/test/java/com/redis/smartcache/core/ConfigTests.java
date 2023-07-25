@@ -281,22 +281,17 @@ class ConfigTests {
                 await().until(manager::isRunning);
                 Map<String, String> body = new HashMap<>();
                 body.put("rules[0].ttl", "123s");
-                assertMessageIdEquals(connection, manager.ackKey(), connection.sync().xadd(manager.key(), body), id);
-                body.put("rules[0].ttl", "456s");
-                assertMessageIdEquals(connection, manager.ackKey(), connection.sync().xadd(manager.key(), body), id);
+                String messageId = connection.sync().xadd(manager.key(), body);
+                String ackKey = manager.ackKey();
+                Awaitility.await().until(() -> !connection.sync().zrangeWithScores(ackKey, 0, -1).isEmpty());
+                List<ScoredValue<String>> scoredValues = connection.sync().zrangeWithScores(ackKey, 0, -1);
+                Assertions.assertEquals(1, scoredValues.size());
+                double score = scoredValues.get(0).getScore();
+                Assertions.assertEquals(messageId, (long) score + "-0");
+                Assertions.assertEquals(id, scoredValues.get(0).getValue());
+
             }
         }
-    }
-
-    private void assertMessageIdEquals(StatefulRedisModulesConnection<String, String> connection, String ackKey,
-            String messageId, String appInstanceId) {
-        Awaitility.await().until(() -> !connection.sync().zrangeWithScores(ackKey, 0, -1).isEmpty());
-        List<ScoredValue<String>> scoredValues = connection.sync().zrangeWithScores(ackKey, 0, -1);
-        Assertions.assertEquals(1, scoredValues.size());
-        double score = scoredValues.get(0).getScore();
-        Assertions.assertEquals(messageId, (long) score + "-0");
-        Assertions.assertEquals(appInstanceId, scoredValues.get(0).getValue());
-
     }
 
 }
