@@ -27,11 +27,11 @@ import java.util.stream.Collectors;
 public class Commands extends AbstractShellComponent {
     final String LIST_APPLICATION_QUERIES = "List application queries";
     final String CREATE_RULE = "Create query caching rule";
-    final String LIST_TABLES = "List Tables";
-    final String LIST_RULES = "List Rules";
+    final String LIST_TABLES = "List database tables";
+    final String LIST_RULES = "List query caching rules";
     final String EXIT = "Exit";
 
-    final String tableInstructions = "press 'enter' to edit\npress 'c' to commit\npress 'esc' to go back\npress ctrl+c to exit\n";
+    final String tableInstructions = "Press [ENTER] to edit\nPress 'c' to commit\nPress [ESC] to go back\nPress [CTRL-C] to exit\n\n";
 
     @Autowired
     private ComponentFlow.Builder componentFlowBuilder;
@@ -70,7 +70,7 @@ public class Commands extends AbstractShellComponent {
                 prompt = String.format("%s%nEnter a TTL in the form of a duration (e.g. 1h, 300s, 5m)",message);
             }
 
-            prompt += displayError?" - Invalidly formatted duration, please try again:" : ":";
+            prompt += displayError?" - Duration must be specified as a number plus the unit (e.g., 1h, 300s, 5m). Please try again:" : ":";
 
             StringInputExtension stringInputComponent = new StringInputExtension(getTerminal(), prompt,"30m");
             stringInputComponent.setResourceLoader(getResourceLoader());
@@ -277,7 +277,7 @@ public class Commands extends AbstractShellComponent {
 
     public void ruleTable(RedisService client){
         List<RuleInfo> rules = client.getRules().stream().map(x->new RuleInfo(x, RuleInfo.Status.Current)).collect(Collectors.toList());
-        String instructions = "Press 'enter' to edit an existing rule\nPress 'n' to create a new rule\nPress 'd' to delete a rule\nPress 'c' to commit\nPress 'esc' to go back\nPress ctrl+c to exit\n";
+        String instructions = "Press [ENTER] to edit an existing rule\nPress 'n' to create a new rule\nPress 'd' to delete a rule\nPress 'c' to commit a pending rule to the live configuration\nPress [ESC] to go back\nPress [CTRL-C] to exit\n";
         int cursorRow = 0;
 
         TableSelector.SingleItemSelectorContext<RuleInfo, SelectorItem<RuleInfo>> context = TableSelector.SingleItemSelectorContext.empty(3, instructions);
@@ -348,7 +348,7 @@ public class Commands extends AbstractShellComponent {
     }
 
     public void tablesTable(RedisService client){
-        String instructions = "press 'enter' to edit\npress 'esc' to go back\npress ctrl+c to exit\n";
+        String instructions = "Press [ENTER] to edit\npress [ESC] to go back\npress [CTRL-C] to exit\n";
         int cursorRow = 0;
         TableSelector.SingleItemSelectorContext<TableInfo, SelectorItem<TableInfo>> context = TableSelector.SingleItemSelectorContext.empty(4, instructions);
         while(true){
@@ -426,7 +426,7 @@ public class Commands extends AbstractShellComponent {
                 Optional<Boolean> confirmed = Optional.empty();
                 while(!confirmed.isPresent()){
 
-                    String prompt = "Confirm pending updates y/n";
+                    String prompt = "Confirm pending updates (y/N)";
                     StringInput stringInputComponent = new StringInput(getTerminal(), prompt,"n");
                     stringInputComponent.setResourceLoader(getResourceLoader());
                     stringInputComponent.setTemplateExecutor(getTemplateExecutor());

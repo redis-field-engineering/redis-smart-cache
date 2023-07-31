@@ -42,7 +42,7 @@ public class TableInfo implements RowInfo {
                 "|" +
                 Util.center("Avg Query Time", colWidth) +
                 "|" +
-                Util.center("Access Frequency", colWidth) +
+                Util.center("Access Count", colWidth) +
                 "|";
     }
 
