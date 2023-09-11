@@ -1,16 +1,16 @@
 package com.redis.smartcache.core;
 
+import com.redis.lettucemod.RedisModulesClient;
+import com.redis.lettucemod.cluster.RedisModulesClusterClient;
+import com.redis.smartcache.core.config.RedisConfig;
+import io.lettuce.core.AbstractRedisClient;
+import io.lettuce.core.RedisURI;
+import org.springframework.util.StringUtils;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.redis.lettucemod.util.ClientBuilder;
-import com.redis.lettucemod.util.RedisURIBuilder;
-import com.redis.smartcache.core.config.RedisConfig;
-
-import io.lettuce.core.AbstractRedisClient;
-import io.lettuce.core.RedisURI;
 
 public class ClientManager implements AutoCloseable {
 
@@ -23,18 +23,33 @@ public class ClientManager implements AutoCloseable {
     }
 
     private AbstractRedisClient createClient(RedisConfig config) {
-        RedisURI redisURI = redisURI(config);
+        RedisURI redisURI = buildRedisURI(config);
         log.log(Level.FINE, "Creating Redis client with URI {0}", redisURI);
-        return ClientBuilder.create(redisURI).cluster(config.isCluster()).build();
+        if(config.isCluster()){
+            return RedisModulesClusterClient.create(redisURI);
+        }
+        else{
+            return RedisModulesClient.create(redisURI);
+        }
     }
 
-    private RedisURI redisURI(RedisConfig config) {
-        RedisURIBuilder builder = RedisURIBuilder.create();
-        builder.uri(config.getUri());
-        builder.username(config.getUsername());
-        builder.password(config.getPassword());
-        builder.ssl(config.isTls());
-        builder.sslVerifyMode(config.getTlsVerify());
+    private RedisURI buildRedisURI(RedisConfig config){
+        RedisURI startingUri = RedisURI.create(config.getUri());
+
+        RedisURI.Builder builder = RedisURI.builder(startingUri);
+
+        if(StringUtils.hasLength(config.getUsername()) && config.getPassword() != null && config.getPassword().length > 0){
+            builder.withAuthentication(config.getUsername(), config.getPassword());
+        }
+        else if(config.getPassword() != null && config.getPassword().length > 0){
+            builder.withPassword(config.getPassword());
+        }
+
+        if(config.isTls()){
+            builder.withSsl(config.isTls());
+            builder.withVerifyPeer(config.getTlsVerify());
+        }
+
         return builder.build();
     }
 
