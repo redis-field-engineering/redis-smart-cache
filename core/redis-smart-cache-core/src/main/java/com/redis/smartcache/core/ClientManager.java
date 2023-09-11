@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import com.redis.lettucemod.RedisModulesClient;
@@ -36,7 +37,7 @@ public class ClientManager implements AutoCloseable {
 
     private RedisURI redisURI(RedisConfig config) {
         RedisURI.Builder builder = RedisURI.builder(RedisURI.create(config.getUri()));
-        if (config.getPassword() != null && config.getPassword().length > 0) {
+        if (!ObjectUtils.isEmpty(config.getPassword())) {
             if (StringUtils.hasLength(config.getUsername())) {
                 builder.withAuthentication(config.getUsername(), config.getPassword());
             } else {
