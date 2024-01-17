@@ -51,3 +51,13 @@ jmhJar {
 compileJava {
     options.release = 8
 }
+
+afterEvaluate {
+    def shadowJar = project.tasks.findByName('shadowJar')
+    def publishTask = project.tasks.findByName('publishMainPublicationToMavenLocal')
+    if (publishTask && shadowJar) publishTask.dependsOn(shadowJar)
+    publishTask = tasks.findByName('publishMainPublicationToLocalSnapshotRepository')
+    if (publishTask && shadowJar) publishTask.dependsOn(shadowJar)
+    publishTask = tasks.findByName('publishMainPublicationToLocalReleaseRepository')
+    if (publishTask && shadowJar) publishTask.dependsOn(shadowJar)
+}
