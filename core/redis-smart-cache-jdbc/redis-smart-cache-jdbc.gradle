@@ -12,7 +12,6 @@ dependencies {
     testImplementation 'com.mysql:mysql-connector-j'
     testImplementation group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: mssqlVersion
     testImplementation group: 'com.ibm.db2', name: 'jcc', version: db2Version    
-    testImplementation group: 'com.redis.testcontainers', name: 'testcontainers-redis-junit', version: testcontainersRedisVersion
     testImplementation group: 'org.testcontainers', name: 'postgresql', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'oracle-xe', version: testcontainersVersion
     testImplementation group: 'org.testcontainers', name: 'mssqlserver', version: testcontainersVersion
@@ -32,16 +31,9 @@ jar.finalizedBy shadowJar
 
 shadowJar {
    archiveClassifier = ''
+   enableRelocation = true
+   relocationPrefix = "com.redis.smartcache.shaded"
 }
-
-import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
-
-task relocateShadowJar(type: ConfigureShadowRelocation) {
-    target = tasks.shadowJar
-    prefix = "com.redis.smartcache.shaded"
-}
-
-tasks.shadowJar.dependsOn tasks.relocateShadowJar
 
 jmh {
     fork = 1

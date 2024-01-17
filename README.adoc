@@ -7,7 +7,7 @@
 :product-name:    Redis Smart Cache
 :artifact-id:     redis-smart-cache-jdbc
 :property-prefix: smartcache
-:grafana-dir:     demo/redis-smart-cache-demo/grafana
+:grafana-dir:     samples/redis-smart-cache-demo/grafana
 :imagesdir:       src/media
 :toc:
 :toc-title:

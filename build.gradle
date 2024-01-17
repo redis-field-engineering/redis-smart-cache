@@ -35,14 +35,7 @@ config {
     
     docs {
         javadoc {
-            options {
-                autoLinks {
-                    enabled = false
-                }
-            }
-            aggregate {
-                enabled = false
-            }
+            enabled = false
         }
     }
 
@@ -95,12 +88,18 @@ subprojects {
     }
     
     dependencies {
-        testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+        testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api'
+        testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params'
+        testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine'
+        testImplementation group: 'org.junit.platform', name: 'junit-platform-launcher'
+        testImplementation group: 'org.testcontainers', name: 'junit-jupiter', version: testcontainersVersion
+        testImplementation(group: 'com.redis', name: 'testcontainers-redis', version: testcontainersRedisVersion) {
+            exclude group: 'com.redis', module: 'lettucemod'
+        }
     }
     
     test {
         useJUnitPlatform()
-        maxHeapSize = "1g" // maximum heap size
     }
     
     configurations.all {

@@ -33,3 +33,10 @@ services:
     container_name: redis-server-with-cache-cli
     ports:
       - 6379:6379
+      
+  redis-cache:
+    image: redis:7.0.12
+    hostname: redis-cache
+    container_name: redis-cache
+    ports:
+      - 6380:6379

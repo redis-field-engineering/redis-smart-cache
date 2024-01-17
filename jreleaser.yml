@@ -85,7 +85,7 @@ distributions:
   redis-smart-cache-demo:
     type: SINGLE_JAR
     artifacts:
-      - path: 'demo/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar'
+      - path: 'samples/{{distributionName}}/build/libs/{{distributionName}}-{{projectVersion}}.jar'
         transform: '{{distributionName}}/{{distributionName}}-{{projectEffectiveVersion}}.jar'
     executable:
       name: 'redis-smart-cache-demo-launcher'
