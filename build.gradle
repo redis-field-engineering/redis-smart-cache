@@ -35,7 +35,14 @@ config {
     
     docs {
         javadoc {
-            enabled = false
+            options {
+                autoLinks {
+                    enabled = false
+                }
+            }
+            aggregate {
+                enabled = false
+            }
         }
     }
 
