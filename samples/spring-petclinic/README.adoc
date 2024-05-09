@@ -1,90 +1,30 @@
 = Spring PetClinic Sample Application
 
+This sample is using the https://github.com/spring-projects/spring-petclinic[Spring Petclinic] application to demonstrate using Redis Smart Cache in a Spring JPA application.
+
 == Run Petclinic locally
 
-Spring Petclinic is a https://spring.io/guides/gs/spring-boot[Spring
-Boot] application built using https://spring.io/guides/gs/gradle/[Gradle].
-You can build a jar file and run it from the command line (it should work just as well with Java 17 or newer):
+1. Build the app
 
 [source,bash]
 ----
-./gradlew build
-java -jar build/libs/*.jar
+git clone https://github.com/redis-field-engineering/redis-smart-cache
+cd redis-smart-cache
+./gradlew :spring-petclinic:build
+----
+
+2. Start the database and Redis services
+
+[source,bash]
+----
+docker compose -f samples/spring-petclinic/docker-compose.yml --profile mysql up
+----
+
+3. Start the app
+
+[source,bash]
+----
+java -jar samples/spring-petclinic/build/libs/*.jar --spring.profiles.active=mysql
 ----
 
 You can then access the Petclinic at http://localhost:8080/.
-
-Or you can run it from Gradle directly using the Spring Boot Gradle
-plugin. If you do this, it will pick up changes that you make in the
-project immediately (changes to Java source files require a compile as
-well - most people use an IDE for this):
-
-[source,bash]
-----
-./gradlew bootRun
-----
-
-== Database configuration
-
-A setup is provided for MySQL. 
-
-You can start MySQL locally with whatever installer works for your OS or use docker:
-
-[source,bash]
-----
-docker run -e MYSQL_USER=petclinic -e MYSQL_PASSWORD=petclinic -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=petclinic -p 3306:3306 mysql:8.2
-----
-
-Further documentation is provided for https://github.com/spring-projects/spring-petclinic/blob/main/src/main/resources/db/mysql/petclinic_db_setup_mysql.txt[MySQL].
-
-== Working with Petclinic in your IDE
-
-=== Prerequisites
-
-The following items should be installed in your system:
-
-* Java 17 or newer (full JDK, not a JRE)
-* https://help.github.com/articles/set-up-git[Git command line tool]
-* Your preferred IDE
-** Eclipse with the m2e plugin. Note: when m2e is available, there is an
-m2 icon in `Help -> About` dialog. If m2e is not there, follow the
-install process https://www.eclipse.org/m2e/[here]
-** https://spring.io/tools[Spring Tools Suite] (STS)
-** https://www.jetbrains.com/idea/[IntelliJ IDEA]
-** https://code.visualstudio.com[VS Code]
-
-=== Steps
-
-[arabic]
-. On the command line run:
-+
-[source,bash]
-----
-git clone https://github.com/spring-projects/spring-petclinic.git
-----
-. Inside Eclipse or STS:
-+
-Open the project via
-`File -> Import -> Maven -> Existing Maven project`, then select the
-root directory of the cloned repo.
-+
-Then either build on the command line `./mvnw generate-resources` or use
-the Eclipse launcher (right-click on project and
-`Run As -> Maven install`) to generate the CSS. Run the application’s
-main method by right-clicking on it and choosing
-`Run As -> Java Application`.
-. Inside IntelliJ IDEA:
-+
-In the main menu, choose `File -> Open` and select the Petclinic
-pom.xml. Click on the `Open` button.
-* CSS files are generated from the Maven build. You can build them on
-the command line `./mvnw generate-resources` or right-click on the
-`spring-petclinic` project then
-`Maven -> Generates sources and Update Folders`.
-* A run configuration named `PetClinicApplication` should have been
-created for you if you’re using a recent Ultimate version. Otherwise,
-run the application by right-clicking on the `PetClinicApplication` main
-class and choosing `Run 'PetClinicApplication'`.
-. Navigate to the Petclinic
-+
-Visit http://localhost:8080 in your browser.
