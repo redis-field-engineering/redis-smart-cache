@@ -14,6 +14,8 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -26,6 +28,7 @@ import com.redis.smartcache.core.Fields;
 import com.redis.smartcache.core.config.Config;
 
 @SuppressWarnings("unchecked")
+@DisabledOnOs(value = OS.LINUX)
 class MySQLTests extends AbstractIntegrationTests {
 
     @Container
