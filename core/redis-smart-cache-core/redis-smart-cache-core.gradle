@@ -5,7 +5,7 @@ dependencies {
     implementation group: 'io.airlift', name: 'units', version: airliftVersion
     implementation 'io.micrometer:micrometer-registry-jmx'
     implementation group: 'com.redis', name: 'micrometer-registry-redis', version: micrometerRedisVersion
-    testImplementation group: 'org.awaitility', name: 'awaitility', version: awaitilityVersion
+    testImplementation 'org.awaitility:awaitility'
 }
 
 bootJar {

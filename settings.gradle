@@ -9,7 +9,7 @@ buildscript {
         classpath "org.kordamp.gradle:jacoco-gradle-plugin:$kordampPluginVersion"
         classpath "org.kordamp.gradle:kordamp-parentbuild:$kordampBuildVersion"
         classpath "org.springframework.boot:spring-boot-gradle-plugin:$bootPluginVersion"
-        classpath "com.github.johnrengelman:shadow:$shadowPluginVersion"
+        classpath "io.github.goooler.shadow:shadow-gradle-plugin:$shadowPluginVersion"
         classpath "me.champeau.jmh:jmh-gradle-plugin:$jmhPluginVersion"
         classpath "org.asciidoctor:asciidoctor-gradle-jvm:$asciidoctorVersion"
     }
@@ -36,7 +36,7 @@ projects {
             id 'org.asciidoctor.jvm.convert'
         }
         path(':redis-smart-cache-jdbc') {
-            id 'com.github.johnrengelman.shadow'
+            id 'io.github.goooler.shadow'
             id 'me.champeau.jmh'
         }
         path('redis-smart-cache-cli') {
@@ -53,7 +53,6 @@ enforce {
     }
     rule(enforcer.rules.ForceDependencies) { r ->
         r.dependencies.addAll "org.checkerframework:checker-qual:$checkerVersion",
-            "org.testcontainers:testcontainers:$testcontainersVersion",
             "com.redis:lettucemod:$lettucemodVersion",
             "com.google.errorprone:error_prone_annotations:$errorproneVersion"
     }
