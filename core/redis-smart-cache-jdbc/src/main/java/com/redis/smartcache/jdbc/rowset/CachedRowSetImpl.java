@@ -319,6 +319,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
      * The list that will hold the Match Column names.
      */
     private List<String> strMatchColumns;
+    
+    private boolean closed;
 
     /**
      * Constructs a new default <code>CachedRowSetImpl</code> object with the capacity to hold 100 rows. This new object has no
@@ -1318,6 +1320,8 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
 
         // clear the vector of it's present contents
         rvh.clear();
+        
+        closed = true;
 
     }
 
@@ -5892,7 +5896,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
      * @since 1.6
      */
     public boolean isClosed() throws SQLException {
-        throw new SQLFeatureNotSupportedException(MESSAGE_OPERATION_NOT_YET_SUPPORTED);
+        return closed;
     }
 
     /**
@@ -6691,7 +6695,7 @@ public class CachedRowSetImpl extends BaseRowSet implements RowSet, RowSetIntern
      */
     @Override
     public void updateBinaryStream(String columnLabel, InputStream x, long length) throws SQLException {
-        // ignore
+    	throw new SQLFeatureNotSupportedException(MESSAGE_FEATURE_NOT_SUPPORTED);
     }
 
     /**
