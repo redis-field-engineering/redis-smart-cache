@@ -51,6 +51,9 @@ enforce {
         r.configurations.addAll(['compileClasspath', 'runtimeClasspath'])
         r.enabled = false
     }
+    rule(enforcer.rules.EnforceBytecodeVersion) { r ->
+        r.enabled = false
+    }
     rule(enforcer.rules.ForceDependencies) { r ->
         r.dependencies.addAll "org.checkerframework:checker-qual:$checkerVersion",
             "com.redis:lettucemod:$lettucemodVersion",
