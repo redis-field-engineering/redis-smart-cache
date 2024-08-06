@@ -2,7 +2,7 @@
 :project-owner:   redis-field-engineering
 :project-name:    redis-smart-cache
 :project-group:   com.redis
-:project-version:    0.3.2
+:project-version:    0.3.3
 :project-url:     https://github.com/{project-owner}/{project-name}
 :product-name:    Redis Smart Cache
 :artifact-id:     redis-smart-cache-jdbc
