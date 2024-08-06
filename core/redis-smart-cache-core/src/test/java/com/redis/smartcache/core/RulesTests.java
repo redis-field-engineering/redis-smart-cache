@@ -1,12 +1,16 @@
 package com.redis.smartcache.core;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.redis.smartcache.core.config.RulesetConfig;
 
 import io.airlift.units.Duration;
@@ -105,6 +109,27 @@ class RulesTests {
         query.setSql(sql);
         query.setTables(new HashSet<>(Arrays.asList(tables)));
         return query;
+    }
+    
+    @Test
+    void configMapper() throws IOException {
+        JavaPropsMapper mapper = Mappers.propsMapper();
+        Map<String, String> properties = new HashMap<>();
+        properties.put("rules.1.tables.1", "customer");
+        properties.put("rules.1.ttl", "1.00h");
+        properties.put("rules.2.regex", "SELECT \\* FROM customers");
+        properties.put("rules.2.ttl", "30.00m");
+        properties.put("rules.3.ttl", "10.00s");
+        properties.put("rules.4.query-ids.1", "ab324499");
+        properties.put("rules.4.ttl", "10.00s");
+        RulesetConfig conf = new RulesetConfig();
+        RuleConfig rule1 = RuleConfig.tables("customer").ttl(Duration.valueOf("1h")).build();
+        RuleConfig rule2 = RuleConfig.regex("SELECT \\* FROM customers").ttl(Duration.valueOf("30m")).build();
+        RuleConfig rule3 = RuleConfig.passthrough().ttl(Duration.valueOf("10s")).build();
+        RuleConfig rule4 = RuleConfig.queryIds("ab324499").ttl(Duration.valueOf("10s")).build();
+        conf.setRules(rule1, rule2, rule3, rule4);
+        Assertions.assertEquals(conf, mapper.readMapAs(properties, RulesetConfig.class));
+        Assertions.assertEquals(properties, mapper.writeValueAsMap(conf));
     }
 
 }
